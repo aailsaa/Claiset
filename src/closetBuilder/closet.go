@@ -12,7 +12,7 @@ import (
 type Closet struct {
 	library    map[int]Item
 	totalItems int
-	//TODO: outfits
+	outfits    map[int]Outfit
 }
 
 /////CONSTRUCTORS///////////////////////////////////////////////////////////////////////////////////////////
@@ -22,6 +22,7 @@ func CreateCloset() Closet {
 	return Closet{
 		library:    make(map[int]Item),
 		totalItems: 0,
+		outfits:    make(map[int]Outfit),
 	}
 }
 
