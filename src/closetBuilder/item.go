@@ -306,16 +306,27 @@ func (e *ExtraInfo) SetWears(w int) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 func (o Item) String() string {
-	return o.necessary.String()
+	return o.necessary.String() + o.extra.String() + o.relationships.String()
 }
 
 func (n NecessaryInfo) String() string {
-	nString := "item ID:\t\t" + strconv.Itoa(n.itemID) + "\n" +
+	return "item ID:\t\t" + strconv.Itoa(n.itemID) + "\n" +
 		"item name:\t\t" + n.itemName + "\n" +
 		"item colors:\t\t" + strings.Join(StringColors(n.itemColors), ", ") + "\n" +
 		"item category:\t\t" + n.itemCategory.String() + "\n" +
 		"item subcategory:\t" + n.itemSubcategory.String() + "\n"
-	return nString
+}
+
+func (e ExtraInfo) String() string {
+	eString := "item date:\t\t"
+	if e.itemDate.Equal(EMPTYDATE) {
+		eString += "NONE\n"
+	} else {
+		eString += e.itemDate.Format("01-02-2006") + "\n"
+	}
+	eString += "item price:\t\t$" + strconv.FormatFloat(float64(e.itemPrice), 'f', 2, 32) + "\n" +
+		"item wears:\t\t" + strconv.Itoa(e.itemWears) + "\n"
+	return eString
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////

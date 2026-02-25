@@ -358,19 +358,19 @@ func (r ItemRelationships) String() string {
 	if len(r.connections) == 0 {
 		sb.WriteString("No connections\n")
 	} else {
-		sb.WriteString(r.connections.String() + "\n")
+		sb.WriteString(r.connections.String())
 	}
 
 	if len(r.outfitsByItems) == 0 {
 		sb.WriteString("No outfits by item\n")
 	} else {
-		sb.WriteString(r.outfitsByItems.String() + "\n")
+		sb.WriteString(r.outfitsByItems.String())
 	}
 
 	if len(r.allOutfits) == 0 {
 		sb.WriteString("No outfits with item " + strconv.Itoa(r.itemID) + "\n")
 	} else {
-		sb.WriteString(r.allOutfits.String() + "\n")
+		sb.WriteString(r.allOutfits.String())
 	}
 
 	return sb.String()
