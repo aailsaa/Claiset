@@ -9,6 +9,7 @@ import (
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 type Outfit struct {
+	name     string
 	items    []Item
 	wears    int
 	outfitID int
@@ -22,6 +23,7 @@ type Outfit struct {
 
 func CreateOutfit(items []Item) Outfit {
 	return Outfit{
+		name:     "Unnamed Outfit",
 		items:    h.RemoveCustomDuplicates(items),
 		wears:    0,
 		outfitID: -1,
