@@ -9,10 +9,10 @@ import (
 //// CONSTS ////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-const BADCONNECTION = -10
-const NEUTRALCONNECTION = 0
-const PERFECTCONNECTION = 10
-const NOCONNECTION = -11
+const BADCONNECTION = float32(-10)
+const NEUTRALCONNECTION = float32(0)
+const PERFECTCONNECTION = float32(10)
+const NOCONNECTION = float32(-11)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //// TYPES /////////////////////////////////////////////////////////////////////////////////////////////////
@@ -45,7 +45,7 @@ type AllOutfitsMap map[int]*Outfit
 /////// ITEM RELATIONSHIPS CONSTRUCTORS ////////////////////////////////////////////////////////////////////
 
 // ItemRelationships constructor: creates empty connections and outfits maps for given itemID
-func createItemRelationships(itemID int) ItemRelationships {
+func CreateItemRelationships(itemID int) ItemRelationships {
 	return ItemRelationships{
 		itemID:         itemID,
 		connections:    make(ConnectionsMap),
@@ -70,6 +70,7 @@ func createEmptyRelationships() ItemRelationships {
 
 //// All getters: gets whole map ///////////////////////////////////////////////////////////////////////////
 
+func (r ItemRelationships) GetItemID() int                          { return r.itemID }
 func (r ItemRelationships) GetAllConnections() ConnectionsMap       { return r.connections }
 func (r ItemRelationships) GetAllOutfitsByItems() OutfitsByItemsMap { return r.outfitsByItems }
 func (r ItemRelationships) GetAllOutfits() AllOutfitsMap            { return r.allOutfits }
@@ -385,7 +386,7 @@ func (c ConnectionsMap) String() string {
 	sb.WriteString("Connections:\n")
 	counter := 1
 	for itemID, strength := range c {
-		sb.WriteString(strconv.Itoa(counter) + ". Item " + strconv.Itoa(itemID) + ": " +
+		sb.WriteString("\t" + strconv.Itoa(counter) + ". Item " + strconv.Itoa(itemID) + ": " +
 			strconv.FormatFloat(float64(strength), 'f', 2, 32) + "\n")
 		counter++
 	}
