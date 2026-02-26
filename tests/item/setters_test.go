@@ -2,6 +2,7 @@ package tests
 
 import (
 	cb "OnlineCloset/src/closetBuilder"
+	testPkg "OnlineCloset/tests"
 	"reflect"
 	"testing"
 	"time"
@@ -24,9 +25,15 @@ func TestSetName(t *testing.T) {
 		currItem := cb.CreateItem(DEFAULT_NAME, []cb.Color{cb.RED}, cb.TOP, cb.BLOUSE, 0)
 		currItem.SetName(test.new)
 		if currItem.GetName() != test.expected {
-			t.Errorf("\nTest %d failed: Expected name: %s\nActual: %s", idx, test.expected, currItem.GetName())
+			t.Errorf("\nTest %d failed:", idx)
+			if *testPkg.ExtraVerbose {
+				t.Logf("\nInput: '%s'\nExpected: '%s'\nActual: '%s'", test.new, test.expected, currItem.GetName())
+			}
 		} else {
-			t.Logf("\nTest %d passed: Expected/actual name: %s", idx, currItem.GetName())
+			t.Logf("\nTest %d passed:", idx)
+			if *testPkg.ExtraVerbose {
+				t.Logf("\nInput: '%s'\nExpected/actual: '%s'", test.new, currItem.GetName())
+			}
 		}
 	}
 }

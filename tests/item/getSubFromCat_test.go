@@ -2,6 +2,7 @@ package tests
 
 import (
 	cb "OnlineCloset/src/closetBuilder"
+	testPkg "OnlineCloset/tests"
 	"reflect"
 	"testing"
 )
@@ -43,8 +44,10 @@ func TestGetSubFromCat(t *testing.T) {
 		if reflect.DeepEqual(result, test.expected) {
 			t.Logf("\nTest case %d PASSED", idx)
 		} else {
-			t.Errorf("\nTest case %d FAILED:\nExpected subcategories: %v\n"+ //
-				"Actual subcategories: %v", idx, test.expected, result)
+			t.Errorf("\nTest case %d FAILED:", idx)
+			if *testPkg.ExtraVerbose {
+				t.Logf("\nInput: %s\nExpected: %v\nActual: %v", test.input.String(), test.expected, result)
+			}
 		}
 	}
 }

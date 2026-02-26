@@ -2,6 +2,7 @@ package tests
 
 import (
 	cb "OnlineCloset/src/closetBuilder"
+	testPkg "OnlineCloset/tests"
 	"reflect"
 	"testing"
 )
@@ -31,7 +32,11 @@ func TestAddItem(t *testing.T) {
 		} else {
 			t.Logf("\nTest case %d PASSED", idx)
 		}
-		//t.Logf("\nCurrent closet status:\n%s", testCloset.String())
+
+		if *testPkg.ExtraVerbose {
+			t.Logf("\nCurrent closet status:\n%s", testCloset.String())
+		}
+
 		currentSize += 1
 	}
 }
@@ -83,8 +88,8 @@ func TestAddIntegrity(t *testing.T) {
 				test.inputCategory.String(), addedItem.GetCategory().String(), test.inputSubcategory, addedItem.GetSubcategory())
 		}
 		currentIndex++
-		t.Logf("\nCurrent closet status:\n%s", testCloset.String())
-
+		if *testPkg.ExtraVerbose {
+			t.Logf("\nCurrent closet status:\n%s", testCloset.String())
+		}
 	}
-
 }

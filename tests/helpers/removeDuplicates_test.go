@@ -3,6 +3,7 @@ package tests
 import (
 	cb "OnlineCloset/src/closetBuilder"
 	helpers "OnlineCloset/src/helpers"
+	testPkg "OnlineCloset/tests"
 	"reflect"
 	"testing"
 )
@@ -29,7 +30,10 @@ func TestRemoveDuplicates(t *testing.T) {
 		if reflect.DeepEqual(result, test.expected) {
 			t.Logf("\nTest %d PASSED", idx)
 		} else {
-			t.Logf("\nTest %d FAILED:\nExpected: %v\nActual: %v", idx, cb.StringColors(test.expected), cb.StringColors(result))
+			t.Logf("\nTest %d FAILED:", idx)
+			if *testPkg.ExtraVerbose {
+				t.Logf("\nInput: %v\nExpected: %v\nActual: %v", test.input, test.expected, result)
+			}
 		}
 	}
 }
