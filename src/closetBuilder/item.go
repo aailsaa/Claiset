@@ -78,7 +78,7 @@ func CreateItem(name string, cs []Color, cat Category, subcat Subcategory, id in
 	return &Item{
 		necessary:     *n,
 		extra:         createEmptyExtra(),
-		relationships: createItemRelationships(id),
+		relationships: CreateItemRelationships(id),
 	}
 }
 
@@ -173,19 +173,36 @@ func createEmptyExtra() ExtraInfo {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // // ITEM ACCESSORS ////////////////////////////////////////////////////////////////////////////////////////
-func (o Item) GetName() string                        { return o.necessary.GetName() }
-func (o Item) GetColors() []Color                     { return o.necessary.GetColors() }
-func (o Item) GetCategory() Category                  { return o.necessary.GetCategory() }
-func (o Item) GetSubcategory() Subcategory            { return o.necessary.GetSubcategory() }
-func (o Item) GetID() int                             { return o.necessary.GetID() }
-func (o Item) GetDate() time.Time                     { return o.extra.GetDate() }
-func (o Item) GetPrice() float32                      { return o.extra.GetPrice() }
-func (o Item) GetWears() int                          { return o.extra.GetWears() }
+// accessing necessary info through item
+func (o Item) GetName() string             { return o.necessary.GetName() }
+func (o Item) GetColors() []Color          { return o.necessary.GetColors() }
+func (o Item) GetCategory() Category       { return o.necessary.GetCategory() }
+func (o Item) GetSubcategory() Subcategory { return o.necessary.GetSubcategory() }
+func (o Item) GetID() int                  { return o.necessary.GetID() }
+
+// accessing extra info through item
+func (o Item) GetDate() time.Time { return o.extra.GetDate() }
+func (o Item) GetPrice() float32  { return o.extra.GetPrice() }
+func (o Item) GetWears() int      { return o.extra.GetWears() }
+
+// accessing relationship item:
+// accessing whole relationship maps through item:
 func (o Item) GetAllConnections() ConnectionsMap      { return o.relationships.GetAllConnections() }
 func (o Item) GetAllOutfitsByItem() OutfitsByItemsMap { return o.relationships.GetAllOutfitsByItems() }
 func (o Item) GetAllOutfits() AllOutfitsMap           { return o.relationships.GetAllOutfits() }
 
-// TODO: add getters for specific connections and outfits
+// accessing specific getters:
+func (o Item) GetConnection(itemID int) float32 { return o.relationships.GetConnection(itemID) }
+func (o Item) GetOutfitsByItem(itemID int) map[int]*Outfit {
+	return o.relationships.GetOutfitsByItem(itemID)
+}
+
+// accessing checkers:
+func (o Item) HasConnection(itemID int) bool { return o.relationships.HasConnection(itemID) }
+func (o Item) HasItemInOBI(itemID int) bool  { return o.relationships.HasConnection(itemID) }
+func (o Item) HasOutfitInOBI(itemID int, outfit *Outfit) bool {
+	return o.relationships.HasOutfitInOBI(itemID, outfit)
+}
 
 // // NECESSARYINFO ACCESSORS ///////////////////////////////////////////////////////////////////////////////
 func (n NecessaryInfo) GetName() string             { return n.itemName }
