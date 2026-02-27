@@ -43,11 +43,13 @@ func TestSetColors(t *testing.T) {
 	tests := []struct {
 		new, expected []cb.Color
 	}{
+		// tests that should set colors
 		{[]cb.Color{cb.BLUE}, []cb.Color{cb.BLUE}},
 		{[]cb.Color{cb.RED, cb.BLUE}, []cb.Color{cb.RED, cb.BLUE}},
+		// tests that shouldn't set colors
 		{[]cb.Color{}, DEFAULTCOLORS},
 		{[]cb.Color{cb.COLORERROR}, DEFAULTCOLORS},
-		{[]cb.Color{cb.GREEN, cb.COLORERROR}, []cb.Color{cb.GREEN}},
+		{[]cb.Color{cb.GREEN, cb.COLORERROR}, DEFAULTCOLORS},
 	}
 
 	for idx, test := range tests {
