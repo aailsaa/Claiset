@@ -39,7 +39,7 @@ func CreateItem(name string, cs []Color, cat Category, subcat Subcategory, id in
 
 	return &Item{
 		necessary:     *n,
-		extra:         createEmptyExtra(),
+		extra:         CreateEmptyExtra(),
 		relationships: CreateRelationships(id),
 	}
 }
@@ -48,7 +48,7 @@ func CreateItem(name string, cs []Color, cat Category, subcat Subcategory, id in
 func CreateEmptyItem() Item {
 	return Item{
 		necessary:     createEmptyNecessary(),
-		extra:         createEmptyExtra(),
+		extra:         CreateEmptyExtra(),
 		relationships: createEmptyRelationships(),
 	}
 }
@@ -142,7 +142,28 @@ func (o Item) Equals(other any) bool {
 //// ISVALID ///////////////////////////////////////////////////////////////////////////////////////////////
 
 // IsValidItem: check if item is valid by going through all fields of item
-// TODO
-func IsValidItem(o Item) (bool, error) {
-	return false, nil
+func IsValidItem(o Item) error {
+	errs := []error{}
+
+	nErr := IsValidNecessaryInfo(o.necessary)
+	if nErr != nil {
+		errs = append(errs, nErr)
+	}
+
+	eErr := IsValidExtraInfo(o.extra)
+	if eErr != nil {
+		errs = append(errs, eErr)
+	}
+
+	rErr := IsValidRelationships(o.relationships)
+	if rErr != nil {
+		errs = append(errs, rErr)
+	}
+
+	if len(errs) == 0 {
+		return nil
+	}
+
+	return errors.Join(errs...)
+
 }
