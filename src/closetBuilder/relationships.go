@@ -18,8 +18,8 @@ const NOCONNECTION = float32(-11)
 //// TYPES /////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// ItemRelationships: holds all connections to other items
-type ItemRelationships struct {
+// Relationships: holds all connections to other items
+type Relationships struct {
 	itemID         int               // the item these relationships are for
 	connections    ConnectionsMap    // map of itemID to connection strength
 	outfitsByItems OutfitsByItemsMap // map of other items to outfits with both items
@@ -44,9 +44,9 @@ type AllOutfitsMap map[int]*Outfit
 
 /////// ITEM RELATIONSHIPS CONSTRUCTORS ////////////////////////////////////////////////////////////////////
 
-// ItemRelationships constructor: creates empty connections and outfits maps for given itemID
-func CreateItemRelationships(itemID int) ItemRelationships {
-	return ItemRelationships{
+// Relationships constructor: creates empty connections and outfits maps for given itemID
+func CreateRelationships(itemID int) Relationships {
+	return Relationships{
 		itemID:         itemID,
 		connections:    make(ConnectionsMap),
 		outfitsByItems: make(OutfitsByItemsMap),
@@ -54,9 +54,9 @@ func CreateItemRelationships(itemID int) ItemRelationships {
 	}
 }
 
-// Empty ItemRelationships constructor: creates empty connections and outfits maps
-func createEmptyRelationships() ItemRelationships {
-	return ItemRelationships{
+// Empty Relationships constructor: creates empty connections and outfits maps
+func createEmptyRelationships() Relationships {
+	return Relationships{
 		itemID:         -1,
 		connections:    make(ConnectionsMap),
 		outfitsByItems: make(OutfitsByItemsMap),
@@ -70,15 +70,15 @@ func createEmptyRelationships() ItemRelationships {
 
 //// All getters: gets whole map ///////////////////////////////////////////////////////////////////////////
 
-func (r ItemRelationships) GetItemID() int                          { return r.itemID }
-func (r ItemRelationships) GetAllConnections() ConnectionsMap       { return r.connections }
-func (r ItemRelationships) GetAllOutfitsByItems() OutfitsByItemsMap { return r.outfitsByItems }
-func (r ItemRelationships) GetAllOutfits() AllOutfitsMap            { return r.allOutfits }
+func (r Relationships) GetItemID() int                          { return r.itemID }
+func (r Relationships) GetAllConnections() ConnectionsMap       { return r.connections }
+func (r Relationships) GetAllOutfitsByItems() OutfitsByItemsMap { return r.outfitsByItems }
+func (r Relationships) GetAllOutfits() AllOutfitsMap            { return r.allOutfits }
 
 //// Specific getters: returns connection/outfit given an item /////////////////////////////////////////////
 
 // GetConnection: returns connection strength for other item if it exists
-func (r ItemRelationships) GetConnection(otherID int) float32 {
+func (r Relationships) GetConnection(otherID int) float32 {
 	strength, exists := r.connections[otherID]
 	if !exists {
 		return NOCONNECTION
@@ -87,7 +87,7 @@ func (r ItemRelationships) GetConnection(otherID int) float32 {
 }
 
 // GetOutfitsByItem: returns map of outfits for other item if it exists
-func (r ItemRelationships) GetOutfitsByItem(otherID int) map[int]*Outfit {
+func (r Relationships) GetOutfitsByItem(otherID int) map[int]*Outfit {
 	outfits, exists := r.outfitsByItems[otherID]
 	if !exists {
 		return nil
@@ -98,19 +98,19 @@ func (r ItemRelationships) GetOutfitsByItem(otherID int) map[int]*Outfit {
 //// Relationship checkers: checks if there are any connections or outfits for the item ///////////////////
 
 // HasConnection: checks for an item in the connections map
-func (r ItemRelationships) HasConnection(otherID int) bool {
+func (r Relationships) HasConnection(otherID int) bool {
 	_, exists := r.connections[otherID]
 	return exists
 }
 
 // HasItemInOBI: checks for an item in the outfitByItem map
-func (r ItemRelationships) HasItemInOBI(otherID int) bool {
+func (r Relationships) HasItemInOBI(otherID int) bool {
 	_, exists := r.outfitsByItems[otherID]
 	return exists
 }
 
 // HasOutfitInOBI: checks for an outfit in the outfitByItem map for a given item
-func (r ItemRelationships) HasOutfitInOBI(otherID int, outfit *Outfit) bool {
+func (r Relationships) HasOutfitInOBI(otherID int, outfit *Outfit) bool {
 	_, exists := r.outfitsByItems[otherID]
 	if !exists {
 		return false
@@ -128,7 +128,7 @@ func (r ItemRelationships) HasOutfitInOBI(otherID int, outfit *Outfit) bool {
 //// connection add ////////////////////////////////////////////////////////////////////////////////////////
 
 // AddConnection: creates a new connection with other item and given strength
-func (r *ItemRelationships) AddConnection(other Item, strength float32) {
+func (r *Relationships) AddConnection(other Item, strength float32) {
 	// if strength is invalid, returns without creating connection
 	if strength < BADCONNECTION || strength > PERFECTCONNECTION {
 		return
@@ -158,14 +158,14 @@ func (r *ItemRelationships) AddConnection(other Item, strength float32) {
 
 // reciprocalAdd: adds a connection to the item relationships without checking for validity
 // used for adding the other side of a connection in AddConnection
-func (r *ItemRelationships) reciprocalAdd(otherID int, strength float32) {
+func (r *Relationships) reciprocalAdd(otherID int, strength float32) {
 	r.connections[otherID] = strength
 }
 
 //// connection set ////////////////////////////////////////////////////////////////////////////////////////
 
 // SetConnection: updates connection strength for other item if connection exists
-func (r *ItemRelationships) SetConnection(other Item, strength float32) {
+func (r *Relationships) SetConnection(other Item, strength float32) {
 	// if strength is invalid, returns without updating connection
 	if strength < BADCONNECTION || strength > PERFECTCONNECTION {
 		return
@@ -194,14 +194,14 @@ func (r *ItemRelationships) SetConnection(other Item, strength float32) {
 
 // reciprocalSet: sets a connection to the item relationships without checking for validity
 // used for setting the other side of a connection in SetConnection
-func (r *ItemRelationships) reciprocalSet(otherID int, strength float32) {
+func (r *Relationships) reciprocalSet(otherID int, strength float32) {
 	r.connections[otherID] = strength
 }
 
 //// connection remove /////////////////////////////////////////////////////////////////////////////////////
 
 // RemoveConnection: removes connection with other item if it exists
-func (r *ItemRelationships) RemoveConnection(other Item) {
+func (r *Relationships) RemoveConnection(other Item) {
 	// if connection doesn't exist, returns without removing connection
 	otherID := other.GetID()
 	_, exists := r.connections[otherID]
@@ -222,14 +222,14 @@ func (r *ItemRelationships) RemoveConnection(other Item) {
 
 // reciprocalRemove: removes a connection to the item relationships without checking for validity
 // used for removing the other side of a connection in RemoveConnection
-func (r *ItemRelationships) reciprocalRemove(otherID int) {
+func (r *Relationships) reciprocalRemove(otherID int) {
 	delete(r.connections, otherID)
 }
 
 //// OUTFITS BY ITEMS MUTATORS /////////////////////////////////////////////////////////////////////////////
 
 // AddOutfitByItem: adds outfit to outfitByItem map for all items in the outfit
-func (r *ItemRelationships) AddOutfitByItem(outfit *Outfit) {
+func (r *Relationships) AddOutfitByItem(outfit *Outfit) {
 	// first checks that self item is in outfit: if not, returns without adding outfit to map
 	found := false
 	outfitItems := outfit.GetItems()
@@ -272,7 +272,7 @@ func (r *ItemRelationships) AddOutfitByItem(outfit *Outfit) {
 }
 
 // RemoveOutfitByItem: removes outfit from outfitByItem map for all items in the outfit
-func (r *ItemRelationships) RemoveOutfitByItem(outfit *Outfit) {
+func (r *Relationships) RemoveOutfitByItem(outfit *Outfit) {
 	// first checks if self item is in outfit
 	outfitItems := outfit.GetItems()
 	found := false
@@ -312,7 +312,7 @@ func (r *ItemRelationships) RemoveOutfitByItem(outfit *Outfit) {
 }
 
 // RemoveItemOBI: removes an item from outfitByItem map if it exists
-func (r *ItemRelationships) RemoveItemOBI(other Item) {
+func (r *Relationships) RemoveItemOBI(other Item) {
 	otherID := other.GetID()
 	_, exists := r.outfitsByItems[otherID]
 	if !exists {
@@ -324,7 +324,7 @@ func (r *ItemRelationships) RemoveItemOBI(other Item) {
 //// allOutfits mutators ///////////////////////////////////////////////////////////////////////////////////
 
 // AddOutfit: adds outfit to allOutfits map
-func (r *ItemRelationships) AddOutfit(outfit Outfit) {
+func (r *Relationships) AddOutfit(outfit Outfit) {
 	// if outfit is already in allOutfits, returns without adding
 	_, exists := r.allOutfits[outfit.GetID()]
 	if exists {
@@ -335,7 +335,7 @@ func (r *ItemRelationships) AddOutfit(outfit Outfit) {
 }
 
 // RemoveOutfit: removes outfit from allOutfits map if it exists
-func (r *ItemRelationships) RemoveOutfit(outfit Outfit) {
+func (r *Relationships) RemoveOutfit(outfit Outfit) {
 	// if outfit isn't in allOutfits, returns without removing
 	_, exists := r.allOutfits[outfit.GetID()]
 	if !exists {
@@ -349,7 +349,7 @@ func (r *ItemRelationships) RemoveOutfit(outfit Outfit) {
 //// STRING ////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-func (r ItemRelationships) String() string {
+func (r Relationships) String() string {
 	if len(r.connections) == 0 && len(r.outfitsByItems) == 0 && len(r.allOutfits) == 0 {
 		return "No relationships for item " + strconv.Itoa(r.itemID)
 	}
