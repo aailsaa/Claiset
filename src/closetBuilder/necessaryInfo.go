@@ -14,14 +14,19 @@ import (
 //// CONSTS ////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Constant error values for necessary info
+// error value for field name
 const ERRNAME = "ERRORNAME"
 
+// error value for field colors
 var ERRCOLORS = []Color{COLORERROR}
+
+// empty value for field colors
 var EMPTYCOLORS = []Color{}
 
+// error value for field itemID
 const ERRID = -1
 
+// custom error value for invalid struct
 var ErrInvalidNecessaryInfo = errors.New("invalid necessary info")
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -30,11 +35,11 @@ var ErrInvalidNecessaryInfo = errors.New("invalid necessary info")
 
 // NecessaryInfo: All necessary information for each item from user
 type NecessaryInfo struct {
-	itemName        string
-	itemColors      []Color
-	itemCategory    Category
-	itemSubcategory Subcategory
-	itemID          int
+	name        string
+	colors      []Color
+	category    Category
+	subcategory Subcategory
+	itemID      int
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -44,43 +49,45 @@ type NecessaryInfo struct {
 // NecessaryInfo constructor: take in necessary data and create new struct
 func CreateNecessaryInfo(name string, cs []Color, cat Category, subcat Subcategory, id int) *NecessaryInfo {
 	// checks name
-	name = strings.TrimSpace(name)
-	if name == "" {
+	name, err := IsValidName(name)
+	if err != nil {
 		return nil
 	}
 	// checks color
-	if reflect.DeepEqual(cs, []Color{}) {
+	cs, err = IsValidColors(cs)
+	if err != nil {
 		return nil
 	}
-	cs = util.RemoveDuplicates(cs)
-	// checks category
-	if cat < TOP || cat > OTHER {
-		return nil
-	}
-	possibleSubs := GetSubFromCat(cat)
 
-	// checks subcategory: must align with category
-	if subcat < TOPSTART || subcat > OTHERSTART || !slices.Contains(possibleSubs, subcat) {
+	// checks category and subcategory
+	cat, subcat, err = IsValidCategories(cat, subcat)
+	if err != nil {
 		return nil
 	}
+
+	id, err = IsValidID(id)
+	if err != nil {
+		return nil
+	}
+
 	// checking id doesnt matter so proceeds to creation
 	return &NecessaryInfo{
-		itemName:        name,
-		itemColors:      cs,
-		itemCategory:    cat,
-		itemSubcategory: subcat,
-		itemID:          id,
+		name:        name,
+		colors:      cs,
+		category:    cat,
+		subcategory: subcat,
+		itemID:      id,
 	}
 }
 
 // Empty NecessaryInfo constructor: set all necessary info to default values
 func createEmptyNecessary() NecessaryInfo {
 	return NecessaryInfo{
-		itemName:        ERRNAME,
-		itemColors:      ERRCOLORS,
-		itemCategory:    CATEGORYERROR,
-		itemSubcategory: SUBCATEGORYERROR,
-		itemID:          ERRID,
+		name:        ERRNAME,
+		colors:      ERRCOLORS,
+		category:    CATEGORYERROR,
+		subcategory: SUBCATEGORYERROR,
+		itemID:      ERRID,
 	}
 }
 
@@ -88,10 +95,10 @@ func createEmptyNecessary() NecessaryInfo {
 //// ACCESSORS /////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-func (n NecessaryInfo) GetName() string             { return n.itemName }
-func (n NecessaryInfo) GetColors() []Color          { return n.itemColors }
-func (n NecessaryInfo) GetCategory() Category       { return n.itemCategory }
-func (n NecessaryInfo) GetSubcategory() Subcategory { return n.itemSubcategory }
+func (n NecessaryInfo) GetName() string             { return n.name }
+func (n NecessaryInfo) GetColors() []Color          { return n.colors }
+func (n NecessaryInfo) GetCategory() Category       { return n.category }
+func (n NecessaryInfo) GetSubcategory() Subcategory { return n.subcategory }
 func (n NecessaryInfo) GetID() int                  { return n.itemID }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -104,7 +111,7 @@ func (n *NecessaryInfo) SetName(newName string) {
 	if newName == "" {
 		return
 	}
-	n.itemName = newName
+	n.name = newName
 }
 
 // SetColors: ensure new colors list isn't empty and doesn't contain duplicates
@@ -119,7 +126,7 @@ func (n *NecessaryInfo) SetColors(cs []Color) {
 	if len(cs) == 0 {
 		return
 	}
-	n.itemColors = cs
+	n.colors = cs
 }
 
 // SetCategories: set category and subcategory toegether to ensure subcategory matches category
@@ -132,8 +139,8 @@ func (n *NecessaryInfo) SetCategories(c Category, s Subcategory) {
 		return
 	}
 
-	n.itemCategory = c
-	n.itemSubcategory = s
+	n.category = c
+	n.subcategory = s
 }
 
 // SetSubcategory: ensure new subcategory matches self category
@@ -142,7 +149,7 @@ func (n *NecessaryInfo) SetSubcategory(s Subcategory) {
 	if s < TOPSTART || s > OTHERSTART || !slices.Contains(possibleSubs, s) {
 		return
 	}
-	n.itemSubcategory = s
+	n.subcategory = s
 }
 
 // SetID: set ID and ensure it's nonnegative
@@ -160,24 +167,24 @@ func (n *NecessaryInfo) SetID(id int) {
 // NecessaryInfo String: return formatted string of all fields in NecessaryInfo
 func (n NecessaryInfo) String() string {
 	return "item ID:\t\t" + strconv.Itoa(n.itemID) + "\n" +
-		"item name:\t\t" + n.itemName + "\n" +
-		"item colors:\t\t" + strings.Join(StringColors(n.itemColors), ", ") + "\n" +
-		"item category:\t\t" + n.itemCategory.String() + "\n" +
-		"item subcategory:\t" + n.itemSubcategory.String() + "\n"
+		"item name:\t\t" + n.name + "\n" +
+		"item colors:\t\t" + strings.Join(StringColors(n.colors), ", ") + "\n" +
+		"item category:\t\t" + n.category.String() + "\n" +
+		"item subcategory:\t" + n.subcategory.String() + "\n"
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//// ITEM VALIDATION ///////////////////////////////////////////////////////////////////////////////////////
+//// NECESSARYINFO VALIDATION //////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 //// EQUALS ////////////////////////////////////////////////////////////////////////////////////////////////
 
 // NecessaryInfo Equals: check if 2 NecessaryInfo structs are equal by going through each field
 func (n NecessaryInfo) Equals(other NecessaryInfo) bool {
-	return n.itemName == other.itemName &&
-		reflect.DeepEqual(n.itemColors, other.itemColors) &&
-		n.itemCategory == other.itemCategory &&
-		n.itemSubcategory == other.itemSubcategory &&
+	return n.name == other.name &&
+		reflect.DeepEqual(n.colors, other.colors) &&
+		n.category == other.category &&
+		n.subcategory == other.subcategory &&
 		n.itemID == other.itemID
 }
 
@@ -196,22 +203,22 @@ func IsValidNecessaryInfo(n NecessaryInfo) error {
 	errs := []error{}
 
 	// goes through all fields and checks validity, adding any errors to accumulator
-	_, nErr := IsValidName(n.itemName)
+	_, nErr := IsValidName(n.name)
 	if nErr != nil {
 		errs = append(errs, nErr)
 	}
 
-	_, cErr := IsValidColors(n.itemColors)
+	_, cErr := IsValidColors(n.colors)
 	if cErr != nil {
 		errs = append(errs, cErr)
 	}
 
-	_, c2Err := IsValidCategory(n.itemCategory)
+	_, c2Err := IsValidCategory(n.category)
 	if c2Err != nil {
 		errs = append(errs, c2Err)
 	}
 
-	_, sErr := IsValidSubcategory(n.itemSubcategory)
+	_, sErr := IsValidSubcategory(n.subcategory)
 	if sErr != nil {
 		errs = append(errs, sErr)
 	}
@@ -223,7 +230,7 @@ func IsValidNecessaryInfo(n NecessaryInfo) error {
 
 	// check if category and subcategory match
 	if c2Err == nil && sErr == nil {
-		if !slices.Contains(GetSubFromCat(n.itemCategory), n.itemSubcategory) {
+		if !slices.Contains(GetSubFromCat(n.category), n.subcategory) {
 			errs = append(errs, fmt.Errorf("category and subcategory don't match: %w", ErrInvalidNecessaryInfo))
 		}
 	}
@@ -253,6 +260,7 @@ func IsValidName(n string) (string, error) {
 // IsValidColors: check if given colors are valid, and return validated & sorted colors or error
 func IsValidColors(cs []Color) ([]Color, error) {
 	slices.Sort(cs)
+	cs = util.RemoveDuplicates(cs)
 
 	if reflect.DeepEqual(cs, ERRCOLORS) || slices.Contains(cs, COLORERROR) {
 		return EMPTYCOLORS, fmt.Errorf("error in colors: %w", ErrInvalidNecessaryInfo)
@@ -277,6 +285,32 @@ func IsValidSubcategory(s Subcategory) (Subcategory, error) {
 		return s, nil
 	}
 	return SUBCATEGORYERROR, fmt.Errorf("error in subcategory: %w", ErrInvalidNecessaryInfo)
+}
+
+// IsValidCategories: check if given category and subcategory match
+func IsValidCategories(c Category, s Subcategory) (Category, Subcategory, error) {
+	errs := []error{}
+
+	c, err := IsValidCategory(c)
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	s, err = IsValidSubcategory(s)
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	allSubsFromCat := GetSubFromCat(c)
+	if !slices.Contains(allSubsFromCat, s) {
+		errs = append(errs, fmt.Errorf("category and subcategory don't match: %w", ErrInvalidNecessaryInfo))
+	}
+
+	if len(errs) == 0 {
+		return c, s, nil
+	} else {
+		return CATEGORYERROR, SUBCATEGORYERROR, errors.Join(errs...)
+	}
 }
 
 // IsValidID: check if given id is valid, and return validated id or error
