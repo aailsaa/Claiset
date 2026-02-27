@@ -1,11 +1,8 @@
 package closetBuilder
 
 import (
-	h "OnlineCloset/src/helpers"
+	"errors"
 	"reflect"
-	"slices"
-	"strconv"
-	"strings"
 	"time"
 )
 
@@ -13,62 +10,27 @@ import (
 //// CONSTS ////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Constant error values for necessary info
-const ERRNAME = "ERRORNAME"
-
-var ERRCOLORS = []Color{COLORERROR}
-
-const ERRID = -1
-
-// Constant error values for extra info
-var ERRDATE = time.Date(1969, time.April, 14, 12, 0, 0, 0, time.UTC)
-
-const ERRPRICE = -1.0
-const ERRWEARS = -1
-
-// Constant empty values for extra info
-var EMPTYDATE = time.Date(1968, time.August, 28, 12, 0, 0, 0, time.UTC)
-
-const EMPTYPRICE = 0
-const EMPTYWEARS = 0
+// Constant errors for invalid type
+var ErrInvalidItem = errors.New("invalid item")
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //// TYPES /////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Item: an item of clothing
+// Item impelements the CustomComparable interface with functions GetID and Equals
 type Item struct {
 	necessary     NecessaryInfo
 	extra         ExtraInfo
-	relationships ItemRelationships
-}
-
-// NecessaryInfo: All necessary information for each item from user
-type NecessaryInfo struct {
-	itemName        string
-	itemColors      []Color
-	itemCategory    Category
-	itemSubcategory Subcategory
-	itemID          int
-}
-
-// ExtraInfo: All extra information for each item
-type ExtraInfo struct {
-	itemDate  time.Time
-	itemPrice float32
-	itemWears int
-	// TODO:
-	// brand
-	// weather
-	// occasion
+	relationships Relationships
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //// CONSTRUCTORS //////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Item constructor: takes in necessary data and creates new item
-// if any necessary data isn't present, fails to create item
+// Item constructor: take in necessary data and create new item
+// if any necessary data isn't present, fail to create item
 func CreateItem(name string, cs []Color, cat Category, subcat Subcategory, id int) *Item {
 	n := CreateNecessaryInfo(name, cs, cat, subcat, id)
 	if n == nil {
@@ -78,68 +40,11 @@ func CreateItem(name string, cs []Color, cat Category, subcat Subcategory, id in
 	return &Item{
 		necessary:     *n,
 		extra:         createEmptyExtra(),
-		relationships: CreateItemRelationships(id),
+		relationships: CreateRelationships(id),
 	}
 }
 
-// NecessaryInfo constructor: takes in necessary data and creates new struct
-func CreateNecessaryInfo(name string, cs []Color, cat Category, subcat Subcategory, id int) *NecessaryInfo {
-	// checks name
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return nil
-	}
-	// checks color
-	if reflect.DeepEqual(cs, []Color{}) {
-		return nil
-	}
-	cs = h.RemoveDuplicates(cs)
-	// checks category
-	if cat < TOP || cat > OTHER {
-		return nil
-	}
-	possibleSubs := GetSubFromCat(cat)
-
-	// checks subcategory: must align with category
-	if subcat < TOPSTART || subcat > OTHERSTART || !slices.Contains(possibleSubs, subcat) {
-		return nil
-	}
-	// checking id doesnt matter so proceeds to creation
-	return &NecessaryInfo{
-		itemName:        name,
-		itemColors:      cs,
-		itemCategory:    cat,
-		itemSubcategory: subcat,
-		itemID:          id,
-	}
-}
-
-// ExtraInfo constructor: takes in extra data and creates new struct
-func CreateExtraInfo(date time.Time, price float32, wears int) *ExtraInfo {
-	// checks date: can't be in the future
-	now := time.Now()
-	if date.After(now) {
-		return nil
-	}
-	// checks price: can't be negative
-	if price < 0 {
-		return nil
-	}
-	// checks wears: can't be negative
-	if wears < 0 {
-		return nil
-	}
-	return &ExtraInfo{
-		itemDate:  date,
-		itemPrice: price,
-		itemWears: wears,
-	}
-}
-
-//// EMPTY ITEM CONSTRUCTORS ///////////////////////////////////////////////////////////////////////////////
-// these create "empty" or error structs to indicate failure or be used as placeholders
-
-// Empty Item constructor: sets all item info to default values
+// Empty Item constructor: set all item info to default values
 func CreateEmptyItem() Item {
 	return Item{
 		necessary:     createEmptyNecessary(),
@@ -148,73 +53,41 @@ func CreateEmptyItem() Item {
 	}
 }
 
-// Empty NecessaryInfo constructor: sets all necessary info to default values
-func createEmptyNecessary() NecessaryInfo {
-	return NecessaryInfo{
-		itemName:        ERRNAME,
-		itemColors:      ERRCOLORS,
-		itemCategory:    CATEGORYERROR,
-		itemSubcategory: SUBCATEGORYERROR,
-		itemID:          ERRID,
-	}
-}
-
-// Empty ExtraInfo constructor: sets all extra info to default values
-func createEmptyExtra() ExtraInfo {
-	return ExtraInfo{
-		itemDate:  EMPTYDATE,
-		itemPrice: EMPTYPRICE,
-		itemWears: EMPTYWEARS,
-	}
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //// ACCESSORS /////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // // ITEM ACCESSORS ////////////////////////////////////////////////////////////////////////////////////////
-// accessing necessary info through item
+// access necessary info through item
 func (o Item) GetName() string             { return o.necessary.GetName() }
 func (o Item) GetColors() []Color          { return o.necessary.GetColors() }
 func (o Item) GetCategory() Category       { return o.necessary.GetCategory() }
 func (o Item) GetSubcategory() Subcategory { return o.necessary.GetSubcategory() }
 func (o Item) GetID() int                  { return o.necessary.GetID() }
 
-// accessing extra info through item
+// access extra info through item
 func (o Item) GetDate() time.Time { return o.extra.GetDate() }
 func (o Item) GetPrice() float32  { return o.extra.GetPrice() }
 func (o Item) GetWears() int      { return o.extra.GetWears() }
 
-// accessing relationship item:
-// accessing whole relationship maps through item:
+// access relationship item:
+// access whole relationship maps through item:
 func (o Item) GetAllConnections() ConnectionsMap      { return o.relationships.GetAllConnections() }
 func (o Item) GetAllOutfitsByItem() OutfitsByItemsMap { return o.relationships.GetAllOutfitsByItems() }
 func (o Item) GetAllOutfits() AllOutfitsMap           { return o.relationships.GetAllOutfits() }
 
-// accessing specific getters:
+// access specific getters:
 func (o Item) GetConnection(itemID int) float32 { return o.relationships.GetConnection(itemID) }
 func (o Item) GetOutfitsByItem(itemID int) map[int]*Outfit {
 	return o.relationships.GetOutfitsByItem(itemID)
 }
 
-// accessing checkers:
+// access checkers:
 func (o Item) HasConnection(itemID int) bool { return o.relationships.HasConnection(itemID) }
 func (o Item) HasItemInOBI(itemID int) bool  { return o.relationships.HasConnection(itemID) }
 func (o Item) HasOutfitInOBI(itemID int, outfit *Outfit) bool {
 	return o.relationships.HasOutfitInOBI(itemID, outfit)
 }
-
-// // NECESSARYINFO ACCESSORS ///////////////////////////////////////////////////////////////////////////////
-func (n NecessaryInfo) GetName() string             { return n.itemName }
-func (n NecessaryInfo) GetColors() []Color          { return n.itemColors }
-func (n NecessaryInfo) GetCategory() Category       { return n.itemCategory }
-func (n NecessaryInfo) GetSubcategory() Subcategory { return n.itemSubcategory }
-func (n NecessaryInfo) GetID() int                  { return n.itemID }
-
-// // EXTRAINFO ACCESSORS ///////////////////////////////////////////////////////////////////////////////////
-func (e ExtraInfo) GetDate() time.Time { return e.itemDate }
-func (e ExtraInfo) GetPrice() float32  { return e.itemPrice }
-func (e ExtraInfo) GetWears() int      { return e.itemWears }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //// MUTATORS //////////////////////////////////////////////////////////////////////////////////////////////
@@ -234,122 +107,22 @@ func (o *Item) SetWears(w int)      { o.extra.SetWears(w) }
 
 //TODO: add mutators for relationships
 
-//// NECESSARYINFO MUTATORS ////////////////////////////////////////////////////////////////////////////////
-
-// SetName ensures new name isn't empty and removes leading/trailing whitespace
-func (n *NecessaryInfo) SetName(newName string) {
-	newName = strings.TrimSpace(newName)
-	if newName == "" {
-		return
-	}
-	n.itemName = newName
-}
-
-// SetColors ensures new colors isn't empty and doesn't contain duplicates
-func (n *NecessaryInfo) SetColors(cs []Color) {
-	cs = h.RemoveDuplicates(cs)
-	for idx, c := range cs {
-		if c < RED || c >= COLORERROR {
-			cs = slices.Delete(cs, idx, idx+1)
-			idx--
-		}
-	}
-	if len(cs) == 0 {
-		return
-	}
-	n.itemColors = cs
-}
-
-// category and subcategory must be set together to ensure same grouping
-func (n *NecessaryInfo) SetCategories(c Category, s Subcategory) {
-	if c < TOP || c > OTHER {
-		return
-	}
-	possibleSubs := GetSubFromCat(c)
-	if s < TOPSTART || s > OTHERSTART || !slices.Contains(possibleSubs, s) {
-		return
-	}
-
-	n.itemCategory = c
-	n.itemSubcategory = s
-}
-
-// subcategory can be edited independently if it is verified
-func (n *NecessaryInfo) SetSubcategory(s Subcategory) {
-	possibleSubs := GetSubFromCat(n.GetCategory())
-	if s < TOPSTART || s > OTHERSTART || !slices.Contains(possibleSubs, s) {
-		return
-	}
-	n.itemSubcategory = s
-}
-
-// SetID: sets ID and ensures it's nonnegative
-func (n *NecessaryInfo) SetID(id int) {
-	if id < 0 {
-		return
-	}
-	n.itemID = id
-}
-
-//// EXTRAINFO MUTATORS ////////////////////////////////////////////////////////////////////////////////////
-
-// SetDate takes in a concrete date and sets it if it isn't in the future
-func (e *ExtraInfo) SetDate(newDate time.Time) {
-	now := time.Now()
-	if newDate.After(now) {
-		return
-	}
-	e.itemDate = newDate
-}
-
-// SetPrice ensures price isn't negative
-func (e *ExtraInfo) SetPrice(p float32) {
-	if p < 0 {
-		return
-	}
-	e.itemPrice = p
-}
-
-// SetWears ensures wears isn't negative
-func (e *ExtraInfo) SetWears(w int) {
-	if w < 0 || w > 10000 {
-		return
-	}
-	e.itemWears = w
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //// STRING ////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// Item String: return all fields of item stringed together
 func (o Item) String() string {
 	return o.necessary.String() + o.extra.String() + o.relationships.String()
 }
 
-func (n NecessaryInfo) String() string {
-	return "item ID:\t\t" + strconv.Itoa(n.itemID) + "\n" +
-		"item name:\t\t" + n.itemName + "\n" +
-		"item colors:\t\t" + strings.Join(StringColors(n.itemColors), ", ") + "\n" +
-		"item category:\t\t" + n.itemCategory.String() + "\n" +
-		"item subcategory:\t" + n.itemSubcategory.String() + "\n"
-}
-
-func (e ExtraInfo) String() string {
-	eString := "item date:\t\t"
-	if e.itemDate.Equal(EMPTYDATE) {
-		eString += "NONE\n"
-	} else {
-		eString += e.itemDate.Format("01-02-2006") + "\n"
-	}
-	eString += "item price:\t\t$" + strconv.FormatFloat(float64(e.itemPrice), 'f', 2, 32) + "\n" +
-		"item wears:\t\t" + strconv.Itoa(e.itemWears) + "\n"
-	return eString
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//// CUSTOMCOMPARABLE //////////////////////////////////////////////////////////////////////////////////////
+//// ITEM VALIDATION ///////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+//// EQUALS ////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Equals: check if 2 Item structs are equal
 func (o Item) Equals(other any) bool {
 	otherItem, ok := other.(Item)
 	if !ok {
@@ -364,4 +137,12 @@ func (o Item) Equals(other any) bool {
 		o.GetDate().Equal(otherItem.GetDate()) &&
 		o.GetPrice() == otherItem.GetPrice() &&
 		o.GetWears() == otherItem.GetWears()
+}
+
+//// ISVALID ///////////////////////////////////////////////////////////////////////////////////////////////
+
+// IsValidItem: check if item is valid by going through all fields of item
+// TODO
+func IsValidItem(o Item) (bool, error) {
+	return false, nil
 }
