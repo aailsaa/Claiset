@@ -2,6 +2,7 @@ package closetBuilder
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 	"time"
 )
@@ -46,19 +47,24 @@ type ExtraInfo struct {
 
 // ExtraInfo constructor: take in extra data and create new struct
 func CreateExtraInfo(date time.Time, price float32, wears int) *ExtraInfo {
-	// checks date: can't be in the future
-	now := time.Now()
-	if date.After(now) {
+	// check date:
+	date, err := IsValidDate(date)
+	if err != nil {
 		return nil
 	}
+
 	// checks price: can't be negative
-	if price < 0 {
+	price, err = IsValidPrice(price)
+	if err != nil {
 		return nil
 	}
+
 	// checks wears: can't be negative
-	if wears < 0 {
+	wears, err = IsValidWears(wears)
+	if err != nil {
 		return nil
 	}
+
 	return &ExtraInfo{
 		itemDate:  date,
 		itemPrice: price,
@@ -67,11 +73,20 @@ func CreateExtraInfo(date time.Time, price float32, wears int) *ExtraInfo {
 }
 
 // Empty ExtraInfo constructor: set all extra info to default values
-func createEmptyExtra() ExtraInfo {
+func CreateEmptyExtra() ExtraInfo {
 	return ExtraInfo{
 		itemDate:  EMPTYDATE,
 		itemPrice: EMPTYPRICE,
 		itemWears: EMPTYWEARS,
+	}
+}
+
+// Error ExtraInfo constructor: set all extra info to error values
+func CreateErrorExtra() ExtraInfo {
+	return ExtraInfo{
+		itemDate:  ERRDATE,
+		itemPrice: ERRPRICE,
+		itemWears: ERRWEARS,
 	}
 }
 
@@ -89,8 +104,8 @@ func (e ExtraInfo) GetWears() int      { return e.itemWears }
 
 // SetDate: ensure given date isn't in the future
 func (e *ExtraInfo) SetDate(newDate time.Time) {
-	now := time.Now()
-	if newDate.After(now) {
+	newDate, err := IsValidDate(newDate)
+	if err != nil {
 		return
 	}
 	e.itemDate = newDate
@@ -98,7 +113,8 @@ func (e *ExtraInfo) SetDate(newDate time.Time) {
 
 // SetPrice: ensure price isn't negative
 func (e *ExtraInfo) SetPrice(p float32) {
-	if p < 0 {
+	p, err := IsValidPrice(p)
+	if err != nil {
 		return
 	}
 	e.itemPrice = p
@@ -106,7 +122,8 @@ func (e *ExtraInfo) SetPrice(p float32) {
 
 // SetWears: ensure wears isn't negative
 func (e *ExtraInfo) SetWears(w int) {
-	if w < 0 || w > 10000 {
+	w, err := IsValidWears(w)
+	if err != nil {
 		return
 	}
 	e.itemWears = w
@@ -130,12 +147,82 @@ func (e ExtraInfo) String() string {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//// ITEM VALIDATION ///////////////////////////////////////////////////////////////////////////////////////
+//// EXTRAINFO VALIDATION //////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// ExtraInfo Equals: check if 2 ExtraInfo structs are equal
+//// EQUALS ////////////////////////////////////////////////////////////////////////////////////////////////
+
 func (e ExtraInfo) Equals(other ExtraInfo) bool {
 	return e.itemDate.Equal(other.itemDate) &&
 		e.itemPrice == other.itemPrice &&
 		e.itemWears == other.itemWears
+}
+
+//// ISVALID ///////////////////////////////////////////////////////////////////////////////////////////////
+
+// IsValidExtraInfo: check if given ExtraInfo struct is valid
+func IsValidExtraInfo(e ExtraInfo) error {
+	if e.Equals(CreateErrorExtra()) {
+		return fmt.Errorf("extra info is empty: %w", ErrInvalidExtraInfo)
+	}
+
+	errs := []error{}
+
+	_, err := IsValidDate(e.itemDate)
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	_, err = IsValidPrice(e.itemPrice)
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	_, err = IsValidWears(e.itemWears)
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	if len(errs) == 0 {
+		return nil
+	}
+
+	return errors.Join(errs...)
+}
+
+// IsValidDate: check if given date isn't in the future, and isn't too far in the past
+func IsValidDate(d time.Time) (time.Time, error) {
+	if d.Equal(ERRDATE) {
+		return d, fmt.Errorf("error in date: %w", ErrInvalidExtraInfo)
+	}
+
+	rn := time.Now()
+	if d.After(rn) {
+		return ERRDATE, fmt.Errorf("invalid future date: %w", ErrInvalidExtraInfo)
+	}
+
+	if d.Before(rn.AddDate(-100, 0, 0)) {
+		return ERRDATE, fmt.Errorf("invalid past date: %w", ErrInvalidExtraInfo)
+	}
+
+	return d, nil
+}
+
+// IsValidPrice: check if given price is positive
+func IsValidPrice(p float32) (float32, error) {
+	if p == ERRPRICE {
+		return ERRPRICE, fmt.Errorf("error in price: %w", ErrInvalidExtraInfo)
+	} else if p < 0 {
+		return ERRPRICE, fmt.Errorf("invalid price: %w", ErrInvalidExtraInfo)
+	}
+	return p, nil
+}
+
+func IsValidWears(w int) (int, error) {
+	if w == ERRWEARS {
+		return ERRWEARS, fmt.Errorf("error in wears: %w", ErrInvalidExtraInfo)
+	} else if w < 0 || w > 36525 {
+		return ERRWEARS, fmt.Errorf("invalid wears: %w", ErrInvalidExtraInfo)
+	}
+	return w, nil
 }
