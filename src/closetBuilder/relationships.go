@@ -1,6 +1,8 @@
 package closetBuilder
 
 import (
+	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 )
@@ -9,10 +11,14 @@ import (
 //// CONSTS ////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-const BADCONNECTION = float32(-10)
+// connection values for connection map
+const NOCONNECTION = float32(-10)
 const NEUTRALCONNECTION = float32(0)
 const PERFECTCONNECTION = float32(10)
-const NOCONNECTION = float32(-11)
+const ERRCONNECTION = float32(-11)
+
+// error value for invalid Relationships
+var ErrInvalidRelationships = errors.New("invalid extra info")
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //// TYPES /////////////////////////////////////////////////////////////////////////////////////////////////
@@ -70,7 +76,7 @@ func createEmptyRelationships() Relationships {
 
 //// All getters: gets whole map ///////////////////////////////////////////////////////////////////////////
 
-func (r Relationships) GetItemID() int                          { return r.itemID }
+func (r Relationships) GetID() int                              { return r.itemID }
 func (r Relationships) GetAllConnections() ConnectionsMap       { return r.connections }
 func (r Relationships) GetAllOutfitsByItems() OutfitsByItemsMap { return r.outfitsByItems }
 func (r Relationships) GetAllOutfits() AllOutfitsMap            { return r.allOutfits }
@@ -81,7 +87,7 @@ func (r Relationships) GetAllOutfits() AllOutfitsMap            { return r.allOu
 func (r Relationships) GetConnection(otherID int) float32 {
 	strength, exists := r.connections[otherID]
 	if !exists {
-		return NOCONNECTION
+		return ERRCONNECTION
 	}
 	return strength
 }
@@ -129,8 +135,15 @@ func (r Relationships) HasOutfitInOBI(otherID int, outfit *Outfit) bool {
 
 // AddConnection: creates a new connection with other item and given strength
 func (r *Relationships) AddConnection(other Item, strength float32) {
+	// if other item is invalid, returns without creating connection
+	err := IsValidItem(other)
+	if err != nil {
+		return
+	}
+
 	// if strength is invalid, returns without creating connection
-	if strength < BADCONNECTION || strength > PERFECTCONNECTION {
+	strength, err = IsValidConnection(strength)
+	if err != nil {
 		return
 	}
 
@@ -167,7 +180,8 @@ func (r *Relationships) reciprocalAdd(otherID int, strength float32) {
 // SetConnection: updates connection strength for other item if connection exists
 func (r *Relationships) SetConnection(other Item, strength float32) {
 	// if strength is invalid, returns without updating connection
-	if strength < BADCONNECTION || strength > PERFECTCONNECTION {
+	strength, err := IsValidConnection(strength)
+	if err != nil {
 		return
 	}
 
@@ -427,4 +441,34 @@ func (a AllOutfitsMap) String() string {
 		counter++
 	}
 	return sb.String()
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//// RELATIONSHIP VALIDATION ///////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+//// EQUALS ////////////////////////////////////////////////////////////////////////////////////////////////
+
+// TODO
+
+//// ISVALID ///////////////////////////////////////////////////////////////////////////////////////////////
+
+// IsValidRelationships: ensure Relationships struct is valid
+// the only thing to check for validity in Relationships is the itemID
+func IsValidRelationships(r Relationships) error {
+	if r.itemID == ERRID {
+		return fmt.Errorf("error in ID: %w", ErrInvalidRelationships)
+	} else if r.itemID < ERRID {
+		return fmt.Errorf("invalid ID: %w", ErrInvalidRelationships)
+	}
+	return nil
+}
+
+func IsValidConnection(c float32) (float32, error) {
+	if c == ERRCONNECTION {
+		return ERRCONNECTION, fmt.Errorf("error in connection: %w", ErrInvalidExtraInfo)
+	} else if c < NOCONNECTION || c > PERFECTCONNECTION {
+		return ERRCONNECTION, fmt.Errorf("invalid connection: %w", ErrInvalidRelationships)
+	}
+	return c, nil
 }
