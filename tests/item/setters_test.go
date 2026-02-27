@@ -185,7 +185,7 @@ func TestSetWears(t *testing.T) {
 		{5, 5},
 		{100, 100},
 		{-3, DEFAULTWEARS},
-		{10001, DEFAULTWEARS},
+		{36526, DEFAULTWEARS},
 	}
 
 	for idx, test := range tests {
