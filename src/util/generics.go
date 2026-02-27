@@ -1,4 +1,4 @@
-package helpers
+package util
 
 // generics contains all generic helper functions used throughout the package
 

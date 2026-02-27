@@ -2,7 +2,7 @@ package tests
 
 import (
 	cb "OnlineCloset/src/closetBuilder"
-	helpers "OnlineCloset/src/helpers"
+	util "OnlineCloset/src/util"
 	testPkg "OnlineCloset/tests"
 	"reflect"
 	"testing"
@@ -26,7 +26,7 @@ func TestRemoveDuplicates(t *testing.T) {
 	}
 
 	for idx, test := range testColors {
-		result := helpers.RemoveDuplicates(test.input)
+		result := util.RemoveDuplicates(test.input)
 		if reflect.DeepEqual(result, test.expected) {
 			t.Logf("\nTest %d PASSED", idx)
 		} else {

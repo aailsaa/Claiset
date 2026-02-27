@@ -1,7 +1,7 @@
 package closetBuilder
 
 import (
-	h "OnlineCloset/src/helpers"
+	util "OnlineCloset/src/util"
 )
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -24,7 +24,7 @@ type Outfit struct {
 func CreateOutfit(items []Item) Outfit {
 	return Outfit{
 		name:     "Unnamed Outfit",
-		items:    h.RemoveCustomDuplicates(items),
+		items:    util.RemoveCustomDuplicates(items),
 		wears:    0,
 		outfitID: -1,
 	}
@@ -55,7 +55,7 @@ func (o Outfit) GetID() int { return o.outfitID }
 /////MUTATORS///////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-func (o *Outfit) SetItems(items []Item) { o.items = h.RemoveCustomDuplicates(items) }
+func (o *Outfit) SetItems(items []Item) { o.items = util.RemoveCustomDuplicates(items) }
 
 func (o *Outfit) SetWears(wears int) {
 	if wears < 0 {
