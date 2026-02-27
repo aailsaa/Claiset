@@ -1,148 +1,7 @@
 package closetBuilder
 
-// this page contains all "enums" or categories for clothing items including:
-// * color
-// * category
-// TODO:
-// * subcategory
-// * weather
-// * occasion
-
-/////COLOR//////////////////////////////////////////////////////////////////////////////////////////////////
-
-// Color represents possible color options for clothing to be tagged as
-type Color int
-
-// all color options as enum
-const (
-	RED        Color = iota //0
-	ORANGE                  //1
-	YELLOW                  //2
-	GREEN                   //3
-	BLUE                    //4
-	PURPLE                  //5
-	PINK                    //6
-	BROWN                   //7
-	BLACK                   //8
-	WHITE                   //9
-	GREY                    //10
-	SILVER                  //11
-	GOLD                    //12
-	MULTICOLOR              //13
-	COLORERROR              //14
-)
-
-// map to convert the enum back to string value
-var ColorNames = map[Color]string{
-	RED:        "RED",
-	ORANGE:     "ORANGE",
-	YELLOW:     "YELLOW",
-	GREEN:      "GREEN",
-	BLUE:       "BLUE",
-	PURPLE:     "PURPLE",
-	PINK:       "PINK",
-	BROWN:      "BROWN",
-	BLACK:      "BLACK",
-	WHITE:      "WHITE",
-	GREY:       "GREY",
-	SILVER:     "SILVER",
-	GOLD:       "GOLD",
-	MULTICOLOR: "MULTICOLOR",
-	COLORERROR: "COLORERROR",
-}
-
-// STRING FUNCTIONS //
-
-// converts single color to string representation
-func (c Color) String() string {
-	if c < RED || c > COLORERROR {
-		return ""
-	}
-	return ColorNames[c]
-}
-
-// converts slice of colors to slice of strings (colors always stored in slice)
-func StringColors(cs []Color) []string {
-	rval := []string{}
-	for _, c := range cs {
-		rval = append(rval, c.String())
-	}
-	return rval
-}
-
-// GetAllColors returns a list of all colors
-// not using map.values to retain order and omit default/error values
-func GetAllColors() []string {
-	rval := []string{}
-	for i := RED; i < COLORERROR; i++ {
-		rval = append(rval, ColorNames[i])
-	}
-	return rval
-}
-
-/////CATEGORY///////////////////////////////////////////////////////////////////////////////////////////////
-
-// Category represents possible types of artices of clothing
-type Category int
-
-// all category types as enum
-const (
-	TOP           Category = iota //0
-	BOTTOMS                       //1
-	OUTERWEAR                     //2
-	ONEPIECE                      //3
-	SHOES                         //4
-	ACCESSORY                     //5
-	JEWELRY                       //6
-	BAG                           //7
-	OTHER                         //8
-	CATEGORYERROR                 //9
-)
-
-// map to convert enum back to string representation
-var CategoryNames = map[Category]string{
-	TOP:           "TOP",
-	BOTTOMS:       "BOTTOMS",
-	OUTERWEAR:     "OUTERWEAR",
-	ONEPIECE:      "ONEPIECE",
-	SHOES:         "SHOES",
-	ACCESSORY:     "ACCESSORY",
-	JEWELRY:       "JEWELRY",
-	BAG:           "BAG",
-	OTHER:         "OTHER",
-	CATEGORYERROR: "CATEGORYERROR",
-}
-
-// string function for category
-func (c Category) String() string {
-	if c < TOP || c > OTHER {
-		return ""
-	}
-	return CategoryNames[c]
-}
-
-// GetAllCategories returns a list of all categories, exluding the error value
-func GetAllCategories() []Category {
-	rval := []Category{}
-	for i := TOP; i < CATEGORYERROR; i++ {
-		rval = append(rval, i)
-	}
-	return rval
-}
-
-// GetAllCategoryStrings returns a list of all categories represented as strings
-func GetAllCategoryStrings() []string {
-	cats := GetAllCategories()
-	rvals := []string{}
-	for _, c := range cats {
-		rvals = append(rvals, c.String())
-	}
-	return rvals
-}
-
-/////SUBCATEGORY////////////////////////////////////////////////////////////////////////////////////////////
-
 // Subcategory represents possible subcategories of each type of clothing
+
 type Subcategory int
 
 // all subcategory types as enum
@@ -238,6 +97,9 @@ const ACCESSORYSTART = BELT
 const JEWELRYSTART = BRACELET
 const BAGSTART = BACKPACK
 const OTHERSTART = SUBOTHER
+
+const SUBCATEGORYSTART = TOPSTART
+const SUBCATEGORYEND = OTHERSTART
 
 // map to convert enum back to string representation
 var SubcategoryNames = map[Subcategory]string{
@@ -370,7 +232,13 @@ func GetSubFromCat(c Category) []Subcategory {
 	}
 }
 
-//TODO
+func (s Subcategory) IsValid() bool {
+	if s < SUBCATEGORYSTART || s > SUBCATEGORYEND {
+		return false
+	}
+	return true
+}
 
-type Weather int
-type Occasion int
+// TODO:
+// * weather
+// * occasion
