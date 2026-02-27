@@ -48,29 +48,29 @@ type NecessaryInfo struct {
 
 // NecessaryInfo constructor: take in necessary data and create new struct
 func CreateNecessaryInfo(name string, cs []Color, cat Category, subcat Subcategory, id int) *NecessaryInfo {
-	// checks name
+	// check name
 	name, err := IsValidName(name)
 	if err != nil {
 		return nil
 	}
-	// checks color
+	// check color
 	cs, err = IsValidColors(cs)
 	if err != nil {
 		return nil
 	}
 
-	// checks category and subcategory
+	// check category and subcategory
 	cat, subcat, err = IsValidCategories(cat, subcat)
 	if err != nil {
 		return nil
 	}
 
+	// check id
 	id, err = IsValidID(id)
 	if err != nil {
 		return nil
 	}
 
-	// checking id doesnt matter so proceeds to creation
 	return &NecessaryInfo{
 		name:        name,
 		colors:      cs,
@@ -107,8 +107,8 @@ func (n NecessaryInfo) GetID() int                  { return n.itemID }
 
 // SetName: ensure new name isn't empty and remove leading/trailing whitespace
 func (n *NecessaryInfo) SetName(newName string) {
-	newName = strings.TrimSpace(newName)
-	if newName == "" {
+	newName, err := IsValidName(newName)
+	if err != nil {
 		return
 	}
 	n.name = newName
@@ -116,14 +116,8 @@ func (n *NecessaryInfo) SetName(newName string) {
 
 // SetColors: ensure new colors list isn't empty and doesn't contain duplicates
 func (n *NecessaryInfo) SetColors(cs []Color) {
-	cs = util.RemoveDuplicates(cs)
-	for idx, c := range cs {
-		if c < RED || c >= COLORERROR {
-			cs = slices.Delete(cs, idx, idx+1)
-			idx--
-		}
-	}
-	if len(cs) == 0 {
+	cs, err := IsValidColors(cs)
+	if err != nil {
 		return
 	}
 	n.colors = cs
@@ -131,20 +125,20 @@ func (n *NecessaryInfo) SetColors(cs []Color) {
 
 // SetCategories: set category and subcategory toegether to ensure subcategory matches category
 func (n *NecessaryInfo) SetCategories(c Category, s Subcategory) {
-	if c < TOP || c > OTHER {
+	c, s, err := IsValidCategories(c, s)
+	if err != nil {
 		return
 	}
-	possibleSubs := GetSubFromCat(c)
-	if s < TOPSTART || s > OTHERSTART || !slices.Contains(possibleSubs, s) {
-		return
-	}
-
 	n.category = c
 	n.subcategory = s
 }
 
 // SetSubcategory: ensure new subcategory matches self category
 func (n *NecessaryInfo) SetSubcategory(s Subcategory) {
+	s, err := IsValidSubcategory(s)
+	if err != nil {
+		return
+	}
 	possibleSubs := GetSubFromCat(n.GetCategory())
 	if s < TOPSTART || s > OTHERSTART || !slices.Contains(possibleSubs, s) {
 		return
@@ -154,7 +148,8 @@ func (n *NecessaryInfo) SetSubcategory(s Subcategory) {
 
 // SetID: set ID and ensure it's nonnegative
 func (n *NecessaryInfo) SetID(id int) {
-	if id < 0 {
+	id, err := IsValidID(id)
+	if err != nil {
 		return
 	}
 	n.itemID = id
