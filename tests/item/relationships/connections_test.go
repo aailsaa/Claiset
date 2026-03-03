@@ -58,6 +58,45 @@ func TestGetConnection(t *testing.T) {
 	}
 }
 
+func TestHasConnection(t *testing.T) {
+	SELFID := 5
+	tests := []struct {
+		inputItem          cb.Item
+		expectedConnection bool
+	}{
+		// items in the connection map
+		{*cb.CreateItem("test0", []cb.Color{cb.RED}, cb.TOP, cb.BLOUSE, 0), true},
+		{*cb.CreateItem("test1", []cb.Color{cb.BLUE}, cb.BOTTOMS, cb.DENIM, 1), true},
+		{*cb.CreateItem("test2", []cb.Color{cb.GREEN}, cb.OUTERWEAR, cb.JACKET, 2), true},
+		//items not in the connection map
+		{*cb.CreateItem("test3", []cb.Color{cb.ORANGE}, cb.TOP, cb.BLOUSE, 3), false},
+		{*cb.CreateItem("test4", []cb.Color{cb.WHITE}, cb.ACCESSORY, cb.SCARF, 4), false},
+		// self item: shoudln't return connection
+		{*cb.CreateItem("test5", []cb.Color{cb.BLACK, cb.WHITE}, cb.OUTERWEAR, cb.JACKET, SELFID), false},
+		// error item: shouldn't return connection
+		{cb.CreateEmptyItem(), false},
+	}
+
+	testIR := cb.CreateRelationships(SELFID)
+	for i := range 3 {
+		testIR.AddConnection(tests[i].inputItem, cb.NEUTRALCONNECTION)
+	}
+
+	for idx, test := range tests {
+		result := testIR.HasConnection(test.inputItem.GetID())
+		if result != test.expectedConnection {
+			t.Errorf("test case %d FAILED", idx)
+			if *testPkg.ExtraVerbose {
+				t.Errorf("expected connection status for item %d: %t\nactual status: %t",
+					test.inputItem.GetID(), test.expectedConnection, result)
+			}
+			continue
+		}
+		t.Logf("test case %d PASSED", idx)
+	}
+
+}
+
 // TestAddConnection: tests Relationship's AddConnection method
 func TestAddConnection(t *testing.T) {
 	SELFID := 5
