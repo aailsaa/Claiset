@@ -6,6 +6,59 @@ import (
 	"testing"
 )
 
+// connections_test tests all accessors and mutators for the "connections" field in the Relationships item.
+
+// accessor tests include:
+//		* TestGetConnection:	Relationship.GetConnection
+//		* TestHasConnection: 	Relationship.HasConnection
+// mutator tests include:
+// 		* TestAddConnection: 	Relationship.AddConnection
+//		* TestSetConnection: 	Relationship.SetConnection
+//		* TestRemoveConnection: Relationship.RemoveConnection
+
+// these tests are all conducted on an empty Relationships object, independent of the Item object.
+
+// TestGetConnection: tests Relationship's GetConnection method
+func TestGetConnection(t *testing.T) {
+	SELFID := 5
+	tests := []struct {
+		inputItem        cb.Item
+		inputStrength    float32
+		expectedStrength float32
+	}{
+		// items in the connections map that should return their given strength
+		{*cb.CreateItem("test0", []cb.Color{cb.RED}, cb.TOP, cb.BLOUSE, 0), 5, 5},
+		{*cb.CreateItem("test1", []cb.Color{cb.BLUE}, cb.BOTTOMS, cb.DENIM, 1), 1, 1},
+		{*cb.CreateItem("test2", []cb.Color{cb.GREEN}, cb.OUTERWEAR, cb.JACKET, 2), -2, -2},
+		// items not in the connections map that shouldn't return strength
+		{*cb.CreateItem("test3", []cb.Color{cb.ORANGE}, cb.TOP, cb.BLOUSE, 3), cb.ERRCONNECTION, cb.ERRCONNECTION},
+		{*cb.CreateItem("test4", []cb.Color{cb.WHITE}, cb.ACCESSORY, cb.SCARF, 4), cb.ERRCONNECTION, cb.ERRCONNECTION},
+		// self item: shouldn't return connection
+		{*cb.CreateItem("test5", []cb.Color{cb.BLACK, cb.WHITE}, cb.OUTERWEAR, cb.JACKET, 5), cb.ERRCONNECTION, cb.ERRCONNECTION},
+		// err item: shouldn't return connection
+		{cb.CreateEmptyItem(), cb.ERRCONNECTION, cb.ERRCONNECTION},
+	}
+
+	testIR := cb.CreateRelationships(SELFID)
+	for i := range 3 {
+		testIR.AddConnection(tests[i].inputItem, tests[i].inputStrength)
+	}
+
+	for idx, test := range tests {
+		currC := testIR.GetConnection(test.inputItem.GetID())
+		if currC != test.expectedStrength {
+			t.Errorf("\nTest case %d FAILED: GetConnection returned incorrect strength for item %d", idx, test.inputItem.GetID())
+			if *testPkg.ExtraVerbose {
+				t.Errorf("\nexpected strength: %f\nactual strength: %f", test.expectedStrength, currC)
+			}
+			continue
+		}
+
+		t.Logf("test case %d PASSED", idx)
+	}
+}
+
+// TestAddConnection: tests Relationship's AddConnection method
 func TestAddConnection(t *testing.T) {
 	SELFID := 5
 	tests := []struct {
@@ -60,6 +113,7 @@ func TestAddConnection(t *testing.T) {
 	}
 }
 
+// TestSetConnection: tests Relationship's SetConnection method
 func TestSetConnection(t *testing.T) {
 	DEFAULTCONNECTION := cb.NEUTRALCONNECTION
 	SELFID := 10
@@ -129,6 +183,7 @@ func TestSetConnection(t *testing.T) {
 	}
 }
 
+// TestRemoveConnection: tests Relationship's RemoveConnection method
 func TestRemoveConnection(t *testing.T) {
 	SELFID := 6
 	tests := []struct {
@@ -172,46 +227,5 @@ func TestRemoveConnection(t *testing.T) {
 		if *testPkg.ExtraVerbose {
 			t.Logf("\nCurrent state of ItemRelationships:\n%s\nCurrent item relationships:\n%s", testIR.String(), test.removeItem.String())
 		}
-	}
-
-}
-
-func TestGetConnection(t *testing.T) {
-	SELFID := 5
-	tests := []struct {
-		inputItem        cb.Item
-		inputStrength    float32
-		expectedStrength float32
-	}{
-		// items in the connections map that should return their given strength
-		{*cb.CreateItem("test0", []cb.Color{cb.RED}, cb.TOP, cb.BLOUSE, 0), 5, 5},
-		{*cb.CreateItem("test1", []cb.Color{cb.BLUE}, cb.BOTTOMS, cb.DENIM, 1), 1, 1},
-		{*cb.CreateItem("test2", []cb.Color{cb.GREEN}, cb.OUTERWEAR, cb.JACKET, 2), -2, -2},
-		// items not in the connections map that shouldn't return strength
-		{*cb.CreateItem("test3", []cb.Color{cb.ORANGE}, cb.TOP, cb.BLOUSE, 3), cb.ERRCONNECTION, cb.ERRCONNECTION},
-		{*cb.CreateItem("test4", []cb.Color{cb.WHITE}, cb.ACCESSORY, cb.SCARF, 4), cb.ERRCONNECTION, cb.ERRCONNECTION},
-		// self item: shouldn't return connection
-		{*cb.CreateItem("test5", []cb.Color{cb.BLACK, cb.WHITE}, cb.OUTERWEAR, cb.JACKET, 5), cb.ERRCONNECTION, cb.ERRCONNECTION},
-		// err item: shouldn't return connection
-		{cb.CreateEmptyItem(), cb.ERRCONNECTION, cb.ERRCONNECTION},
-	}
-
-	testIR := cb.CreateRelationships(SELFID)
-	for i := range 3 {
-		testIR.AddConnection(tests[i].inputItem, tests[i].inputStrength)
-	}
-
-	for idx, test := range tests {
-		currC := testIR.GetConnection(test.inputItem.GetID())
-		if currC != test.expectedStrength {
-			t.Errorf("\nTest case %d FAILED: GetConnection returned incorrect strength for item %d", idx, test.inputItem.GetID())
-			if *testPkg.ExtraVerbose {
-				t.Errorf("\nexpected strength: %f\nactual strength: %f", test.expectedStrength, currC)
-			}
-			continue
-		}
-
-		t.Logf("test case %d PASSED", idx)
-
 	}
 }
