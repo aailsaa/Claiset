@@ -142,10 +142,10 @@ func (o Item) Equals(other any) bool {
 //// ISVALID ///////////////////////////////////////////////////////////////////////////////////////////////
 
 // IsValidItem: check if item is valid by going through all fields of item
-func IsValidItem(o Item) error {
+func IsValidItem(o Item) (*Item, error) {
 	errs := []error{}
 
-	nErr := IsValidNecessaryInfo(o.necessary)
+	_, nErr := IsValidNecessaryInfo(o.necessary)
 	if nErr != nil {
 		errs = append(errs, nErr)
 	}
@@ -161,9 +161,9 @@ func IsValidItem(o Item) error {
 	}
 
 	if len(errs) == 0 {
-		return nil
+		return &o, nil
 	}
 
-	return errors.Join(errs...)
+	return nil, errors.Join(errs...)
 
 }

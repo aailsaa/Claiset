@@ -186,11 +186,11 @@ func (n NecessaryInfo) Equals(other NecessaryInfo) bool {
 //// ISVALID ///////////////////////////////////////////////////////////////////////////////////////////////
 
 // IsValidNecessaryInfo: check if NecessaryInfo is valid by going through all fields
-// returns error if NecessaryInfo is invalid
-func IsValidNecessaryInfo(n NecessaryInfo) error {
+// returns NecessaryInfo if validated or error if NecessaryInfo is invalid
+func IsValidNecessaryInfo(n NecessaryInfo) (*NecessaryInfo, error) {
 	// if n is the generic empty/error necessaryInfo item, returns error flag
 	if n.Equals(createEmptyNecessary()) {
-		return fmt.Errorf("necessary info is empty: %w", ErrInvalidNecessaryInfo)
+		return nil, fmt.Errorf("necessary info is empty: %w", ErrInvalidNecessaryInfo)
 	}
 
 	// otherwise must go through all fields and check validity:
@@ -231,16 +231,16 @@ func IsValidNecessaryInfo(n NecessaryInfo) error {
 	}
 
 	if len(errs) == 0 {
-		return nil
+		return &n, nil
 	} else if len(errs) == 1 {
-		return errs[0]
+		return nil, errs[0]
 	}
-	return errors.Join(errs...)
+	return nil, errors.Join(errs...)
 }
 
 //// ISVALID: NECESSARYINFO FIELDS /////////////////////////////////////////////////////////////////////////
 
-// IsValidName: check if given string is a valid name,  and return validated name or error
+// IsValidName: check if given string is a valid name, and return validated name or error
 func IsValidName(n string) (string, error) {
 	n = strings.TrimSpace(n)
 	switch n {
