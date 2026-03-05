@@ -160,10 +160,10 @@ func IsValidOutfit(o Outfit) (*Outfit, error) {
 	}
 
 	// go through all items and check for error items
-	for _, item := range o.items {
+	for idx, item := range o.items {
 		_, iErr := IsValidItem(*item)
 		if iErr != nil {
-			return nil, fmt.Errorf("error in item %d: %w", ErrInvalidOutfit)
+			return nil, fmt.Errorf("error in item %d: %w", idx, ErrInvalidOutfit)
 		}
 	}
 
