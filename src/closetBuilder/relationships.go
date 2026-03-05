@@ -137,7 +137,7 @@ func (r Relationships) HasOutfitInOBI(otherID int, outfit *Outfit) bool {
 // AddConnection: create a new connection with other item and given strength
 func (r *Relationships) AddConnection(other Item, strength float32) {
 	// if other item is invalid, returns without creating connection
-	_, err := IsValidItem(other)
+	_, err := other.IsValid()
 	if err != nil {
 		return
 	}
@@ -465,9 +465,9 @@ func (r Relationships) Equals(other any) bool {
 
 //// ISVALID ///////////////////////////////////////////////////////////////////////////////////////////////
 
-// IsValidRelationships: ensure Relationships struct is valid
+// IsValid: ensure Relationships struct is valid
 // the only thing to check for validity in Relationships is the itemID
-func IsValidRelationships(r Relationships) error {
+func (r Relationships) IsValid() error {
 	if r.itemID == ERRID {
 		return fmt.Errorf("error in ID: %w", ErrInvalidRelationships)
 	} else if r.itemID < ERRID {

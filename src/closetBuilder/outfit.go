@@ -40,7 +40,7 @@ func CreateOutfit(name string, items []Item, ID int) Outfit {
 	items = util.RemoveCustomDuplicates(items)
 	itemMap := make(map[int]*Item)
 	for _, item := range items {
-		_, iErr := IsValidItem(item)
+		_, iErr := item.IsValid()
 		if iErr != nil {
 			continue
 		}
@@ -112,7 +112,7 @@ func (o *Outfit) SetItems(items []Item) {
 	items = util.RemoveCustomDuplicates(items)
 	itemMap := make(map[int]*Item)
 	for _, item := range items {
-		_, iErr := IsValidItem(item)
+		_, iErr := item.IsValid()
 		if iErr != nil {
 			continue
 		}
@@ -152,8 +152,8 @@ func (o Outfit) Equals(other any) bool {
 
 //// ISVALID ///////////////////////////////////////////////////////////////////////////////////////////////
 
-// IsValidOutfit: ensure outfit struct is valid
-func IsValidOutfit(o Outfit) (*Outfit, error) {
+// IsValid: ensure outfit struct is valid
+func (o Outfit) IsValid() (*Outfit, error) {
 	// check if name is valid
 	if o.name == ERRNAME {
 		return nil, fmt.Errorf("error in name: %w", ErrInvalidOutfit)
@@ -161,7 +161,7 @@ func IsValidOutfit(o Outfit) (*Outfit, error) {
 
 	// go through all items and check for error items
 	for idx, item := range o.items {
-		_, iErr := IsValidItem(*item)
+		_, iErr := item.IsValid()
 		if iErr != nil {
 			return nil, fmt.Errorf("error in item %d: %w", idx, ErrInvalidOutfit)
 		}

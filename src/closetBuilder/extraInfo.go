@@ -160,8 +160,8 @@ func (e ExtraInfo) Equals(other ExtraInfo) bool {
 
 //// ISVALID ///////////////////////////////////////////////////////////////////////////////////////////////
 
-// IsValidExtraInfo: check if given ExtraInfo struct is valid
-func IsValidExtraInfo(e ExtraInfo) error {
+// IsValid: check if given ExtraInfo struct is valid
+func (e ExtraInfo) IsValid() error {
 	if e.Equals(CreateErrorExtra()) {
 		return fmt.Errorf("extra info is empty: %w", ErrInvalidExtraInfo)
 	}

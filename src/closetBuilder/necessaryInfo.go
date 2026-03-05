@@ -185,9 +185,9 @@ func (n NecessaryInfo) Equals(other NecessaryInfo) bool {
 
 //// ISVALID ///////////////////////////////////////////////////////////////////////////////////////////////
 
-// IsValidNecessaryInfo: check if NecessaryInfo is valid by going through all fields
+// IsValid: check if NecessaryInfo is valid by going through all fields
 // returns NecessaryInfo if validated or error if NecessaryInfo is invalid
-func IsValidNecessaryInfo(n NecessaryInfo) (*NecessaryInfo, error) {
+func (n NecessaryInfo) IsValid() (*NecessaryInfo, error) {
 	// if n is the generic empty/error necessaryInfo item, returns error flag
 	if n.Equals(createEmptyNecessary()) {
 		return nil, fmt.Errorf("necessary info is empty: %w", ErrInvalidNecessaryInfo)

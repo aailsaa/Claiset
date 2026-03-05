@@ -141,21 +141,21 @@ func (o Item) Equals(other any) bool {
 
 //// ISVALID ///////////////////////////////////////////////////////////////////////////////////////////////
 
-// IsValidItem: check if item is valid by going through all fields of item
-func IsValidItem(o Item) (*Item, error) {
+// IsValid: check if item is valid by going through all fields of item
+func (o Item) IsValid() (*Item, error) {
 	errs := []error{}
 
-	_, nErr := IsValidNecessaryInfo(o.necessary)
+	_, nErr := o.necessary.IsValid()
 	if nErr != nil {
 		errs = append(errs, nErr)
 	}
 
-	eErr := IsValidExtraInfo(o.extra)
+	eErr := o.extra.IsValid()
 	if eErr != nil {
 		errs = append(errs, eErr)
 	}
 
-	rErr := IsValidRelationships(o.relationships)
+	rErr := o.relationships.IsValid()
 	if rErr != nil {
 		errs = append(errs, rErr)
 	}
