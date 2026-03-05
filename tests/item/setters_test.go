@@ -64,7 +64,7 @@ func TestSetColors(t *testing.T) {
 		} else {
 			t.Logf(testPkg.TestMessage(idx, true))
 			if *testPkg.ExtraVerbose {
-				t.Errorf("case %d status:\nExpected/actual colors: %v", idx, cb.StringColors(test.expected))
+				t.Logf("case %d status:\nExpected/actual colors: %v", idx, cb.StringColors(test.expected))
 			}
 		}
 	}
