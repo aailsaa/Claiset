@@ -42,11 +42,16 @@ func TestGetSubFromCat(t *testing.T) {
 	for idx, test := range tests {
 		result := cb.GetSubFromCat(test.input)
 		if reflect.DeepEqual(result, test.expected) {
-			t.Logf("\nTest case %d PASSED", idx)
-		} else {
-			t.Errorf("\nTest case %d FAILED:", idx)
+			t.Logf(testPkg.TestMessage(idx, true))
 			if *testPkg.ExtraVerbose {
-				t.Logf("\nInput: %s\nExpected: %v\nActual: %v", test.input.String(), test.expected, result)
+				t.Logf("case %d results:\nInput: %s\nExpected: %v\nActual: %v",
+					idx, test.input.String(), test.expected, result)
+			}
+		} else {
+			t.Errorf(testPkg.TestMessage(idx, false))
+			if *testPkg.ExtraVerbose {
+				t.Errorf("case %d results:\nInput: %s\nExpected: %v\nActual: %v",
+					idx, test.input.String(), test.expected, result)
 			}
 		}
 	}

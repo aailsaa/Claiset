@@ -18,7 +18,7 @@ import (
 
 // these tests are all conducted on an empty Relationships object, independent of the Item object.
 
-// TestGetConnection: tests Relationship's GetConnection method
+// TestGetConnection: test Relationship's GetConnection method
 func TestGetConnection(t *testing.T) {
 	SELFID := 5
 	tests := []struct {
@@ -28,8 +28,11 @@ func TestGetConnection(t *testing.T) {
 	}{
 		// items in the connections map that should return their given strength
 		{*cb.CreateItem("test0", []cb.Color{cb.RED}, cb.TOP, cb.BLOUSE, 0), 5, 5},
+
 		{*cb.CreateItem("test1", []cb.Color{cb.BLUE}, cb.BOTTOMS, cb.DENIM, 1), 1, 1},
+
 		{*cb.CreateItem("test2", []cb.Color{cb.GREEN}, cb.OUTERWEAR, cb.JACKET, 2), -2, -2},
+
 		// items not in the connections map that shouldn't return strength
 		{*cb.CreateItem("test3", []cb.Color{cb.ORANGE}, cb.TOP, cb.BLOUSE, 3), cb.ERRCONNECTION, cb.ERRCONNECTION},
 		{*cb.CreateItem("test4", []cb.Color{cb.WHITE}, cb.ACCESSORY, cb.SCARF, 4), cb.ERRCONNECTION, cb.ERRCONNECTION},
@@ -47,17 +50,19 @@ func TestGetConnection(t *testing.T) {
 	for idx, test := range tests {
 		currC := testIR.GetConnection(test.inputItem.GetID())
 		if currC != test.expectedStrength {
-			t.Errorf("\nTest case %d FAILED: GetConnection returned incorrect strength for item %d", idx, test.inputItem.GetID())
+			t.Errorf(testPkg.TestMessage(idx, false))
 			if *testPkg.ExtraVerbose {
-				t.Errorf("\nexpected strength: %f\nactual strength: %f", test.expectedStrength, currC)
+				t.Errorf("case %d status:\nexpected strength: %f\nactual strength: %f",
+					idx, test.expectedStrength, currC)
 			}
 			continue
 		}
 
-		t.Logf("test case %d PASSED", idx)
+		t.Logf(testPkg.TestMessage(idx, true))
 	}
 }
 
+// TestHasConnection: test Relationship's HasConnection method
 func TestHasConnection(t *testing.T) {
 	SELFID := 5
 	tests := []struct {
@@ -85,14 +90,14 @@ func TestHasConnection(t *testing.T) {
 	for idx, test := range tests {
 		result := testIR.HasConnection(test.inputItem.GetID())
 		if result != test.expectedConnection {
-			t.Errorf("test case %d FAILED", idx)
+			t.Errorf(testPkg.TestMessage(idx, false))
 			if *testPkg.ExtraVerbose {
 				t.Errorf("expected connection status for item %d: %t\nactual status: %t",
 					test.inputItem.GetID(), test.expectedConnection, result)
 			}
 			continue
 		}
-		t.Logf("test case %d PASSED", idx)
+		t.Logf(testPkg.TestMessage(idx, true))
 	}
 
 }
@@ -125,27 +130,33 @@ func TestAddConnection(t *testing.T) {
 		errd := false
 
 		if resultStrength != test.expectedStrength {
-			t.Errorf("\nTest case %d FAILED:\nExpected connection strength: %f\n"+
-				"Actual connection strength: %f", idx, test.expectedStrength, resultStrength)
+			t.Errorf(testPkg.TestMessage(idx, false))
+			if *testPkg.ExtraVerbose {
+				t.Errorf("case %d status:\nincorrect result strength:\nExpected connection strength: %f\n"+
+					"Actual connection strength: %f", idx, test.expectedStrength, resultStrength)
+			}
 			errd = true
 		}
 
 		if otherResultStrength != test.expectedStrength {
-			t.Errorf("\nTest case %d FAILED:\nExpected connection strength in other item: %f\n"+
-				"Actual connection strength in other item: %f", idx, test.expectedStrength, otherResultStrength)
+			t.Errorf(testPkg.TestMessage(idx, false))
+			if *testPkg.ExtraVerbose {
+				t.Errorf("case %d status:\nincorrect strength in other item\nExpected connection strength in other item: %f\n"+
+					"Actual connection strength in other item: %f", idx, test.expectedStrength, otherResultStrength)
+			}
 			errd = true
 		}
 
-		if *testPkg.ExtraVerbose {
+		if errd && *testPkg.ExtraVerbose {
 			t.Errorf("\nCurrent state of ItemRelationships:\n%s", testIR.String())
-
 		}
 
 		if errd {
 			return
 		}
 
-		t.Logf("\nTest case %d PASSED", idx)
+		t.Logf(testPkg.TestMessage(idx, true))
+
 		if *testPkg.ExtraVerbose {
 			t.Logf("\nCurrent state of ItemRelationships:\n%s", testIR.String())
 		}
@@ -199,15 +210,23 @@ func TestSetConnection(t *testing.T) {
 		errd := false
 
 		if resultStrength != test.expectedStrength {
-			t.Errorf("\nTest case %d FAILED:\nExpected connection strength: %f\n"+
-				"Actual connection strength: %f", idx, test.expectedStrength, resultStrength)
+			if *testPkg.ExtraVerbose {
+				t.Errorf("case %d status:incorrect result strength:\nExpected connection strength: %f\n"+
+					"Actual connection strength: %f", idx, test.expectedStrength, resultStrength)
+			}
 			errd = true
 		}
 
 		if otherResultStrength != test.expectedStrength {
-			t.Errorf("\nTest case %d FAILED:\nExpected connection strength in other item: %f\n"+
-				"Actual connection strength in other item: %f", idx, test.expectedStrength, otherResultStrength)
+			if *testPkg.ExtraVerbose {
+				t.Errorf("case %d status:\nincorrect other item result strength\nExpected connection strength in other item: %f\n"+
+					"Actual connection strength in other item: %f", idx, test.expectedStrength, otherResultStrength)
+			}
 			errd = true
+		}
+
+		if errd {
+			t.Errorf(testPkg.TestMessage(idx, false))
 		}
 
 		if errd && *testPkg.ExtraVerbose {
@@ -215,7 +234,7 @@ func TestSetConnection(t *testing.T) {
 			return
 		}
 
-		t.Logf("\nTest case %d PASSED", idx)
+		t.Logf(testPkg.TestMessage(idx, true))
 		if *testPkg.ExtraVerbose {
 			t.Logf("\nCurrent state of ItemRelationships:\n%s", testIR.String())
 		}
@@ -251,16 +270,22 @@ func TestRemoveConnection(t *testing.T) {
 		testIR.RemoveConnection(test.removeItem)
 		errd := false
 		if testIR.HasConnection(test.removeItem.GetID()) {
-			t.Errorf("\nTest case %d FAILED: connections map still contains item %d", idx, test.removeItem.GetID())
+			if *testPkg.ExtraVerbose {
+				t.Errorf("case %d status:\nconnections map still contains item %d", idx, test.removeItem.GetID())
+			}
 			errd = true
 		}
 		if test.removeItem.HasConnection(SELFID) {
-			t.Errorf("\nTest case %d FAILED: item %d still has connection to main test item", idx, test.removeItem.GetID())
+			if *testPkg.ExtraVerbose {
+				t.Errorf("case %d status:\nitem %d still has connection to main test item", idx, test.removeItem.GetID())
+			}
 			errd = true
 		}
 
 		if !errd {
-			t.Logf("\nTest case %d PASSED", idx)
+			t.Logf(testPkg.TestMessage(idx, true))
+		} else {
+			t.Errorf(testPkg.TestMessage(idx, false))
 		}
 
 		if *testPkg.ExtraVerbose {

@@ -28,11 +28,14 @@ func TestRemoveDuplicates(t *testing.T) {
 	for idx, test := range testColors {
 		result := util.RemoveDuplicates(test.input)
 		if reflect.DeepEqual(result, test.expected) {
-			t.Logf("\nTest %d PASSED", idx)
-		} else {
-			t.Logf("\nTest %d FAILED:", idx)
+			t.Logf(testPkg.TestMessage(idx, true))
 			if *testPkg.ExtraVerbose {
-				t.Logf("\nInput: %v\nExpected: %v\nActual: %v", test.input, test.expected, result)
+				t.Logf("case %d status:\nInput: %v\nExpected/actual: %v", idx, test.input, result)
+			}
+		} else {
+			t.Errorf(testPkg.TestMessage(idx, false))
+			if *testPkg.ExtraVerbose {
+				t.Errorf("case %d status:\nInput: %v\nExpected: %v\nActual: %v", idx, test.input, test.expected, result)
 			}
 		}
 	}

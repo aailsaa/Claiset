@@ -26,11 +26,20 @@ func TestAddItem(t *testing.T) {
 	for idx, test := range tests {
 		testCloset.AddItem(test.inputName, test.inputColors, test.inputCategory, test.inputSubcategory)
 		if testCloset.GetSize() <= currentSize {
-			t.Errorf("\nTest case %d FAILED:\nexpected size: %d\nactual size: %d", idx, test.expectedSize, testCloset.GetSize())
+			t.Errorf(testPkg.TestMessage(idx, false))
+			if *testPkg.ExtraVerbose {
+				t.Errorf("case %d results:\nexpected size: %d\nactual size: %d",
+					idx, test.expectedSize, testCloset.GetSize())
+			}
 		} else if testCloset.GetSize() != testCloset.GetTotalItems() {
-			t.Errorf("\nTest case %d FAILED: inaccurate total item counter:\ncounter: %d\nactual size: %d", idx, testCloset.GetTotalItems(), testCloset.GetSize())
+			t.Errorf(testPkg.TestMessage(idx, false))
+			if *testPkg.ExtraVerbose {
+				t.Errorf("case %d results:\ninaccurate total item counter:\ncounter: %d\nactual size: %d",
+					idx, testCloset.GetTotalItems(), testCloset.GetSize())
+			}
+
 		} else {
-			t.Logf("\nTest case %d PASSED", idx)
+			t.Logf(testPkg.TestMessage(idx, true))
 		}
 
 		if *testPkg.ExtraVerbose {
@@ -64,28 +73,37 @@ func TestAddIntegrity(t *testing.T) {
 		testCloset.AddItem(test.inputName, test.inputColors, test.inputCategory, test.inputSubcategory)
 		//first checks that item is added
 		if testCloset.GetSize() <= currentSize {
-			t.Errorf("\nTest case %d failed to add item", idx)
+			t.Errorf(testPkg.TestMessage(idx, false))
+			if *testPkg.ExtraVerbose {
+				t.Errorf("case %d status:\nfailed to add item %d", idx, currentIndex)
+			}
 			continue
 		}
 		currentSize++
 		//integrity check
 		addedItem, err := testCloset.GetItem(currentIndex)
 		if err != nil {
-			t.Errorf("\nTest case %d failed to find item %d", idx, currentIndex)
+			t.Errorf(testPkg.TestMessage(idx, false))
+			if *testPkg.ExtraVerbose {
+				t.Errorf("case %d status:\nfailed to find item %d", idx, currentIndex)
+			}
 		}
 		if addedItem.GetName() == test.inputName &&
 			reflect.DeepEqual(addedItem.GetColors(), test.inputColors) &&
 			addedItem.GetCategory() == test.inputCategory &&
 			addedItem.GetSubcategory() == test.inputSubcategory {
-			t.Logf("\nTest case %d PASSED", idx)
+			t.Logf(testPkg.TestMessage(idx, true))
 		} else {
-			t.Errorf("\nTest case %d FAILED: inaccurate item information:\n"+ //
-				"Expected name: %s\tActual name %s\n"+ //
-				"Expected colors: %v\tActual colors: %v"+ //
-				"Expected category: %s\tActual category: %s\n"+ //
-				"Expected subcategory: %d\tActual subcategory: %d\n",
-				idx, test.inputName, addedItem.GetName(), cb.StringColors(test.inputColors), cb.StringColors(addedItem.GetColors()),
-				test.inputCategory.String(), addedItem.GetCategory().String(), test.inputSubcategory, addedItem.GetSubcategory())
+			t.Errorf(testPkg.TestMessage(idx, false))
+			if *testPkg.ExtraVerbose {
+				t.Errorf("case %d status:\ninaccurate item information:\n"+ //
+					"Expected name: %s\tActual name %s\n"+ //
+					"Expected colors: %v\tActual colors: %v"+ //
+					"Expected category: %s\tActual category: %s\n"+ //
+					"Expected subcategory: %d\tActual subcategory: %d\n",
+					idx, test.inputName, addedItem.GetName(), cb.StringColors(test.inputColors), cb.StringColors(addedItem.GetColors()),
+					test.inputCategory.String(), addedItem.GetCategory().String(), test.inputSubcategory, addedItem.GetSubcategory())
+			}
 		}
 		currentIndex++
 		if *testPkg.ExtraVerbose {
