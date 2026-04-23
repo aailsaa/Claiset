@@ -21,11 +21,13 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 }
 
 function drawCheckerboard(ctx: CanvasRenderingContext2D, w: number, h: number) {
+  ctx.clearRect(0, 0, w, h)
   const size = 12
   for (let y = 0; y < h; y += size) {
     for (let x = 0; x < w; x += size) {
       const odd = ((x / size) ^ (y / size)) & 1
-      ctx.fillStyle = odd ? 'rgba(0,0,0,0.06)' : 'rgba(0,0,0,0.02)'
+      // Use opaque colors so repeated redraws don't "darken" via alpha stacking.
+      ctx.fillStyle = odd ? '#eef0f2' : '#f8f9fa'
       ctx.fillRect(x, y, size, size)
     }
   }
@@ -40,18 +42,32 @@ export function PhotoEditorModal({ open, imageSrc, originalSrc, onCancel, onSave
   const [tab, setTab] = useState<'crop' | 'refine'>('crop')
   const [brushMode, setBrushMode] = useState<'restore' | 'erase'>('restore')
   const [brushSize, setBrushSize] = useState(22)
+  const [refineZoom, setRefineZoom] = useState(1)
+  const [refineCenter, setRefineCenter] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
   const [workingSrc, setWorkingSrc] = useState<string | null>(null)
   const [loadingRefine, setLoadingRefine] = useState(false)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const refineHostRef = useRef<HTMLDivElement | null>(null)
   const rafRef = useRef<number | null>(null)
   const isPaintingRef = useRef(false)
   const originalDataRef = useRef<ImageData | null>(null)
   const workingDataRef = useRef<ImageData | null>(null)
+  const offscreenRef = useRef<HTMLCanvasElement | null>(null)
+  const viewRef = useRef<{ scale: number; ox: number; oy: number; w: number; h: number; dpr: number }>({
+    scale: 1,
+    ox: 0,
+    oy: 0,
+    w: 1,
+    h: 1,
+    dpr: 1,
+  })
 
   useEffect(() => {
     if (!open) return
     setTab('crop')
     setWorkingSrc(imageSrc)
+    setRefineZoom(1)
+    setRefineCenter({ x: 0, y: 0 })
   }, [open, imageSrc])
 
   const canSave = useMemo(
@@ -70,9 +86,14 @@ export function PhotoEditorModal({ open, imageSrc, originalSrc, onCancel, onSave
         const w = Math.max(1, workImg.naturalWidth || workImg.width)
         const h = Math.max(1, workImg.naturalHeight || workImg.height)
         const canvas = canvasRef.current
-        if (!canvas) return
-        canvas.width = w
-        canvas.height = h
+        const host = refineHostRef.current
+        if (!canvas || !host) return
+        const dpr = window.devicePixelRatio || 1
+        const hostRect = host.getBoundingClientRect()
+        const cw = Math.max(1, Math.round(hostRect.width * dpr))
+        const ch = Math.max(1, Math.round(hostRect.height * dpr))
+        canvas.width = cw
+        canvas.height = ch
         const ctx = canvas.getContext('2d')
         if (!ctx) return
 
@@ -94,9 +115,29 @@ export function PhotoEditorModal({ open, imageSrc, originalSrc, onCancel, onSave
         wCtx.drawImage(workImg, 0, 0, w, h)
         workingDataRef.current = wCtx.getImageData(0, 0, w, h)
 
+        // Offscreen buffer at native resolution.
+        const off = document.createElement('canvas')
+        off.width = w
+        off.height = h
+        const offCtx = off.getContext('2d')
+        if (!offCtx) return
+        offCtx.putImageData(workingDataRef.current, 0, 0)
+        offscreenRef.current = off
+
+        // Compute contain transform (native -> visible canvas).
+        const baseScale = Math.min(cw / w, ch / h)
+        const scale = baseScale * refineZoom
+        const drawW = w * scale
+        const drawH = h * scale
+        const centerX = refineCenter.x || w / 2
+        const centerY = refineCenter.y || h / 2
+        const ox = cw / 2 - centerX * scale
+        const oy = ch / 2 - centerY * scale
+        viewRef.current = { scale, ox, oy, w, h, dpr }
+
         // Initial paint
-        drawCheckerboard(ctx, w, h)
-        ctx.putImageData(workingDataRef.current, 0, 0)
+        drawCheckerboard(ctx, cw, ch)
+        ctx.drawImage(off, ox, oy, drawW, drawH)
       } finally {
         if (!cancelled) setLoadingRefine(false)
       }
@@ -104,7 +145,32 @@ export function PhotoEditorModal({ open, imageSrc, originalSrc, onCancel, onSave
     return () => {
       cancelled = true
     }
-  }, [open, tab, workingSrc, originalSrc])
+  }, [open, tab, workingSrc, originalSrc, refineZoom, refineCenter])
+
+  useEffect(() => {
+    if (!open || tab !== 'refine') return
+    const canvas = canvasRef.current
+    const host = refineHostRef.current
+    const off = offscreenRef.current
+    const data = workingDataRef.current
+    if (!canvas || !host || !off || !data) return
+    const dpr = window.devicePixelRatio || 1
+    const hostRect = host.getBoundingClientRect()
+    const cw = Math.max(1, Math.round(hostRect.width * dpr))
+    const ch = Math.max(1, Math.round(hostRect.height * dpr))
+    const w = off.width
+    const h = off.height
+    canvas.width = cw
+    canvas.height = ch
+    const baseScale = Math.min(cw / w, ch / h)
+    const scale = baseScale * refineZoom
+    const centerX = refineCenter.x || w / 2
+    const centerY = refineCenter.y || h / 2
+    const ox = cw / 2 - centerX * scale
+    const oy = ch / 2 - centerY * scale
+    viewRef.current = { scale, ox, oy, w, h, dpr }
+    scheduleCanvasRedraw()
+  }, [open, tab, refineZoom, refineCenter])
 
   function scheduleCanvasRedraw() {
     if (rafRef.current != null) return
@@ -113,9 +179,14 @@ export function PhotoEditorModal({ open, imageSrc, originalSrc, onCancel, onSave
       const canvas = canvasRef.current
       const ctx = canvas?.getContext('2d')
       const data = workingDataRef.current
-      if (!canvas || !ctx || !data) return
+      const off = offscreenRef.current
+      const v = viewRef.current
+      if (!canvas || !ctx || !data || !off) return
+      const offCtx = off.getContext('2d')
+      if (!offCtx) return
+      offCtx.putImageData(data, 0, 0)
       drawCheckerboard(ctx, canvas.width, canvas.height)
-      ctx.putImageData(data, 0, 0)
+      ctx.drawImage(off, v.ox, v.oy, v.w * v.scale, v.h * v.scale)
     })
   }
 
@@ -125,11 +196,16 @@ export function PhotoEditorModal({ open, imageSrc, originalSrc, onCancel, onSave
     const work = workingDataRef.current
     if (!canvas || !orig || !work) return
     const rect = canvas.getBoundingClientRect()
-    const x = Math.round(((clientX - rect.left) / rect.width) * canvas.width)
-    const y = Math.round(((clientY - rect.top) / rect.height) * canvas.height)
+    const v = viewRef.current
+    const dpr = v.dpr || (window.devicePixelRatio || 1)
+    const cx = (clientX - rect.left) * dpr
+    const cy = (clientY - rect.top) * dpr
+    const x = Math.round((cx - v.ox) / v.scale)
+    const y = Math.round((cy - v.oy) / v.scale)
     const r = Math.max(4, Math.round(brushSize))
-    const w = canvas.width
-    const h = canvas.height
+    const w = orig.width
+    const h = orig.height
+    if (x < 0 || y < 0 || x >= w || y >= h) return
     const x0 = Math.max(0, x - r)
     const x1 = Math.min(w - 1, x + r)
     const y0 = Math.max(0, y - r)
@@ -156,7 +232,7 @@ export function PhotoEditorModal({ open, imageSrc, originalSrc, onCancel, onSave
   }
 
   async function commitRefineToWorkingSrc() {
-    const canvas = canvasRef.current
+    const canvas = offscreenRef.current
     const data = workingDataRef.current
     if (!canvas || !data) return
     const out = document.createElement('canvas')
@@ -224,10 +300,46 @@ export function PhotoEditorModal({ open, imageSrc, originalSrc, onCancel, onSave
                 showGrid={false}
               />
             ) : (
-              <div className="relative h-full w-full">
+              <div ref={refineHostRef} className="relative h-full w-full">
                 <canvas
                   ref={canvasRef}
                   className="h-full w-full touch-none"
+                  onWheel={(e) => {
+                    // Two-finger trackpad scroll should zoom in/out.
+                    e.preventDefault()
+                    const canvas = canvasRef.current
+                    const off = offscreenRef.current
+                    if (!canvas || !off) return
+                    const v = viewRef.current
+                    const rect = canvas.getBoundingClientRect()
+                    const dpr = v.dpr || (window.devicePixelRatio || 1)
+                    const cx = (e.clientX - rect.left) * dpr
+                    const cy = (e.clientY - rect.top) * dpr
+                    // Image coords under cursor before zoom
+                    const ix = (cx - v.ox) / v.scale
+                    const iy = (cy - v.oy) / v.scale
+
+                    const factor = Math.exp(-e.deltaY * 0.0015)
+                    const nextZoom = Math.min(4, Math.max(1, refineZoom * factor))
+                    if (!Number.isFinite(nextZoom)) return
+
+                    setRefineZoom(nextZoom)
+                    // Keep the same image point under cursor by setting center accordingly.
+                    // Center is where canvas center maps to in image coords after zoom.
+                    const host = refineHostRef.current
+                    if (!host) return
+                    const hostRect = host.getBoundingClientRect()
+                    const cw = Math.max(1, Math.round(hostRect.width * dpr))
+                    const ch = Math.max(1, Math.round(hostRect.height * dpr))
+                    const baseScale = Math.min(cw / off.width, ch / off.height)
+                    const newScale = baseScale * nextZoom
+                    const newCenterX = (ix * newScale - (cx - cw / 2)) / newScale
+                    const newCenterY = (iy * newScale - (cy - ch / 2)) / newScale
+                    setRefineCenter({
+                      x: Math.max(0, Math.min(off.width, newCenterX)),
+                      y: Math.max(0, Math.min(off.height, newCenterY)),
+                    })
+                  }}
                   onPointerDown={(e) => {
                     isPaintingRef.current = true
                     ;(e.currentTarget as HTMLCanvasElement).setPointerCapture(e.pointerId)
@@ -309,6 +421,16 @@ export function PhotoEditorModal({ open, imageSrc, originalSrc, onCancel, onSave
                       Erase
                     </button>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRefineZoom(1)
+                      setRefineCenter({ x: 0, y: 0 })
+                    }}
+                    className="mt-3 w-full rounded-full border border-[var(--color-line)] bg-white px-4 py-2 text-sm font-semibold text-[var(--color-ink)] hover:bg-[var(--color-paper)]"
+                  >
+                    Recenter view
+                  </button>
                   <label className="mt-4 block text-xs font-medium text-[var(--color-muted)]">
                     Brush size
                     <input
@@ -322,10 +444,6 @@ export function PhotoEditorModal({ open, imageSrc, originalSrc, onCancel, onSave
                     />
                   </label>
                 </div>
-                <p className="text-xs text-[var(--color-muted)]">
-                  Use <span className="font-semibold">Restore</span> to fill holes in the item. Use{' '}
-                  <span className="font-semibold">Erase</span> to remove leftover background.
-                </p>
               </>
             )}
 
@@ -362,7 +480,8 @@ export function PhotoEditorModal({ open, imageSrc, originalSrc, onCancel, onSave
             </div>
 
             <p className="text-xs text-[var(--color-muted)]">
-              Tip: If the sweater has holes, use Refine → Restore before saving.
+              Tip: Use <span className="font-semibold">Restore</span> to bring back parts of the item, and{' '}
+              <span className="font-semibold">Erase</span> to remove leftover background. You can switch between them as needed.
             </p>
           </div>
         </div>
