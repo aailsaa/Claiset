@@ -1,4 +1,4 @@
-package closetBuilder
+package closet
 
 import (
 	"errors"
@@ -17,36 +17,36 @@ var ErrInvalidItem = errors.New("invalid item")
 //// TYPES /////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Item: an item of clothing
-// Item impelements the CustomComparable interface with functions GetID and Equals
-type Item struct {
+// LocalItem: an item of clothing
+// LocalItem implements the CustomComparable interface with functions GetID and Equals
+type LocalItem struct {
 	necessary     NecessaryInfo
 	extra         ExtraInfo
-	relationships Relationships
+	relationships LocalRelationships
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //// CONSTRUCTORS //////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Item constructor: take in necessary data and create new item
+// CreateItem: take in necessary data and create new item
 // if any necessary data isn't present, fail to create item
-func CreateItem(name string, cs []Color, cat Category, subcat Subcategory, id int) *Item {
+func CreateItem(name string, cs []Color, cat Category, subcat Subcategory, id int) *LocalItem {
 	n := CreateNecessaryInfo(name, cs, cat, subcat, id)
 	if n == nil {
 		return nil
 	}
 
-	return &Item{
+	return &LocalItem{
 		necessary:     *n,
 		extra:         CreateEmptyExtra(),
 		relationships: CreateRelationships(id),
 	}
 }
 
-// Empty Item constructor: set all item info to default values
-func CreateEmptyItem() Item {
-	return Item{
+// CreateEmptyItem: set all item info to default values
+func CreateEmptyItem() LocalItem {
+	return LocalItem{
 		necessary:     createEmptyNecessary(),
 		extra:         CreateEmptyExtra(),
 		relationships: createEmptyRelationships(),
@@ -59,33 +59,33 @@ func CreateEmptyItem() Item {
 
 // // ITEM ACCESSORS ////////////////////////////////////////////////////////////////////////////////////////
 // access necessary info through item
-func (o Item) GetName() string             { return o.necessary.GetName() }
-func (o Item) GetColors() []Color          { return o.necessary.GetColors() }
-func (o Item) GetCategory() Category       { return o.necessary.GetCategory() }
-func (o Item) GetSubcategory() Subcategory { return o.necessary.GetSubcategory() }
-func (o Item) GetID() int                  { return o.necessary.GetID() }
+func (o LocalItem) GetName() string             { return o.necessary.GetName() }
+func (o LocalItem) GetColors() []Color          { return o.necessary.GetColors() }
+func (o LocalItem) GetCategory() Category       { return o.necessary.GetCategory() }
+func (o LocalItem) GetSubcategory() Subcategory { return o.necessary.GetSubcategory() }
+func (o LocalItem) GetID() int                  { return o.necessary.GetID() }
 
 // access extra info through item
-func (o Item) GetDate() time.Time { return o.extra.GetDate() }
-func (o Item) GetPrice() float32  { return o.extra.GetPrice() }
-func (o Item) GetWears() int      { return o.extra.GetWears() }
+func (o LocalItem) GetDate() time.Time { return o.extra.GetDate() }
+func (o LocalItem) GetPrice() float32  { return o.extra.GetPrice() }
+func (o LocalItem) GetWears() int      { return o.extra.GetWears() }
 
 // access relationship item:
 // access whole relationship maps through item:
-func (o Item) GetAllConnections() ConnectionsMap      { return o.relationships.GetAllConnections() }
-func (o Item) GetAllOutfitsByItem() OutfitsByItemsMap { return o.relationships.GetAllOutfitsByItems() }
-func (o Item) GetAllOutfits() AllOutfitsMap           { return o.relationships.GetAllOutfits() }
+func (o LocalItem) GetAllConnections() ConnectionsMap      { return o.relationships.GetAllConnections() }
+func (o LocalItem) GetAllOutfitsByItem() OutfitsByItemsMap { return o.relationships.GetAllOutfitsByItems() }
+func (o LocalItem) GetAllOutfits() AllOutfitsMap           { return o.relationships.GetAllOutfits() }
 
 // access specific getters:
-func (o Item) GetConnection(itemID int) float32 { return o.relationships.GetConnection(itemID) }
-func (o Item) GetOutfitsByItem(itemID int) map[int]*Outfit {
+func (o LocalItem) GetConnection(itemID int) float32 { return o.relationships.GetConnection(itemID) }
+func (o LocalItem) GetOutfitsByItem(itemID int) map[int]*LocalOutfit {
 	return o.relationships.GetOutfitsByItem(itemID)
 }
 
 // access checkers:
-func (o Item) HasConnection(itemID int) bool { return o.relationships.HasConnection(itemID) }
-func (o Item) HasItemInOBI(itemID int) bool  { return o.relationships.HasConnection(itemID) }
-func (o Item) HasOutfitInOBI(itemID int, outfit *Outfit) bool {
+func (o LocalItem) HasConnection(itemID int) bool { return o.relationships.HasConnection(itemID) }
+func (o LocalItem) HasItemInOBI(itemID int) bool  { return o.relationships.HasConnection(itemID) }
+func (o LocalItem) HasOutfitInOBI(itemID int, outfit *LocalOutfit) bool {
 	return o.relationships.HasOutfitInOBI(itemID, outfit)
 }
 
@@ -95,15 +95,15 @@ func (o Item) HasOutfitInOBI(itemID int, outfit *Outfit) bool {
 
 //// ITEM MUTATORS /////////////////////////////////////////////////////////////////////////////////////////
 
-func (o *Item) SetName(newName string)                  { o.necessary.SetName(newName) }
-func (o *Item) SetColors(cs []Color)                    { o.necessary.SetColors(cs) }
-func (o *Item) SetCategories(c Category, s Subcategory) { o.necessary.SetCategories(c, s) }
-func (o *Item) SetSubcategory(c Subcategory)            { o.necessary.SetSubcategory(c) }
-func (o *Item) SetID(id int)                            { o.necessary.SetID(id) }
+func (o *LocalItem) SetName(newName string)                  { o.necessary.SetName(newName) }
+func (o *LocalItem) SetColors(cs []Color)                    { o.necessary.SetColors(cs) }
+func (o *LocalItem) SetCategories(c Category, s Subcategory) { o.necessary.SetCategories(c, s) }
+func (o *LocalItem) SetSubcategory(c Subcategory)            { o.necessary.SetSubcategory(c) }
+func (o *LocalItem) SetID(id int)                            { o.necessary.SetID(id) }
 
-func (o *Item) SetDate(d time.Time) { o.extra.SetDate(d) }
-func (o *Item) SetPrice(p float32)  { o.extra.SetPrice(p) }
-func (o *Item) SetWears(w int)      { o.extra.SetWears(w) }
+func (o *LocalItem) SetDate(d time.Time) { o.extra.SetDate(d) }
+func (o *LocalItem) SetPrice(p float32)  { o.extra.SetPrice(p) }
+func (o *LocalItem) SetWears(w int)      { o.extra.SetWears(w) }
 
 //TODO: add mutators for relationships
 
@@ -111,8 +111,8 @@ func (o *Item) SetWears(w int)      { o.extra.SetWears(w) }
 //// STRING ////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Item String: return all fields of item stringed together
-func (o Item) String() string {
+// String: return all fields of item stringed together
+func (o LocalItem) String() string {
 	return o.necessary.String() + o.extra.String() + o.relationships.String()
 }
 
@@ -122,9 +122,9 @@ func (o Item) String() string {
 
 //// EQUALS ////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Equals: check if 2 Item structs are equal
-func (o Item) Equals(other any) bool {
-	otherItem, ok := other.(Item)
+// Equals: check if 2 LocalItem structs are equal
+func (o LocalItem) Equals(other any) bool {
+	otherItem, ok := other.(LocalItem)
 	if !ok {
 		return false
 	}
@@ -142,7 +142,7 @@ func (o Item) Equals(other any) bool {
 //// ISVALID ///////////////////////////////////////////////////////////////////////////////////////////////
 
 // IsValid: check if item is valid by going through all fields of item
-func (o Item) IsValid() (*Item, error) {
+func (o LocalItem) IsValid() (*LocalItem, error) {
 	errs := []error{}
 
 	_, nErr := o.necessary.IsValid()

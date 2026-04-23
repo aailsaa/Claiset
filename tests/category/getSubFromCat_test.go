@@ -1,7 +1,7 @@
 package tests
 
 import (
-	cb "OnlineCloset/src/closetBuilder"
+	cb "OnlineCloset/src/closet"
 	testPkg "OnlineCloset/tests"
 	"reflect"
 	"testing"

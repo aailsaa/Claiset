@@ -1,4 +1,4 @@
-package closetBuilder
+package closet
 
 // Color represents possible color options for clothing to be tagged as.
 

@@ -1,4 +1,4 @@
-package closetBuilder
+package closet
 
 import (
 	util "OnlineCloset/src/util"
@@ -15,16 +15,16 @@ import (
 const EMPTYOUTFITID = -1
 const ERROUTFITID = -2
 
-// error value for invalid Outfit
+// error value for invalid LocalOutfit
 var ErrInvalidOutfit = errors.New("invalid outfit")
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //// TYPES /////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-type Outfit struct {
+type LocalOutfit struct {
 	name     string
-	items    map[int]*Item
+	items    map[int]*LocalItem
 	wears    int
 	outfitID int
 
@@ -36,9 +36,9 @@ type Outfit struct {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // CreateOutfit: create a new outfit given name, items and id
-func CreateOutfit(name string, items []Item, ID int) Outfit {
+func CreateOutfit(name string, items []LocalItem, ID int) LocalOutfit {
 	items = util.RemoveCustomDuplicates(items)
-	itemMap := make(map[int]*Item)
+	itemMap := make(map[int]*LocalItem)
 	for _, item := range items {
 		_, iErr := item.IsValid()
 		if iErr != nil {
@@ -47,7 +47,7 @@ func CreateOutfit(name string, items []Item, ID int) Outfit {
 		itemMap[item.GetID()] = &item
 	}
 
-	return Outfit{
+	return LocalOutfit{
 		name:     name,
 		items:    itemMap,
 		wears:    0,
@@ -56,18 +56,18 @@ func CreateOutfit(name string, items []Item, ID int) Outfit {
 }
 
 // CreateEmptyOutfit: create a new outfit with empty values for all fields
-func CreateEmptyOutfit() Outfit {
-	return Outfit{
+func CreateEmptyOutfit() LocalOutfit {
+	return LocalOutfit{
 		name:     "new outfit",
-		items:    make(map[int]*Item),
+		items:    make(map[int]*LocalItem),
 		wears:    0,
 		outfitID: EMPTYOUTFITID,
 	}
 }
 
 // CreateErrorOutfit: create a new outfit with error values for all fields
-func CreateErrorOutfit() Outfit {
-	return Outfit{
+func CreateErrorOutfit() LocalOutfit {
+	return LocalOutfit{
 		name:     ERRNAME,
 		items:    nil,
 		wears:    -1,
@@ -76,10 +76,10 @@ func CreateErrorOutfit() Outfit {
 }
 
 // CreateCopyOutfit: create a new outfit with same items as given outfit
-func CreateCopyOutfit(o Outfit) Outfit {
+func CreateCopyOutfit(o LocalOutfit) LocalOutfit {
 	newItems := maps.Clone(o.items)
 
-	return Outfit{
+	return LocalOutfit{
 		items:    newItems,
 		wears:    0,
 		outfitID: EMPTYOUTFITID,
@@ -90,27 +90,27 @@ func CreateCopyOutfit(o Outfit) Outfit {
 /////ACCESSORS//////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-func (o Outfit) GetItems() map[int]*Item { return o.items }
+func (o LocalOutfit) GetItems() map[int]*LocalItem { return o.items }
 
-func (o Outfit) GetItemsSlice() []*Item {
-	rval := []*Item{}
+func (o LocalOutfit) GetItemsSlice() []*LocalItem {
+	rval := []*LocalItem{}
 	for _, v := range o.items {
 		rval = append(rval, v)
 	}
 	return rval
 }
 
-func (o Outfit) GetWears() int { return o.wears }
+func (o LocalOutfit) GetWears() int { return o.wears }
 
-func (o Outfit) GetID() int { return o.outfitID }
+func (o LocalOutfit) GetID() int { return o.outfitID }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////MUTATORS///////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-func (o *Outfit) SetItems(items []Item) {
+func (o *LocalOutfit) SetItems(items []LocalItem) {
 	items = util.RemoveCustomDuplicates(items)
-	itemMap := make(map[int]*Item)
+	itemMap := make(map[int]*LocalItem)
 	for _, item := range items {
 		_, iErr := item.IsValid()
 		if iErr != nil {
@@ -121,16 +121,20 @@ func (o *Outfit) SetItems(items []Item) {
 	o.items = itemMap
 }
 
-func (o *Outfit) SetWears(wears int) {
+func (o *LocalOutfit) SetWears(wears int) {
 	if wears < 0 {
 		return
 	}
 	o.wears = wears
 }
 
-func (o *Outfit) AddWear() { o.wears++ }
+func (o *LocalOutfit) AddWear() { o.wears++ }
 
-func (o *Outfit) SetOutfitID(outfitID int) { o.outfitID = outfitID }
+func (o *LocalOutfit) SetOutfitID(outfitID int) { o.outfitID = outfitID }
+
+func (o *LocalOutfit) RemoveItem(item LocalItem) {
+	delete(o.items, item.GetID())
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //// OUTFIT VALIDATION /////////////////////////////////////////////////////////////////////////////////////
@@ -138,8 +142,8 @@ func (o *Outfit) SetOutfitID(outfitID int) { o.outfitID = outfitID }
 
 //// EQUALS ////////////////////////////////////////////////////////////////////////////////////////////////
 
-func (o Outfit) Equals(other any) bool {
-	otherO, ok := other.(Outfit)
+func (o LocalOutfit) Equals(other any) bool {
+	otherO, ok := other.(LocalOutfit)
 	if !ok {
 		return false
 	}
@@ -153,7 +157,7 @@ func (o Outfit) Equals(other any) bool {
 //// ISVALID ///////////////////////////////////////////////////////////////////////////////////////////////
 
 // IsValid: ensure outfit struct is valid
-func (o Outfit) IsValid() (*Outfit, error) {
+func (o LocalOutfit) IsValid() (*LocalOutfit, error) {
 	// check if name is valid
 	if o.name == ERRNAME {
 		return nil, fmt.Errorf("error in name: %w", ErrInvalidOutfit)

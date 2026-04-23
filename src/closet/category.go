@@ -1,4 +1,4 @@
-package closetBuilder
+package closet
 
 // Category represents possible types of artices of clothing
 type Category int

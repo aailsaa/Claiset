@@ -1,0 +1,45 @@
+# --- OS / editor ---
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# --- Cursor ---
+.cursor/
+**/agent-transcripts/
+
+# --- Go ---
+bin/
+*.exe
+*.out
+*.test
+coverage.*
+
+# Go workspace/cache (rarely committed; safe to ignore)
+go.work
+go.work.sum
+
+# --- Web (Vite/React) ---
+web/node_modules/
+web/dist/
+web/dist-ssr/
+web/.vite/
+web/*.local
+
+# Env files (keep .env.example committed)
+web/.env
+web/.env.*
+!web/.env.example
+
+# Package manager caches
+web/.npm/
+web/.yarn/
+web/.pnpm-store/
+
+# --- Docker ---
+*.pid
+

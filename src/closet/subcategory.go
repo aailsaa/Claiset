@@ -1,4 +1,4 @@
-package closetBuilder
+package closet
 
 // Subcategory represents possible subcategories of each type of clothing
 

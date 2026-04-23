@@ -1,0 +1,16 @@
+# Local PostgreSQL for development. Point AWS RDS from Terraform at the same schema
+# (run cmd/migrate against RDS). DATABASE_URL for all three Go services + migrate.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: closet
+      POSTGRES_PASSWORD: closet
+      POSTGRES_DB: onlinecloset
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:

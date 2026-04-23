@@ -1,4 +1,4 @@
-package closetBuilder
+package closet
 
 import (
 	util "OnlineCloset/src/util"

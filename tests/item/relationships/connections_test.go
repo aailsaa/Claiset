@@ -1,12 +1,12 @@
 package tests
 
 import (
-	cb "OnlineCloset/src/closetBuilder"
+	cb "OnlineCloset/src/closet"
 	testPkg "OnlineCloset/tests"
 	"testing"
 )
 
-// connections_test tests all accessors and mutators for the "connections" field in the Relationships item.
+// connections_test tests all accessors and mutators for the "connections" field in LocalRelationships.
 
 // accessor tests include:
 //		* TestGetConnection:	Relationship.GetConnection
@@ -16,13 +16,13 @@ import (
 //		* TestSetConnection: 	Relationship.SetConnection
 //		* TestRemoveConnection: Relationship.RemoveConnection
 
-// these tests are all conducted on an empty Relationships object, independent of the Item object.
+// these tests are all conducted on an empty LocalRelationships value, independent of LocalItem.
 
 // TestGetConnection: test Relationship's GetConnection method
 func TestGetConnection(t *testing.T) {
 	SELFID := 5
 	tests := []struct {
-		inputItem        cb.Item
+		inputItem        cb.LocalItem
 		inputStrength    float32
 		expectedStrength float32
 	}{
@@ -66,7 +66,7 @@ func TestGetConnection(t *testing.T) {
 func TestHasConnection(t *testing.T) {
 	SELFID := 5
 	tests := []struct {
-		inputItem          cb.Item
+		inputItem          cb.LocalItem
 		expectedConnection bool
 	}{
 		// items in the connection map
@@ -106,7 +106,7 @@ func TestHasConnection(t *testing.T) {
 func TestAddConnection(t *testing.T) {
 	SELFID := 5
 	tests := []struct {
-		inputItem                       cb.Item
+		inputItem                       cb.LocalItem
 		inputStrength, expectedStrength float32
 	}{
 		// tests that should add a connection
@@ -168,7 +168,7 @@ func TestSetConnection(t *testing.T) {
 	DEFAULTCONNECTION := cb.NEUTRALCONNECTION
 	SELFID := 10
 	tests := []struct {
-		inputItem                       cb.Item
+		inputItem                       cb.LocalItem
 		inputStrength, expectedStrength float32
 	}{
 		// tests that should set a connection
@@ -245,7 +245,7 @@ func TestSetConnection(t *testing.T) {
 func TestRemoveConnection(t *testing.T) {
 	SELFID := 6
 	tests := []struct {
-		removeItem cb.Item
+		removeItem cb.LocalItem
 	}{
 		// items that should be removed because they're in the connections map
 		{*cb.CreateItem("test0", []cb.Color{cb.RED}, cb.TOP, cb.BLOUSE, 0)},
