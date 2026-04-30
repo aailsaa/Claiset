@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"os"
@@ -15,21 +16,23 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Item struct {
-	ID          int        `json:"id"`
-	Name        string     `json:"name"`
-	Colors      []string   `json:"colors"`
-	Category    string     `json:"category"`
-	Subcategory string     `json:"subcategory"`
-	Price       float64    `json:"price"`
-	Wears       int        `json:"wears"`
-	ItemDate    *time.Time `json:"itemDate,omitempty"`
-	PhotoDataURL *string   `json:"photoDataUrl,omitempty"`
-	Extra       json.RawMessage `json:"extra,omitempty"`
-	Archived    bool       `json:"archived"`
+	ID           int            `json:"id"`
+	Name         string         `json:"name"`
+	Colors       []string       `json:"colors"`
+	Category     string         `json:"category"`
+	Subcategory  string         `json:"subcategory"`
+	Price        float64        `json:"price"`
+	Wears        int            `json:"wears"`
+	ItemDate     *time.Time     `json:"itemDate,omitempty"`
+	CreatedAt    time.Time      `json:"createdAt"`
+	PhotoDataURL *string        `json:"photoDataUrl,omitempty"`
+	Extra        json.RawMessage `json:"extra,omitempty"`
+	Archived     bool           `json:"archived"`
 }
 
 type createItemBody struct {
@@ -106,6 +109,7 @@ func (m *memStore) update(user string, id int, next Item) (Item, bool) {
 	for i, r := range m.rows {
 		if r.UserSub == user && r.Item.ID == id {
 			next.ID = id
+			next.CreatedAt = r.Item.CreatedAt
 			m.rows[i].Item = next
 			return next, true
 		}
@@ -160,7 +164,7 @@ func main() {
 			}
 			ctx := req.Context()
 			rows, err := pool.Query(ctx, `
-				SELECT id, name, colors, category, subcategory, price, wears, item_date, photo_data_url, extra, archived
+				SELECT id, name, colors, category, subcategory, price, wears, item_date, created_at, photo_data_url, extra, archived
 				FROM items WHERE user_sub = $1 AND archived = false ORDER BY id`, user)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -174,7 +178,7 @@ func main() {
 				var itemDate *time.Time
 				var photo *string
 				var extraRaw []byte
-				if err := rows.Scan(&it.ID, &it.Name, &colorsRaw, &it.Category, &it.Subcategory, &it.Price, &it.Wears, &itemDate, &photo, &extraRaw, &it.Archived); err != nil {
+				if err := rows.Scan(&it.ID, &it.Name, &colorsRaw, &it.Category, &it.Subcategory, &it.Price, &it.Wears, &itemDate, &it.CreatedAt, &photo, &extraRaw, &it.Archived); err != nil {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
 				}
@@ -215,9 +219,10 @@ func main() {
 			w.Header().Set("Content-Type", "application/json")
 
 			if pool == nil {
+				now := time.Now().UTC()
 				it := mem.add(user, Item{
 					Name: body.Name, Colors: body.Colors, Category: body.Category,
-					Subcategory: body.Subcategory, Price: body.Price, Wears: body.Wears, ItemDate: body.ItemDate, PhotoDataURL: body.PhotoDataURL, Extra: body.Extra, Archived: body.Archived,
+					Subcategory: body.Subcategory, Price: body.Price, Wears: body.Wears, ItemDate: body.ItemDate, CreatedAt: now, PhotoDataURL: body.PhotoDataURL, Extra: body.Extra, Archived: body.Archived,
 				})
 				w.WriteHeader(http.StatusCreated)
 				_ = json.NewEncoder(w).Encode(it)
@@ -231,21 +236,22 @@ func main() {
 			}
 			ctx := req.Context()
 			var id int
+			var createdAt time.Time
 			err = pool.QueryRow(ctx, `
 				INSERT INTO items (user_sub, name, colors, category, subcategory, price, wears, item_date, photo_data_url, extra, archived)
 				VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7, $8, $9, $10::jsonb, $11)
-				RETURNING id`,
+				RETURNING id, created_at`,
 				user, body.Name, colorsJSON, body.Category, body.Subcategory, body.Price, body.Wears, body.ItemDate, body.PhotoDataURL,
 				body.Extra,
 				body.Archived,
-			).Scan(&id)
+			).Scan(&id, &createdAt)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
 			it := Item{
 				ID: id, Name: body.Name, Colors: body.Colors, Category: body.Category,
-				Subcategory: body.Subcategory, Price: body.Price, Wears: body.Wears, ItemDate: body.ItemDate, PhotoDataURL: body.PhotoDataURL, Extra: body.Extra, Archived: body.Archived,
+				Subcategory: body.Subcategory, Price: body.Price, Wears: body.Wears, ItemDate: body.ItemDate, CreatedAt: createdAt, PhotoDataURL: body.PhotoDataURL, Extra: body.Extra, Archived: body.Archived,
 			}
 			w.WriteHeader(http.StatusCreated)
 			_ = json.NewEncoder(w).Encode(it)
@@ -279,9 +285,9 @@ func main() {
 			var photo *string
 			var extraRaw []byte
 			err = pool.QueryRow(ctx, `
-				SELECT id, name, colors, category, subcategory, price, wears, item_date, photo_data_url, extra, archived
+				SELECT id, name, colors, category, subcategory, price, wears, item_date, created_at, photo_data_url, extra, archived
 				FROM items WHERE id = $1 AND user_sub = $2`, id, user,
-			).Scan(&it.ID, &it.Name, &colorsRaw, &it.Category, &it.Subcategory, &it.Price, &it.Wears, &itemDate, &photo, &extraRaw, &it.Archived)
+			).Scan(&it.ID, &it.Name, &colorsRaw, &it.Category, &it.Subcategory, &it.Price, &it.Wears, &itemDate, &it.CreatedAt, &photo, &extraRaw, &it.Archived)
 			if err != nil {
 				http.NotFound(w, req)
 				return
@@ -345,24 +351,26 @@ func main() {
 				return
 			}
 			ctx := req.Context()
-			cmdTag, err := pool.Exec(ctx, `
+			var createdAt time.Time
+			err = pool.QueryRow(ctx, `
 				UPDATE items
 				SET name = $1, colors = $2::jsonb, category = $3, subcategory = $4, price = $5, wears = $6, item_date = $7, photo_data_url = $8, extra = $9::jsonb, archived = $10
-				WHERE id = $11 AND user_sub = $12`,
+				WHERE id = $11 AND user_sub = $12
+				RETURNING created_at`,
 				body.Name, colorsJSON, body.Category, body.Subcategory, body.Price, body.Wears, body.ItemDate, body.PhotoDataURL, body.Extra,
 				body.Archived, id, user,
-			)
+			).Scan(&createdAt)
 			if err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					http.NotFound(w, req)
+					return
+				}
 				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-			if cmdTag.RowsAffected() == 0 {
-				http.NotFound(w, req)
 				return
 			}
 			it := Item{
 				ID: id, Name: body.Name, Colors: body.Colors, Category: body.Category,
-				Subcategory: body.Subcategory, Price: body.Price, Wears: body.Wears, ItemDate: body.ItemDate, PhotoDataURL: body.PhotoDataURL, Extra: body.Extra, Archived: body.Archived,
+				Subcategory: body.Subcategory, Price: body.Price, Wears: body.Wears, ItemDate: body.ItemDate, CreatedAt: createdAt, PhotoDataURL: body.PhotoDataURL, Extra: body.Extra, Archived: body.Archived,
 			}
 			_ = json.NewEncoder(w).Encode(it)
 		})

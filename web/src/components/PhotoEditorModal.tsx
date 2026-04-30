@@ -251,13 +251,13 @@ export function PhotoEditorModal({ open, imageSrc, originalSrc, onCancel, onSave
       <div className="w-full max-w-2xl overflow-hidden rounded-3xl border border-[var(--color-line)] bg-white shadow-xl">
         <div className="flex items-center justify-between border-b border-[var(--color-line)] px-5 py-4">
           <h3 className="text-sm font-semibold text-[var(--color-ink)]">Edit photo</h3>
-          <button type="button" onClick={onCancel} className="rounded-full px-2 py-1 text-sm text-[var(--color-muted)] hover:bg-[var(--color-paper)]">
+          <button type="button" onClick={onCancel} className="rounded-full px-2 py-1 text-sm text-[var(--color-muted)] hover:bg-[var(--color-hover)]">
             Close
           </button>
         </div>
 
         <div className="border-b border-[var(--color-line)] px-5 py-3">
-          <div className="flex items-center gap-2 rounded-2xl bg-[var(--color-paper)]/60 p-1">
+          <div className="flex items-center gap-2 rounded-2xl bg-[var(--color-surface)] p-1">
             <button
               type="button"
               onClick={() => setTab('crop')}
@@ -284,7 +284,7 @@ export function PhotoEditorModal({ open, imageSrc, originalSrc, onCancel, onSave
         </div>
 
         <div className="grid gap-4 p-5 sm:grid-cols-[minmax(0,1fr)_260px]">
-          <div className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-[var(--color-paper)]">
+          <div className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-[var(--color-surface)]">
             {tab === 'crop' ? (
               <Cropper
                 image={workingSrc ?? imageSrc}
@@ -404,7 +404,7 @@ export function PhotoEditorModal({ open, imageSrc, originalSrc, onCancel, onSave
                       className={`flex-1 rounded-full px-4 py-2 text-sm font-semibold ring-1 ${
                         brushMode === 'restore'
                           ? 'bg-[var(--color-sage)] text-white ring-[var(--color-sage)]'
-                          : 'bg-white text-[var(--color-ink)] ring-[var(--color-line)] hover:bg-[var(--color-paper)]'
+                          : 'bg-white text-[var(--color-ink)] ring-[var(--color-line)] hover:bg-[var(--color-hover)]'
                       }`}
                     >
                       Restore
@@ -414,8 +414,8 @@ export function PhotoEditorModal({ open, imageSrc, originalSrc, onCancel, onSave
                       onClick={() => setBrushMode('erase')}
                       className={`flex-1 rounded-full px-4 py-2 text-sm font-semibold ring-1 ${
                         brushMode === 'erase'
-                          ? 'bg-[var(--color-clay)] text-white ring-[var(--color-clay)]'
-                          : 'bg-white text-[var(--color-ink)] ring-[var(--color-line)] hover:bg-[var(--color-paper)]'
+                          ? 'bg-[var(--color-sage)] text-white ring-[var(--color-sage)]'
+                          : 'bg-white text-[var(--color-ink)] ring-[var(--color-line)] hover:bg-[var(--color-hover)]'
                       }`}
                     >
                       Erase
@@ -427,7 +427,7 @@ export function PhotoEditorModal({ open, imageSrc, originalSrc, onCancel, onSave
                       setRefineZoom(1)
                       setRefineCenter({ x: 0, y: 0 })
                     }}
-                    className="mt-3 w-full rounded-full border border-[var(--color-line)] bg-white px-4 py-2 text-sm font-semibold text-[var(--color-ink)] hover:bg-[var(--color-paper)]"
+                    className="mt-3 w-full rounded-full border border-[var(--color-line)] bg-white px-4 py-2 text-sm font-semibold text-[var(--color-ink)] hover:bg-[var(--color-hover)]"
                   >
                     Recenter view
                   </button>
@@ -473,16 +473,18 @@ export function PhotoEditorModal({ open, imageSrc, originalSrc, onCancel, onSave
                     setSaving(false)
                   }
                 }}
-                className="flex-1 rounded-full bg-[var(--color-clay)] py-2.5 text-sm font-semibold text-white shadow-md disabled:opacity-60"
+                className="flex-1 rounded-full bg-[var(--color-sage)] py-2.5 text-sm font-semibold text-white shadow-md disabled:opacity-60"
               >
                 {saving ? 'Saving…' : 'Save'}
               </button>
             </div>
 
-            <p className="text-xs text-[var(--color-muted)]">
-              Tip: Use <span className="font-semibold">Restore</span> to bring back parts of the item, and{' '}
-              <span className="font-semibold">Erase</span> to remove leftover background. You can switch between them as needed.
-            </p>
+            {tab === 'refine' ? (
+              <p className="text-xs text-[var(--color-muted)]">
+                Tip: Use <span className="font-semibold">Restore</span> to bring back parts of the item, and{' '}
+                <span className="font-semibold">Erase</span> to remove leftover background. You can switch between them as needed.
+              </p>
+            ) : null}
           </div>
         </div>
       </div>

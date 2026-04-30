@@ -35,7 +35,7 @@ export function MultiSelectDropdown({ label, options, selected, setSelected, pla
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="mt-2 flex w-full items-center justify-between rounded-2xl border border-[var(--color-line)] bg-white px-4 py-3 text-left text-sm font-semibold text-[var(--color-ink)] shadow-sm hover:bg-[var(--color-paper)]"
+        className="mt-2 flex w-full items-center justify-between rounded-2xl border border-[var(--color-line)] bg-white px-4 py-3 text-left text-sm font-semibold text-[var(--color-ink)] shadow-sm hover:bg-[var(--color-hover)]"
         aria-haspopup="listbox"
         aria-expanded={open}
       >
@@ -56,7 +56,7 @@ export function MultiSelectDropdown({ label, options, selected, setSelected, pla
                 <button
                   key={opt.id}
                   type="button"
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm hover:bg-[var(--color-paper)]"
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm hover:bg-[var(--color-hover)]"
                   role="option"
                   aria-selected={on}
                   onClick={() => {
@@ -83,14 +83,14 @@ export function MultiSelectDropdown({ label, options, selected, setSelected, pla
             <button
               type="button"
               onClick={() => setSelected([])}
-              className="flex-1 rounded-xl border border-[var(--color-line)] bg-white px-3 py-2 text-sm font-semibold text-[var(--color-muted)] hover:bg-[var(--color-paper)]"
+              className="flex-1 rounded-xl border border-[var(--color-line)] bg-white px-3 py-2 text-sm font-semibold text-[var(--color-muted)] hover:bg-[var(--color-hover)]"
             >
               Clear
             </button>
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="flex-1 rounded-xl bg-[var(--color-clay)] px-3 py-2 text-sm font-semibold text-white shadow-sm"
+              className="flex-1 rounded-xl bg-[var(--color-sage)] px-3 py-2 text-sm font-semibold text-white shadow-sm"
             >
               Done
             </button>

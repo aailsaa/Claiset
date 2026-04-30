@@ -1,10 +1,19 @@
 import { authHeaders } from './authHeaders'
 import { itemsApi, outfitsApi, scheduleApi } from './config'
-import type { Assignment, Item, Outfit } from './types'
+import type { Assignment, Item, Outfit, OutfitPicture } from './types'
+
+async function unauthorizedMessage(res: Response): Promise<never> {
+  const detail = (await res.text()).trim()
+  throw new Error(
+    detail
+      ? `Session expired or not signed in. (${detail})`
+      : 'Session expired or not signed in. Please log in again.',
+  )
+}
 
 async function parseJson<T>(res: Response): Promise<T> {
   if (res.status === 401) {
-    throw new Error('Session expired or not signed in. Please log in again.')
+    await unauthorizedMessage(res)
   }
   if (!res.ok) {
     const text = await res.text()
@@ -34,6 +43,11 @@ function normalizeItem(raw: unknown): Item | null {
     typeof o.wears === 'number' && Number.isFinite(o.wears)
       ? Math.trunc(o.wears)
       : parseInt(String(o.wears ?? 0), 10) || 0
+  let createdAt: string | undefined
+  if (o.createdAt != null && String(o.createdAt).trim() !== '') {
+    const s = String(o.createdAt)
+    if (!s.startsWith('0001-01-01')) createdAt = s
+  }
   return {
     id,
     name: String(o.name ?? ''),
@@ -43,9 +57,26 @@ function normalizeItem(raw: unknown): Item | null {
     price,
     wears,
     itemDate: o.itemDate == null ? undefined : String(o.itemDate),
+    createdAt,
     photoDataUrl: o.photoDataUrl == null ? undefined : String(o.photoDataUrl),
     extra: o.extra && typeof o.extra === 'object' ? (o.extra as Item['extra']) : undefined,
     archived: typeof o.archived === 'boolean' ? o.archived : undefined,
+  }
+}
+
+function normalizeOutfitPicture(raw: unknown): OutfitPicture | null {
+  if (!raw || typeof raw !== 'object') return null
+  const p = raw as Record<string, unknown>
+  const id = typeof p.id === 'string' && p.id ? p.id : null
+  const dataUrl = typeof p.dataUrl === 'string' && p.dataUrl ? p.dataUrl : null
+  const takenAt = typeof p.takenAt === 'string' && p.takenAt ? p.takenAt : null
+  if (!id || !dataUrl || !takenAt) return null
+  return {
+    id,
+    dataUrl,
+    takenAt,
+    backgroundRemoved: p.backgroundRemoved === true,
+    wornOnDay: typeof p.wornOnDay === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(p.wornOnDay) ? p.wornOnDay : undefined,
   }
 }
 
@@ -62,11 +93,23 @@ function normalizeOutfit(raw: unknown): Outfit | null {
     typeof o.wears === 'number' && Number.isFinite(o.wears)
       ? Math.trunc(o.wears)
       : parseInt(String(o.wears ?? 0), 10) || 0
+  const coverDataUrl = o.coverDataUrl == null ? undefined : String(o.coverDataUrl)
+  const extra = o.extra && typeof o.extra === 'object' ? (o.extra as Outfit['extra']) : undefined
+  const layout = Array.isArray(o.layout) ? (o.layout as Outfit['layout']) : undefined
+  let pictures: Outfit['pictures'] = undefined
+  if (Array.isArray(o.pictures)) {
+    const arr = o.pictures.map(normalizeOutfitPicture).filter((x): x is OutfitPicture => x !== null)
+    pictures = arr
+  }
   return {
     id,
     name: String(o.name ?? ''),
     wears,
     itemIds,
+    coverDataUrl,
+    extra,
+    layout,
+    pictures,
   }
 }
 
@@ -146,7 +189,7 @@ export async function deleteItem(id: number): Promise<void> {
     headers: mergeHeaders(),
   })
   if (res.status === 401) {
-    throw new Error('Session expired or not signed in. Please log in again.')
+    await unauthorizedMessage(res)
   }
   if (!res.ok && res.status !== 204) {
     const text = await res.text()
@@ -164,6 +207,11 @@ export async function fetchOutfits(): Promise<Outfit[]> {
 export async function createOutfit(body: {
   name: string
   itemIds: number[]
+  wears?: number
+  coverDataUrl?: string | null
+  extra?: Outfit['extra'] | null
+  layout?: Outfit['layout'] | null
+  pictures?: Outfit['pictures'] | null
 }): Promise<Outfit> {
   const res = await fetch(`${outfitsApi}/api/v1/outfits`, {
     method: 'POST',
@@ -174,6 +222,43 @@ export async function createOutfit(body: {
   const o = normalizeOutfit(raw)
   if (!o) throw new Error('Invalid outfit response')
   return o
+}
+
+export async function updateOutfit(
+  id: number,
+  body: {
+    name: string
+    itemIds: number[]
+    wears?: number
+    coverDataUrl?: string | null
+    extra?: Outfit['extra'] | null
+    layout?: Outfit['layout'] | null
+    pictures?: Outfit['pictures'] | null
+  },
+): Promise<Outfit> {
+  const res = await fetch(`${outfitsApi}/api/v1/outfits/${id}`, {
+    method: 'PUT',
+    headers: mergeHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(body),
+  })
+  const raw = await parseJson<unknown>(res)
+  const o = normalizeOutfit(raw)
+  if (!o) throw new Error('Invalid outfit response')
+  return o
+}
+
+export async function deleteOutfit(id: number): Promise<void> {
+  const res = await fetch(`${outfitsApi}/api/v1/outfits/${id}`, {
+    method: 'DELETE',
+    headers: mergeHeaders(),
+  })
+  if (res.status === 401) {
+    await unauthorizedMessage(res)
+  }
+  if (!res.ok && res.status !== 204) {
+    const text = await res.text()
+    throw new Error(text || res.statusText)
+  }
 }
 
 export async function fetchAssignments(month: string): Promise<Assignment[]> {
@@ -208,10 +293,11 @@ export async function deleteAssignment(id: number): Promise<void> {
     headers: mergeHeaders(),
   })
   if (res.status === 401) {
-    throw new Error('Session expired or not signed in. Please log in again.')
+    await unauthorizedMessage(res)
   }
   if (!res.ok && res.status !== 204) {
     const text = await res.text()
     throw new Error(text || res.statusText)
   }
 }
+

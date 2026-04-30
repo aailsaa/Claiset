@@ -1,32 +1,50 @@
 @import 'tailwindcss';
 
 @theme {
-  --font-display: 'Instrument Serif', ui-serif, Georgia, serif;
   --font-sans: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
-  --color-paper: #faf6f0;
-  --color-ink: #1a1814;
-  --color-muted: #6b6458;
-  --color-line: #e4ddd2;
-  --color-sage: #3f5249;
-  --color-sage-muted: #5a6f65;
-  --color-clay: #b85c38;
-  --color-clay-soft: #f3e4dc;
-  --color-night: #0f1412;
+  --color-paper: #ffffff;
+  --color-surface: #fafafa;
+  --color-ink: #121212;
+  --color-muted: #6e6a68;
+  --color-line: #e4e1de;
+  /* Dark red accent (single hue — use sage everywhere in UI) */
+  --color-sage: #9a1530;
+  --color-sage-muted: #6e6a68;
+  --color-clay: #9a1530;
+  --color-clay-soft: #fceff1;
+  --color-night: #121212;
+  --color-hover: #f0f0f0;
+  --color-accent-soft: #fdf2f4;
 }
 
-html {
-  @apply antialiased;
-  font-family: var(--font-sans);
-  background: radial-gradient(1200px 800px at 10% -10%, #e8efe9 0%, transparent 55%),
-    radial-gradient(900px 600px at 100% 0%, #f3ebe4 0%, transparent 50%), var(--color-paper);
-  color: var(--color-ink);
-  min-height: 100%;
-}
+@layer base {
+  html {
+    @apply antialiased;
+    font-family: var(--font-sans);
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+    min-height: 100%;
+  }
 
-body {
-  margin: 0;
-}
+  body {
+    margin: 0;
+    font-family: var(--font-sans);
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+  }
 
-#root {
-  min-height: 100vh;
+  #root {
+    min-height: 100vh;
+    font-family: var(--font-sans);
+    background-color: var(--color-paper);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-sans);
+  }
 }

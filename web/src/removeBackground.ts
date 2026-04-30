@@ -10,6 +10,7 @@ function blobToDataUrl(blob: Blob): Promise<string> {
 }
 
 export type BgModel = 'isnet' | 'isnet_fp16' | 'isnet_quint8'
+export type BgPostprocessTuning = 'balanced' | 'cleaner' | 'preserveEdges'
 
 export async function fileToDataUrl(file: Blob): Promise<string> {
   return blobToDataUrl(file)
@@ -273,6 +274,7 @@ export async function removeBackgroundToDataUrl(
   opts?: {
     model?: BgModel
     device?: 'cpu' | 'gpu'
+    tuning?: BgPostprocessTuning
   },
 ): Promise<{
   dataUrl: string
@@ -318,15 +320,27 @@ export async function removeBackgroundToDataUrl(
         const alpha = new Uint8ClampedArray(w * h)
         for (let i = 0; i < w * h; i++) alpha[i] = rem.data.data[i * 4 + 3]
 
-        // Lower threshold includes weak alpha around light edges.
-        maskKeepLargestComponent(alpha, w, h, 6)
+        const tuning: BgPostprocessTuning = opts?.tuning ?? 'balanced'
+        const params =
+          tuning === 'cleaner'
+            ? { keepThreshold: 18, closeRadius: 2, expand: 0, erodeAfter: 1, blur: 1 }
+            : tuning === 'preserveEdges'
+              ? { keepThreshold: 6, closeRadius: 3, expand: 2, erodeAfter: 0, blur: 1 }
+              : { keepThreshold: 10, closeRadius: 3, expand: 1, erodeAfter: 0, blur: 1 }
+
+        // Keep the garment and discard stray background islands.
+        maskKeepLargestComponent(alpha, w, h, params.keepThreshold)
+
         // Closing fills holes and reconnects stripes that get cut.
-        const closed = erode(dilate(alpha, w, h, 3), w, h, 3)
-        // Fill any interior holes that remain after closing.
+        const closed = erode(dilate(alpha, w, h, params.closeRadius), w, h, params.closeRadius)
         fillHoles(closed, w, h)
-        // Slight expansion to protect light edges, then feather lightly.
-        const expanded = dilate(closed, w, h, 1)
-        const feathered = blurAlpha(expanded, w, h, 1)
+
+        // Optional expansion to protect light edges; optional erosion to cut leftover background.
+        let tuned = closed
+        if (params.expand > 0) tuned = dilate(tuned, w, h, params.expand)
+        if (params.erodeAfter > 0) tuned = erode(tuned, w, h, params.erodeAfter)
+
+        const feathered = blurAlpha(tuned, w, h, params.blur)
 
         const protectedImg = composeFromMask(orig.data, feathered)
         const canvas = document.createElement('canvas')

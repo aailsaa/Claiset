@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS items (
     price REAL NOT NULL DEFAULT 0,
     wears INT NOT NULL DEFAULT 0,
     item_date TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     photo_data_url TEXT,
     extra JSONB NOT NULL DEFAULT '{}'::jsonb,
     archived BOOLEAN NOT NULL DEFAULT FALSE
@@ -19,13 +20,24 @@ CREATE TABLE IF NOT EXISTS items (
 ALTER TABLE items ADD COLUMN IF NOT EXISTS photo_data_url TEXT;
 ALTER TABLE items ADD COLUMN IF NOT EXISTS extra JSONB NOT NULL DEFAULT '{}'::jsonb;
 ALTER TABLE items ADD COLUMN IF NOT EXISTS archived BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE items ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
 
 CREATE TABLE IF NOT EXISTS outfits (
     id SERIAL PRIMARY KEY,
     user_sub TEXT NOT NULL,
     name TEXT NOT NULL,
-    wears INT NOT NULL DEFAULT 0
+    wears INT NOT NULL DEFAULT 0,
+    cover_data_url TEXT,
+    extra JSONB NOT NULL DEFAULT '{}'::jsonb,
+    layout JSONB NOT NULL DEFAULT '[]'::jsonb,
+    pictures JSONB NOT NULL DEFAULT '[]'::jsonb
 );
+
+-- Allow schema upgrades on existing databases.
+ALTER TABLE outfits ADD COLUMN IF NOT EXISTS cover_data_url TEXT;
+ALTER TABLE outfits ADD COLUMN IF NOT EXISTS extra JSONB NOT NULL DEFAULT '{}'::jsonb;
+ALTER TABLE outfits ADD COLUMN IF NOT EXISTS layout JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE outfits ADD COLUMN IF NOT EXISTS pictures JSONB NOT NULL DEFAULT '[]'::jsonb;
 
 CREATE TABLE IF NOT EXISTS outfit_items (
     outfit_id INT NOT NULL REFERENCES outfits (id) ON DELETE CASCADE,

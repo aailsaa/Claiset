@@ -33,7 +33,7 @@ export function ClosetColorAddSelect({ omit, onAdd, disabled }: Props) {
         aria-expanded={open}
         aria-haspopup="listbox"
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between rounded-xl border border-[var(--color-line)] bg-white px-3 py-2 text-left text-sm text-[var(--color-ink)] outline-none ring-[var(--color-sage)]/30 hover:bg-[var(--color-paper)] focus:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
+        className="flex w-full items-center justify-between rounded-xl border border-[var(--color-line)] bg-white px-3 py-2 text-left text-sm text-[var(--color-ink)] outline-none ring-[var(--color-sage)]/30 hover:bg-[var(--color-hover)] focus:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
       >
         <span className="text-[var(--color-muted)]">
           {available.length === 0 ? 'All colors added' : 'Add a color…'}
@@ -53,7 +53,7 @@ export function ClosetColorAddSelect({ omit, onAdd, disabled }: Props) {
               <button
                 type="button"
                 role="option"
-                className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm hover:bg-[var(--color-paper)]"
+                className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm hover:bg-[var(--color-hover)]"
                 onClick={() => {
                   onAdd(c.id)
                   setOpen(false)

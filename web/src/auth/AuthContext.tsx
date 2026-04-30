@@ -7,9 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { setAuthTokenGetter } from '../authHeaders'
-
-const STORAGE_KEY = 'oc_google_id_token'
+import { OC_GOOGLE_ID_TOKEN_KEY, setAuthTokenGetter } from '../authHeaders'
 
 type AuthValue = {
   token: string | null
@@ -22,14 +20,15 @@ const AuthContext = createContext<AuthValue | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setTokenState] = useState<string | null>(() =>
-    typeof sessionStorage !== 'undefined' ? sessionStorage.getItem(STORAGE_KEY) : null,
+    typeof sessionStorage !== 'undefined' ? sessionStorage.getItem(OC_GOOGLE_ID_TOKEN_KEY) : null,
   )
 
   const setToken = useCallback((t: string | null) => {
     if (typeof sessionStorage !== 'undefined') {
-      if (t) sessionStorage.setItem(STORAGE_KEY, t)
-      else sessionStorage.removeItem(STORAGE_KEY)
+      if (t) sessionStorage.setItem(OC_GOOGLE_ID_TOKEN_KEY, t)
+      else sessionStorage.removeItem(OC_GOOGLE_ID_TOKEN_KEY)
     }
+    setAuthTokenGetter(() => t)
     setTokenState(t)
   }, [])
 

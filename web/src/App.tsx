@@ -7,6 +7,7 @@ import { CalendarPage } from './pages/CalendarPage'
 import { ClosetPage } from './pages/ClosetPage'
 import { LoginPage } from './pages/LoginPage'
 import { OutfitsPage } from './pages/OutfitsPage'
+import { StatsPage } from './pages/StatsPage'
 
 function HomeRedirect() {
   const { isAuthenticated } = useAuth()
@@ -27,6 +28,7 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/" element={<HomeRedirect />} />
+        <Route path="/stats" element={authedPage(<StatsPage />)} />
         <Route path="/closet" element={authedPage(<ClosetPage />)} />
         <Route path="/outfits" element={authedPage(<OutfitsPage />)} />
         <Route path="/calendar" element={authedPage(<CalendarPage />)} />

@@ -11,7 +11,7 @@ import {
   SUBCATEGORIES_BY_CATEGORY,
   type ClosetCategoryId,
 } from '../closetCatalog'
-import { fileToDataUrl, removeBackgroundToDataUrl, type BgModel } from '../removeBackground'
+import { fileToDataUrl, removeBackgroundToDataUrl, type BgModel, type BgPostprocessTuning } from '../removeBackground'
 import type { Item } from '../types'
 
 function defaultForm() {
@@ -34,6 +34,7 @@ function defaultForm() {
     locationPurchased: '' as string,
     notes: '' as string,
     archived: false,
+    createdAt: null as string | null,
   }
 }
 
@@ -49,6 +50,12 @@ function dateToRfc3339(dateStr: string): string | null {
   if (!s) return null
   // Date input gives YYYY-MM-DD; encode as midnight UTC.
   return `${s}T00:00:00Z`
+}
+
+function formatAddedToCloset(iso: string) {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return iso
+  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
 const ACQUISITION_METHODS = ['Bought', 'Gifted', 'Handmade', 'Second-hand', 'Traded', 'Rented', 'Other'] as const
@@ -87,6 +94,8 @@ type SortKey =
   | 'color'
   | 'costPerWear'
 
+type NametagKey = 'name' | 'price' | 'costPerWear' | 'wears' | 'brand' | 'datePurchased' | 'itemNumber'
+
 function parseItemDate(itemDate?: string | null): number {
   if (!itemDate) return 0
   const t = Date.parse(itemDate)
@@ -115,12 +124,77 @@ export function ClosetPage() {
   const [photoEditOriginalSrc, setPhotoEditOriginalSrc] = useState<string | null>(null)
   const [photoOriginalFile, setPhotoOriginalFile] = useState<File | null>(null)
   const [bgModelUsed, setBgModelUsed] = useState<BgModel>('isnet')
+  const [bgTuning, setBgTuning] = useState<BgPostprocessTuning>('balanced')
+  const [viewOpen, setViewOpen] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [sortOpen, setSortOpen] = useState(false)
   const [appliedFilters, setAppliedFilters] = useState<ItemFilters>(EMPTY_FILTERS)
   const [draftFilters, setDraftFilters] = useState<ItemFilters>(EMPTY_FILTERS)
   const [sortKey, setSortKey] = useState<SortKey>('datePurchased')
   const [sortReversed, setSortReversed] = useState(false)
+  const [itemsPerRow, setItemsPerRow] = useState<number>(() => {
+    try {
+      if (typeof window === 'undefined') return 4
+      const raw = window.localStorage.getItem('closet:view:itemsPerRow')
+      const n = raw ? Number(raw) : 4
+      return Number.isFinite(n) ? Math.min(6, Math.max(2, Math.round(n))) : 4
+    } catch {
+      return 4
+    }
+  })
+  const [nametagKey, setNametagKey] = useState<NametagKey>(() => {
+    try {
+      if (typeof window === 'undefined') return 'itemNumber'
+      const raw = window.localStorage.getItem('closet:view:nametagKey') as NametagKey | null
+      const allowed: NametagKey[] = ['name', 'price', 'costPerWear', 'wears', 'brand', 'datePurchased', 'itemNumber']
+      return raw && allowed.includes(raw) ? raw : 'itemNumber'
+    } catch {
+      return 'itemNumber'
+    }
+  })
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem('closet:view:itemsPerRow', String(itemsPerRow))
+    } catch {
+      // ignore
+    }
+  }, [itemsPerRow])
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem('closet:view:nametagKey', nametagKey)
+    } catch {
+      // ignore
+    }
+  }, [nametagKey])
+
+  const ensureBrowserReadableImage = useCallback(async (file: File): Promise<File> => {
+    const name = file.name || ''
+    const lower = name.toLowerCase()
+    const isHeic =
+      file.type === 'image/heic' ||
+      file.type === 'image/heif' ||
+      lower.endsWith('.heic') ||
+      lower.endsWith('.heif')
+
+    if (!isHeic) return file
+
+    try {
+      const mod = await import('heic2any')
+      const heic2any = (mod as any).default as (opts: {
+        blob: Blob
+        toType: string
+        quality?: number
+      }) => Promise<Blob | Blob[]>
+      const out = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.92 })
+      const blob = Array.isArray(out) ? out[0] : out
+      const nextName = name.replace(/\.(heic|heif)$/i, '') + '.jpg'
+      return new File([blob], nextName, { type: 'image/jpeg', lastModified: file.lastModified })
+    } catch {
+      return file
+    }
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -141,6 +215,43 @@ export function ClosetPage() {
   const sortedItems = useMemo(() => {
     return [...items].sort((a, b) => b.id - a.id)
   }, [items])
+
+  const nametagText = useCallback(
+    (it: Item): string => {
+      const extra = (it.extra && typeof it.extra === 'object' ? it.extra : {}) as NonNullable<Item['extra']>
+      switch (nametagKey) {
+        case 'name':
+          return it.name?.trim() ? String(it.name) : `Item #${it.id}`
+        case 'price': {
+          const p = Number(it.price)
+          return Number.isFinite(p) ? `$${p.toFixed(0)}` : '—'
+        }
+        case 'costPerWear': {
+          const cpw = costPerWear(Number(it.price) || 0, Number(it.wears) || 0)
+          return cpw == null ? '—' : `$${cpw.toFixed(2)}`
+        }
+        case 'wears':
+          return `${Number(it.wears) || 0} wears`
+        case 'brand': {
+          const b = String((extra as any).brand ?? '').trim()
+          return b || '—'
+        }
+        case 'datePurchased': {
+          const d = parseItemDate(it.itemDate)
+          if (!d) return '—'
+          try {
+            return new Date(d).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+          } catch {
+            return '—'
+          }
+        }
+        case 'itemNumber':
+        default:
+          return `#${it.id}`
+      }
+    },
+    [nametagKey],
+  )
 
   const visibleItems = useMemo(() => {
     const f = appliedFilters
@@ -289,6 +400,7 @@ export function ClosetPage() {
   function resetPhotoSession() {
     setPhotoOriginalFile(null)
     setBgModelUsed('isnet')
+    setBgTuning('balanced')
     setPhotoMessage(null)
     setRemovingBg(false)
     setPhotoEditOpen(false)
@@ -338,6 +450,7 @@ export function ClosetPage() {
       locationPurchased: String((extra as any).locationPurchased ?? (extra as any).location ?? ''),
       notes: String(extra.notes ?? ''),
       archived: Boolean(it.archived ?? false),
+      createdAt: it.createdAt ?? null,
     })
     setMode('edit')
     setEditingId(it.id)
@@ -348,12 +461,17 @@ export function ClosetPage() {
 
   async function onPickPhoto(file: File | null) {
     if (!file) return
-    setPhotoOriginalFile(file)
-    setPhotoEditOriginalSrc(await fileToDataUrl(file))
+    const usable = await ensureBrowserReadableImage(file)
+    setPhotoOriginalFile(usable)
+    setPhotoEditOriginalSrc(await fileToDataUrl(usable))
     setPhotoMessage(null)
     setRemovingBg(true)
     try {
-      const { dataUrl, removed, modelUsed } = await removeBackgroundToDataUrl(file, { model: 'isnet', device: 'gpu' })
+      const { dataUrl, removed, modelUsed } = await removeBackgroundToDataUrl(usable, {
+        model: 'isnet',
+        device: 'gpu',
+        tuning: bgTuning,
+      })
       setBgModelUsed(modelUsed)
       setPhotoEditSrc(dataUrl)
       setPhotoEditOpen(true)
@@ -378,6 +496,7 @@ export function ClosetPage() {
       const { dataUrl, removed, modelUsed } = await removeBackgroundToDataUrl(photoOriginalFile, {
         model: next,
         device: 'gpu',
+        tuning: bgTuning,
       })
       setBgModelUsed(modelUsed)
       setPhotoEditSrc(dataUrl)
@@ -464,27 +583,31 @@ export function ClosetPage() {
         }}
       />
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <h1
-          className="text-2xl tracking-tight text-[var(--color-ink)] sm:text-3xl"
-          style={{ fontFamily: 'Instrument Serif, Georgia, serif' }}
-        >
+        <h1 className="text-2xl font-semibold tracking-tight text-[var(--color-ink)] sm:text-3xl">
           All items
         </h1>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setViewOpen(true)}
+            className="rounded-full border border-[var(--color-line)] bg-white px-4 py-2 text-sm font-medium text-[var(--color-sage)] shadow-sm hover:bg-[var(--color-hover)]"
+          >
+            View
+          </button>
           <button
             type="button"
             onClick={() => {
               setDraftFilters(appliedFilters)
               setFiltersOpen(true)
             }}
-            className="rounded-full border border-[var(--color-line)] bg-white px-4 py-2 text-sm font-medium text-[var(--color-sage)] shadow-sm hover:bg-[var(--color-paper)]"
+            className="rounded-full border border-[var(--color-line)] bg-white px-4 py-2 text-sm font-medium text-[var(--color-sage)] shadow-sm hover:bg-[var(--color-hover)]"
           >
             Filter
           </button>
           <button
             type="button"
             onClick={() => setSortOpen(true)}
-            className="rounded-full border border-[var(--color-line)] bg-white px-4 py-2 text-sm font-medium text-[var(--color-sage)] shadow-sm hover:bg-[var(--color-paper)]"
+            className="rounded-full border border-[var(--color-line)] bg-white px-4 py-2 text-sm font-medium text-[var(--color-sage)] shadow-sm hover:bg-[var(--color-hover)]"
           >
             Sort
           </button>
@@ -501,12 +624,15 @@ export function ClosetPage() {
         <p className="text-sm text-[var(--color-muted)]">Loading items…</p>
       ) : null}
 
-      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
+      <ul
+        className="grid gap-3 sm:gap-4"
+        style={{ gridTemplateColumns: `repeat(${itemsPerRow}, minmax(0, 1fr))` }}
+      >
         <li>
           <button
             type="button"
             onClick={openAddModal}
-            className="flex aspect-square w-full flex-col items-center justify-center rounded-3xl border-2 border-dashed border-[var(--color-sage)]/40 bg-white/60 text-[var(--color-sage)] shadow-sm transition hover:border-[var(--color-sage)] hover:bg-[#eef4f1]"
+            className="flex aspect-square w-full flex-col items-center justify-center rounded-3xl border-2 border-dashed border-[var(--color-sage)]/40 bg-white text-[var(--color-sage)] shadow-sm transition hover:border-[var(--color-sage)] hover:bg-[var(--color-accent-soft)]"
           >
             <span className="text-4xl font-light leading-none">+</span>
             <span className="mt-2 text-xs font-semibold uppercase tracking-wide">Add item</span>
@@ -515,7 +641,7 @@ export function ClosetPage() {
         {!loading &&
           visibleItems.map((it) => (
             <li key={it.id}>
-              <div className="group relative flex aspect-square h-full flex-col overflow-hidden rounded-3xl border border-[var(--color-line)] bg-white/80 p-4 shadow-sm ring-1 ring-transparent transition hover:-translate-y-0.5 hover:shadow-md hover:ring-[var(--color-clay)]/20">
+              <div className="group relative flex aspect-square h-full flex-col overflow-hidden rounded-3xl border border-[var(--color-line)] bg-white p-4 shadow-sm ring-1 ring-transparent transition hover:-translate-y-0.5 hover:shadow-md hover:ring-[var(--color-sage)]/25">
                 <button
                   type="button"
                   onClick={() => openEditModal(it)}
@@ -527,11 +653,11 @@ export function ClosetPage() {
                     <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4 11.5-11.5z" />
                   </svg>
                 </button>
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-clay)]">
-                  #{it.id}
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-sage)]">
+                  {nametagText(it)}
                 </p>
                 {it.photoDataUrl ? (
-                  <div className="mt-2 flex flex-1 items-center justify-center rounded-2xl bg-[var(--color-paper)]/50 p-2">
+                  <div className="mt-2 flex flex-1 items-center justify-center rounded-2xl bg-[var(--color-surface)] p-2">
                     <img
                       src={it.photoDataUrl}
                       alt={it.name}
@@ -550,7 +676,7 @@ export function ClosetPage() {
                   {it.colors.slice(0, 4).map((c) => (
                     <span
                       key={`${it.id}-${c}`}
-                      className="inline-flex max-w-full items-center gap-1 truncate rounded-full bg-[var(--color-paper)] py-0.5 pl-1 pr-2 text-[10px] text-[var(--color-sage-muted)] ring-1 ring-[var(--color-line)]"
+                      className="inline-flex max-w-full items-center gap-1 truncate rounded-full bg-[var(--color-surface)] py-0.5 pl-1 pr-2 text-[10px] text-[var(--color-sage-muted)] ring-1 ring-[var(--color-line)]"
                     >
                       <span
                         className="h-3.5 w-3.5 shrink-0 rounded-sm ring-1 ring-black/10"
@@ -573,6 +699,66 @@ export function ClosetPage() {
           ))}
       </ul>
 
+      {viewOpen ? (
+        <div
+          className="fixed inset-0 z-40 flex items-end justify-center bg-black/40 p-4 sm:items-center"
+          role="dialog"
+          aria-modal="true"
+          aria-label="View options"
+          onClick={() => setViewOpen(false)}
+        >
+          <div
+            className="w-full max-w-md overflow-hidden rounded-3xl border border-[var(--color-line)] bg-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-[var(--color-line)] px-5 py-4">
+              <h2 className="text-lg font-semibold text-[var(--color-sage)]">View</h2>
+              <button
+                type="button"
+                onClick={() => setViewOpen(false)}
+                className="rounded-full px-2 py-1 text-sm text-[var(--color-muted)] hover:bg-[var(--color-hover)]"
+              >
+                Close
+              </button>
+            </div>
+            <div className="space-y-5 p-5">
+              <label className="block text-xs font-medium text-[var(--color-muted)]">
+                Items per row
+                <div className="mt-2 flex items-center gap-3">
+                  <input
+                    type="range"
+                    min={2}
+                    max={6}
+                    step={1}
+                    value={itemsPerRow}
+                    onChange={(e) => setItemsPerRow(Number(e.target.value))}
+                    className="w-full"
+                  />
+                  <span className="w-8 text-right text-sm font-semibold text-[var(--color-ink)]">{itemsPerRow}</span>
+                </div>
+              </label>
+
+              <label className="block text-xs font-medium text-[var(--color-muted)]">
+                Item nametag
+                <select
+                  value={nametagKey}
+                  onChange={(e) => setNametagKey(e.target.value as NametagKey)}
+                  className="mt-2 w-full rounded-xl border border-[var(--color-line)] bg-white px-3 py-2 text-sm outline-none ring-[var(--color-sage)]/30 focus:ring-2"
+                >
+                  <option value="name">Name</option>
+                  <option value="price">Price</option>
+                  <option value="costPerWear">Cost per wear</option>
+                  <option value="wears">Wears</option>
+                  <option value="brand">Brand</option>
+                  <option value="datePurchased">Date purchased</option>
+                  <option value="itemNumber">Item number</option>
+                </select>
+              </label>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {filtersOpen ? (
         <div
           className="fixed inset-0 z-40 flex items-end justify-center bg-black/40 p-4 sm:items-center"
@@ -590,7 +776,7 @@ export function ClosetPage() {
               <button
                 type="button"
                 onClick={() => setFiltersOpen(false)}
-                className="rounded-full px-2 py-1 text-sm text-[var(--color-muted)] hover:bg-[var(--color-paper)]"
+                className="rounded-full px-2 py-1 text-sm text-[var(--color-muted)] hover:bg-[var(--color-hover)]"
               >
                 Close
               </button>
@@ -664,7 +850,7 @@ export function ClosetPage() {
                         className={`rounded-full px-4 py-2 text-sm font-semibold ring-1 transition ${
                           on
                             ? 'bg-[var(--color-sage)] text-white ring-[var(--color-sage)]'
-                            : 'bg-white text-[var(--color-ink)] ring-[var(--color-line)] hover:bg-[var(--color-paper)]'
+                            : 'bg-white text-[var(--color-ink)] ring-[var(--color-line)] hover:bg-[var(--color-hover)]'
                         }`}
                       >
                         {label}
@@ -678,7 +864,7 @@ export function ClosetPage() {
                 <button
                   type="button"
                   onClick={() => setDraftFilters(EMPTY_FILTERS)}
-                  className="flex-1 rounded-full border border-[var(--color-line)] py-2.5 text-sm font-semibold text-[var(--color-muted)] hover:bg-[var(--color-paper)]"
+                  className="flex-1 rounded-full border border-[var(--color-line)] py-2.5 text-sm font-semibold text-[var(--color-muted)] hover:bg-[var(--color-hover)]"
                 >
                   Clear filters
                 </button>
@@ -688,7 +874,7 @@ export function ClosetPage() {
                     setAppliedFilters(draftFilters)
                     setFiltersOpen(false)
                   }}
-                  className="flex-1 rounded-full bg-[var(--color-clay)] py-2.5 text-sm font-semibold text-white shadow-md"
+                  className="flex-1 rounded-full bg-[var(--color-sage)] py-2.5 text-sm font-semibold text-white shadow-md"
                 >
                   Save filters
                 </button>
@@ -715,7 +901,7 @@ export function ClosetPage() {
               <button
                 type="button"
                 onClick={() => setSortOpen(false)}
-                className="rounded-full px-2 py-1 text-sm text-[var(--color-muted)] hover:bg-[var(--color-paper)]"
+                className="rounded-full px-2 py-1 text-sm text-[var(--color-muted)] hover:bg-[var(--color-hover)]"
               >
                 Close
               </button>
@@ -742,8 +928,8 @@ export function ClosetPage() {
                   }}
                   className={`flex w-full items-center justify-between rounded-2xl border px-4 py-3 text-left text-sm font-semibold transition ${
                     sortKey === k
-                      ? 'border-[var(--color-sage)] bg-[var(--color-paper)]/60 text-[var(--color-ink)]'
-                      : 'border-[var(--color-line)] bg-white text-[var(--color-ink)] hover:bg-[var(--color-paper)]'
+                      ? 'border-[var(--color-sage)] bg-[var(--color-surface)] text-[var(--color-ink)]'
+                      : 'border-[var(--color-line)] bg-white text-[var(--color-ink)] hover:bg-[var(--color-hover)]'
                   }`}
                 >
                   <span>{label}</span>
@@ -790,12 +976,12 @@ export function ClosetPage() {
               <button
                 type="button"
                 onClick={closeItemModal}
-                className="rounded-full px-2 py-1 text-sm text-[var(--color-muted)] hover:bg-[var(--color-paper)]"
+                className="rounded-full px-2 py-1 text-sm text-[var(--color-muted)] hover:bg-[var(--color-hover)]"
               >
                 Close
               </button>
             </div>
-            <div className="mt-4 flex items-center gap-2 rounded-2xl bg-[var(--color-paper)]/60 p-1">
+            <div className="mt-4 flex items-center gap-2 rounded-2xl bg-[var(--color-surface)] p-1">
               <button
                 type="button"
                 onClick={() => setTab('details')}
@@ -826,7 +1012,7 @@ export function ClosetPage() {
               <div>
                 <span className="text-xs font-medium text-[var(--color-muted)]">Photo</span>
                 <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-[96px_1fr] sm:items-start">
-                  <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-2xl border border-[var(--color-line)] bg-[var(--color-paper)]/40">
+                  <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface)]">
                     {form.photoDataUrl ? (
                       <img
                         src={form.photoDataUrl}
@@ -842,25 +1028,39 @@ export function ClosetPage() {
                   <div>
                     <input
                       type="file"
-                      accept="image/*"
+                      accept="image/*,.heic,.heif"
                       disabled={saving || removingBg}
                       onChange={(e) => void onPickPhoto(e.target.files?.[0] ?? null)}
-                      className="block w-full text-sm text-[var(--color-muted)] file:mr-3 file:rounded-full file:border-0 file:bg-[var(--color-paper)] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-[var(--color-ink)] hover:file:bg-[#e9efe9]"
+                      className="block w-full text-sm text-[var(--color-muted)] file:mr-3 file:rounded-full file:border-0 file:bg-[var(--color-surface)] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-[var(--color-ink)] hover:file:bg-[var(--color-hover)]"
                     />
                     {removingBg ? (
                       <p className="mt-2 text-xs text-[var(--color-muted)]">Removing background…</p>
                     ) : null}
                     {photoMessage ? (
-                      <p className="mt-2 text-xs text-amber-800">{photoMessage}</p>
+                      <p className="mt-2 text-xs text-[var(--color-sage)]">{photoMessage}</p>
                     ) : null}
                     {photoOriginalFile && !removingBg ? (
-                      <button
-                        type="button"
-                        onClick={() => void retryBackgroundRemoval()}
-                        className="mt-2 text-xs font-semibold text-[var(--color-sage)] hover:underline"
-                      >
-                        Try background removal again
-                      </button>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <label className="text-xs font-medium text-[var(--color-muted)]">
+                          Removal
+                          <select
+                            value={bgTuning}
+                            onChange={(e) => setBgTuning(e.target.value as BgPostprocessTuning)}
+                            className="ml-2 rounded-lg border border-[var(--color-line)] bg-white px-2 py-1 text-xs font-semibold text-[var(--color-ink)] outline-none ring-[var(--color-sage)]/30 focus:ring-2"
+                          >
+                            <option value="balanced">Balanced</option>
+                            <option value="cleaner">Cleaner background</option>
+                            <option value="preserveEdges">Preserve edges</option>
+                          </select>
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => void retryBackgroundRemoval()}
+                          className="text-xs font-semibold text-[var(--color-sage)] hover:underline"
+                        >
+                          Try again
+                        </button>
+                      </div>
                     ) : null}
                     {mode === 'edit' && form.photoDataUrl ? (
                       <button
@@ -886,13 +1086,20 @@ export function ClosetPage() {
                 />
               </label>
 
+              {mode === 'edit' && form.createdAt ? (
+                <p className="text-xs text-[var(--color-muted)]">
+                  Added to closet{' '}
+                  <span className="font-medium text-[var(--color-ink)]">{formatAddedToCloset(form.createdAt)}</span>
+                </p>
+              ) : null}
+
               <div>
                 <span className="text-xs font-medium text-[var(--color-muted)]">Colors</span>
                 {form.selectedColors.length > 0 ? (
                   <ul className="mt-2 flex flex-wrap gap-2">
                     {form.selectedColors.map((id) => (
                       <li key={id}>
-                        <span className="inline-flex items-center gap-2 rounded-full border border-[var(--color-line)] bg-[var(--color-paper)] py-1 pl-1.5 pr-1 text-xs font-medium text-[var(--color-ink)]">
+                        <span className="inline-flex items-center gap-2 rounded-full border border-[var(--color-line)] bg-[var(--color-surface)] py-1 pl-1.5 pr-1 text-xs font-medium text-[var(--color-ink)]">
                           <span
                             className="h-4 w-4 shrink-0 rounded-md ring-1 ring-black/10"
                             style={{ background: closetColorSwatch(id) }}
@@ -1080,7 +1287,7 @@ export function ClosetPage() {
                             className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 transition ${
                               on
                                 ? 'bg-[var(--color-sage)] text-white ring-[var(--color-sage)]'
-                                : 'bg-[var(--color-paper)] text-[var(--color-ink)] ring-[var(--color-line)] hover:bg-[#e9efe9]'
+                                : 'bg-[var(--color-surface)] text-[var(--color-ink)] ring-[var(--color-line)] hover:bg-[var(--color-hover)]'
                             }`}
                           >
                             {t}
@@ -1108,7 +1315,7 @@ export function ClosetPage() {
                             className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 transition ${
                               on
                                 ? 'bg-[var(--color-sage)] text-white ring-[var(--color-sage)]'
-                                : 'bg-[var(--color-paper)] text-[var(--color-ink)] ring-[var(--color-line)] hover:bg-[#e9efe9]'
+                                : 'bg-[var(--color-surface)] text-[var(--color-ink)] ring-[var(--color-line)] hover:bg-[var(--color-hover)]'
                             }`}
                           >
                             {s}
@@ -1220,14 +1427,14 @@ export function ClosetPage() {
                         setSaving(false)
                       }
                     }}
-                    className="rounded-full border border-[var(--color-line)] bg-white py-2.5 text-sm font-semibold text-[var(--color-sage)] hover:bg-[var(--color-paper)] disabled:opacity-60"
+                    className="rounded-full border border-[var(--color-line)] bg-white py-2.5 text-sm font-semibold text-[var(--color-sage)] hover:bg-[var(--color-hover)] disabled:opacity-60"
                   >
                     {form.archived ? 'Unarchive' : 'Archive'}
                   </button>
                   <button
                     type="submit"
                     disabled={saving || removingBg}
-                    className="rounded-full bg-[var(--color-clay)] py-2.5 text-sm font-semibold text-white shadow-md disabled:opacity-60"
+                    className="rounded-full bg-[var(--color-sage)] py-2.5 text-sm font-semibold text-white shadow-md disabled:opacity-60"
                   >
                     {saving ? 'Saving…' : 'Save'}
                   </button>
@@ -1237,7 +1444,7 @@ export function ClosetPage() {
                   <button
                     type="submit"
                     disabled={saving || removingBg}
-                    className="w-full rounded-full bg-[var(--color-clay)] py-2.5 text-sm font-semibold text-white shadow-md disabled:opacity-60"
+                    className="w-full rounded-full bg-[var(--color-sage)] py-2.5 text-sm font-semibold text-white shadow-md disabled:opacity-60"
                   >
                     {saving ? 'Saving…' : 'Save'}
                   </button>

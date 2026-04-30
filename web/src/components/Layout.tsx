@@ -20,8 +20,8 @@ export function Layout({ children }: LayoutProps) {
   const { logout } = useAuth()
 
   return (
-    <div className="flex min-h-screen flex-col text-[var(--color-ink)]">
-      <header className="sticky top-0 z-20 border-b border-[var(--color-line)] bg-[var(--color-paper)]/95 backdrop-blur-md">
+    <div className="flex min-h-screen flex-col bg-[var(--color-paper)] font-sans text-[var(--color-ink)]">
+      <header className="sticky top-0 z-20 border-b border-[var(--color-line)] bg-white/95 backdrop-blur-md">
         <nav className="mx-auto flex max-w-6xl items-center border-b border-[var(--color-line)]/80">
           <NavLink to="/closet" className={tabClass}>
             Items
@@ -32,6 +32,9 @@ export function Layout({ children }: LayoutProps) {
           <NavLink to="/calendar" className={tabClass}>
             Calendar
           </NavLink>
+          <NavLink to="/stats" className={tabClass}>
+            Stats
+          </NavLink>
           <div className="shrink-0 border-l border-[var(--color-line)] px-2 py-1 sm:px-3">
             <button
               type="button"
@@ -39,7 +42,7 @@ export function Layout({ children }: LayoutProps) {
                 logout()
                 navigate('/login', { replace: true })
               }}
-              className="rounded-full px-3 py-2 text-xs font-medium text-[var(--color-muted)] hover:bg-white/80 hover:text-[var(--color-ink)] sm:text-sm"
+              className="rounded-full px-3 py-2 text-xs font-medium text-[var(--color-muted)] hover:bg-[var(--color-hover)] hover:text-[var(--color-ink)] sm:text-sm"
             >
               Sign out
             </button>
