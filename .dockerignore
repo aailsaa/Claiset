@@ -1,0 +1,12 @@
+.git
+.gitignore
+.DS_Store
+**/.terraform
+infra/**/.terraform
+infra/**/terraform.tfstate*
+web/node_modules
+web/dist
+**/node_modules
+**/dist
+**/*.log
+
