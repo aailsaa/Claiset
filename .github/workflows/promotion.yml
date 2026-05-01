@@ -123,9 +123,20 @@ jobs:
       - name: Retag ECR images dev → qa
         run: |
           set -euo pipefail
+          ecr_promote() {
+            local repo="$1" from="$2" to="$3"
+            local src_d dest_d=""
+            src_d="$(aws ecr describe-images --repository-name "$repo" --image-ids imageTag="$from" --query 'imageDetails[0].imageDigest' --output text)"
+            dest_d="$(aws ecr describe-images --repository-name "$repo" --image-ids imageTag="$to" --query 'imageDetails[0].imageDigest' --output text 2>/dev/null)" || true
+            if [[ -n "${dest_d}" && "${dest_d}" == "${src_d}" ]]; then
+              echo "${repo}: ${to} already matches ${from}, skipping put-image"
+              return 0
+            fi
+            aws ecr batch-get-image --repository-name "$repo" --image-ids imageTag="$from" --query 'images[0].imageManifest' --output text > manifest.json
+            aws ecr put-image --repository-name "$repo" --image-tag "$to" --image-manifest file://manifest.json >/dev/null
+          }
           for repo in "${ECR_ITEMS_REPO}" "${ECR_OUTFITS_REPO}" "${ECR_SCHEDULE_REPO}" "${ECR_WEB_REPO}" "${ECR_MIGRATE_REPO}"; do
-            aws ecr batch-get-image --repository-name "$repo" --image-ids imageTag=dev --query 'images[0].imageManifest' --output text > manifest.json
-            aws ecr put-image --repository-name "$repo" --image-tag qa --image-manifest file://manifest.json >/dev/null
+            ecr_promote "$repo" dev qa
           done
 
       - name: Set up Terraform
@@ -173,9 +184,20 @@ jobs:
       - name: Retag ECR images qa → uat
         run: |
           set -euo pipefail
+          ecr_promote() {
+            local repo="$1" from="$2" to="$3"
+            local src_d dest_d=""
+            src_d="$(aws ecr describe-images --repository-name "$repo" --image-ids imageTag="$from" --query 'imageDetails[0].imageDigest' --output text)"
+            dest_d="$(aws ecr describe-images --repository-name "$repo" --image-ids imageTag="$to" --query 'imageDetails[0].imageDigest' --output text 2>/dev/null)" || true
+            if [[ -n "${dest_d}" && "${dest_d}" == "${src_d}" ]]; then
+              echo "${repo}: ${to} already matches ${from}, skipping put-image"
+              return 0
+            fi
+            aws ecr batch-get-image --repository-name "$repo" --image-ids imageTag="$from" --query 'images[0].imageManifest' --output text > manifest.json
+            aws ecr put-image --repository-name "$repo" --image-tag "$to" --image-manifest file://manifest.json >/dev/null
+          }
           for repo in "${ECR_ITEMS_REPO}" "${ECR_OUTFITS_REPO}" "${ECR_SCHEDULE_REPO}" "${ECR_WEB_REPO}" "${ECR_MIGRATE_REPO}"; do
-            aws ecr batch-get-image --repository-name "$repo" --image-ids imageTag=qa --query 'images[0].imageManifest' --output text > manifest.json
-            aws ecr put-image --repository-name "$repo" --image-tag uat --image-manifest file://manifest.json >/dev/null
+            ecr_promote "$repo" qa uat
           done
 
       - name: Set up Terraform
@@ -222,9 +244,20 @@ jobs:
       - name: Retag ECR images uat → prod
         run: |
           set -euo pipefail
+          ecr_promote() {
+            local repo="$1" from="$2" to="$3"
+            local src_d dest_d=""
+            src_d="$(aws ecr describe-images --repository-name "$repo" --image-ids imageTag="$from" --query 'imageDetails[0].imageDigest' --output text)"
+            dest_d="$(aws ecr describe-images --repository-name "$repo" --image-ids imageTag="$to" --query 'imageDetails[0].imageDigest' --output text 2>/dev/null)" || true
+            if [[ -n "${dest_d}" && "${dest_d}" == "${src_d}" ]]; then
+              echo "${repo}: ${to} already matches ${from}, skipping put-image"
+              return 0
+            fi
+            aws ecr batch-get-image --repository-name "$repo" --image-ids imageTag="$from" --query 'images[0].imageManifest' --output text > manifest.json
+            aws ecr put-image --repository-name "$repo" --image-tag "$to" --image-manifest file://manifest.json >/dev/null
+          }
           for repo in "${ECR_ITEMS_REPO}" "${ECR_OUTFITS_REPO}" "${ECR_SCHEDULE_REPO}" "${ECR_WEB_REPO}" "${ECR_MIGRATE_REPO}"; do
-            aws ecr batch-get-image --repository-name "$repo" --image-ids imageTag=uat --query 'images[0].imageManifest' --output text > manifest.json
-            aws ecr put-image --repository-name "$repo" --image-tag prod --image-manifest file://manifest.json >/dev/null
+            ecr_promote "$repo" uat prod
           done
 
       - name: Set up Terraform
