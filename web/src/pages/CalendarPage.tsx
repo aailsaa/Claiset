@@ -18,6 +18,10 @@ function monthKey(d: Date) {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`
 }
 
+function localDateStr(d: Date): string {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+}
+
 function buildMonthGrid(year: number, monthIndex: number) {
   const first = new Date(year, monthIndex, 1)
   const pad = first.getDay()
@@ -266,7 +270,7 @@ export function CalendarPage() {
                   const a = byDay.get(cell.dateStr)
                   const o = a ? outfitById.get(a.outfitId) : undefined
                   const thumb = a && o ? calendarCellThumb(o, cell.dateStr, calendarViewMode) : null
-                  const isToday = cell.dateStr === new Date().toISOString().slice(0, 10)
+                  const isToday = cell.dateStr === localDateStr(new Date())
                   return (
                     <button
                       key={cell.dateStr}
@@ -287,7 +291,7 @@ export function CalendarPage() {
                           : a && thumb
                             ? 'border-[var(--color-sage)]/40 bg-[var(--color-surface)]'
                             : 'border-transparent bg-[var(--color-surface)] hover:border-[var(--color-line)]',
-                        isToday ? 'ring-2 ring-[var(--color-sage)]/50' : '',
+                        isToday ? 'border-[var(--color-line)] bg-zinc-200' : '',
                       ].join(' ')}
                     >
                       <span
