@@ -31,6 +31,12 @@ variable "domain_root" {
   default = ""
 }
 
+variable "hosted_zone_id" {
+  type        = string
+  description = "If set, reuse an existing Route53 hosted zone instead of creating a new one."
+  default     = ""
+}
+
 variable "frontend_subdomain" {
   type    = string
   default = "app"

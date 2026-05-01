@@ -62,6 +62,7 @@ module "platform" {
 
   # Domain wiring is scaffolded but optional until you create a domain.
   domain_root        = var.domain_root
+  hosted_zone_id     = var.route53_hosted_zone_id
   frontend_subdomain = var.frontend_subdomain
 }
 

@@ -59,6 +59,7 @@ module "platform" {
   vpc_id       = module.network.vpc_id
 
   domain_root        = var.domain_root
+  hosted_zone_id     = var.route53_hosted_zone_id
   frontend_subdomain = var.frontend_subdomain
 }
 

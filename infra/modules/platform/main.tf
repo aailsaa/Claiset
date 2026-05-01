@@ -1,11 +1,12 @@
 locals {
   name = "${var.project}-${var.env}"
+  zone_id = var.hosted_zone_id != "" ? var.hosted_zone_id : try(aws_route53_zone.this[0].zone_id, null)
 }
 
 # DNS hosted zone (Terraform-managed). You still need to update your registrar
 # to use the Route53 nameservers that Terraform creates.
 resource "aws_route53_zone" "this" {
-  count = var.domain_root != "" ? 1 : 0
+  count = var.domain_root != "" && var.hosted_zone_id == "" ? 1 : 0
   name  = var.domain_root
 
   tags = var.tags
@@ -29,7 +30,7 @@ resource "aws_route53_record" "frontend_cert_validation" {
     }
   } : {}
 
-  zone_id = aws_route53_zone.this[0].zone_id
+  zone_id = local.zone_id
   name    = each.value.name
   type    = each.value.type
   records = [each.value.record]

@@ -1,5 +1,5 @@
 output "route53_zone_id" {
-  value       = try(aws_route53_zone.this[0].zone_id, null)
+  value       = var.hosted_zone_id != "" ? var.hosted_zone_id : try(aws_route53_zone.this[0].zone_id, null)
   description = "Hosted zone ID if a zone was created."
 }
 

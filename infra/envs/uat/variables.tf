@@ -34,6 +34,12 @@ variable "domain_root" {
   default     = "claiset.xyz"
 }
 
+variable "route53_hosted_zone_id" {
+  type        = string
+  description = "Existing Route53 hosted zone ID to reuse (prevents creating duplicate zones)."
+  default     = ""
+}
+
 variable "frontend_subdomain" {
   type        = string
   description = "Subdomain for the frontend (e.g. app). Full name becomes app.<domain_root>."
