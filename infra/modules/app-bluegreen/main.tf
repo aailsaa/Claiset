@@ -1,6 +1,8 @@
 locals {
   name          = "${var.project}-${var.env}"
   frontend_host = var.domain_root != "" ? "${var.frontend_subdomain}.${var.domain_root}" : ""
+  apex_host     = var.domain_root
+  www_host      = var.domain_root != "" ? "www.${var.domain_root}" : ""
   # Require aws_region so we can build a working ECR imagePullSecret (LabRole often cannot pull from ECR without it).
   enabled = local.frontend_host != "" && var.frontend_certificate_arn != "" && var.database_url != "" && var.aws_region != ""
 }
@@ -448,9 +450,23 @@ resource "kubernetes_ingress_v1" "app" {
       "kubernetes.io/ingress.class"               = "alb"
       "alb.ingress.kubernetes.io/scheme"          = "internet-facing"
       "alb.ingress.kubernetes.io/target-type"     = "ip"
-      "alb.ingress.kubernetes.io/listen-ports"    = "[{\"HTTPS\":443}]"
+      "alb.ingress.kubernetes.io/listen-ports"    = "[{\"HTTP\":80},{\"HTTPS\":443}]"
+      "alb.ingress.kubernetes.io/ssl-redirect"    = "443"
       "alb.ingress.kubernetes.io/certificate-arn" = var.frontend_certificate_arn
-      "external-dns.alpha.kubernetes.io/hostname" = local.frontend_host
+      "external-dns.alpha.kubernetes.io/hostname" = "${local.frontend_host},${local.apex_host},${local.www_host}"
+
+      # Redirect apex/www → canonical frontend host (https://app.<domain>/)
+      "alb.ingress.kubernetes.io/actions.redirect-to-frontend" = jsonencode({
+        Type = "redirect"
+        RedirectConfig = {
+          Protocol   = "HTTPS"
+          Port       = "443"
+          Host       = local.frontend_host
+          Path       = "/#{path}"
+          Query      = "#{query}"
+          StatusCode = "HTTP_301"
+        }
+      })
     }
   }
 
@@ -496,6 +512,40 @@ resource "kubernetes_ingress_v1" "app" {
             service {
               name = kubernetes_service.web[0].metadata[0].name
               port { number = 80 }
+            }
+          }
+        }
+      }
+    }
+
+    # Redirect bare domain (https://claiset.xyz/*) to canonical frontend host.
+    rule {
+      host = local.apex_host
+      http {
+        path {
+          path      = "/"
+          path_type = "Prefix"
+          backend {
+            service {
+              name = "redirect-to-frontend"
+              port { name = "use-annotation" }
+            }
+          }
+        }
+      }
+    }
+
+    # Redirect www (https://www.claiset.xyz/*) to canonical frontend host.
+    rule {
+      host = local.www_host
+      http {
+        path {
+          path      = "/"
+          path_type = "Prefix"
+          backend {
+            service {
+              name = "redirect-to-frontend"
+              port { name = "use-annotation" }
             }
           }
         }
