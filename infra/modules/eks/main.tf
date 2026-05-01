@@ -166,6 +166,14 @@ resource "aws_launch_template" "nodes" {
 
   vpc_security_group_ids = [aws_security_group.node.id]
 
+  # Pods (like aws-load-balancer-controller/external-dns) often use the node IAM role
+  # via EC2 Instance Metadata Service. The hop limit must allow pod network hops.
+  metadata_options {
+    http_endpoint               = "enabled"
+    http_tokens                 = "required"
+    http_put_response_hop_limit = 2
+  }
+
   tag_specifications {
     resource_type = "instance"
     tags          = var.tags

@@ -70,6 +70,17 @@ resource "helm_release" "aws_load_balancer_controller" {
   chart      = "aws-load-balancer-controller"
   namespace  = "kube-system"
 
+  # Avoid AWS Academy IAM/IRSA constraints by using node credentials (IMDS).
+  # hostNetwork removes extra network hops to IMDS in some CNI setups.
+  set {
+    name  = "hostNetwork"
+    value = "true"
+  }
+  set {
+    name  = "dnsPolicy"
+    value = "ClusterFirstWithHostNet"
+  }
+
   set {
     name  = "clusterName"
     value = var.cluster_name
@@ -99,6 +110,34 @@ resource "helm_release" "external_dns" {
   repository = "https://kubernetes-sigs.github.io/external-dns/"
   chart      = "external-dns"
   namespace  = kubernetes_namespace.platform.metadata[0].name
+
+  set {
+    name  = "hostNetwork"
+    value = "true"
+  }
+  set {
+    name  = "dnsPolicy"
+    value = "ClusterFirstWithHostNet"
+  }
+
+  # The AWS SDK needs a region. Some environments (including restricted student accounts)
+  # don't populate it automatically.
+  set {
+    name  = "env[0].name"
+    value = "AWS_REGION"
+  }
+  set {
+    name  = "env[0].value"
+    value = var.region
+  }
+  set {
+    name  = "env[1].name"
+    value = "AWS_DEFAULT_REGION"
+  }
+  set {
+    name  = "env[1].value"
+    value = var.region
+  }
 
   set {
     name  = "provider"
