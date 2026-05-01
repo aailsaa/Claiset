@@ -4,6 +4,7 @@ This folder is the **only place** AWS / Kubernetes infrastructure is managed. No
 
 ### Layout
 - `envs/dev`: first environment to stand up (us-east-1)
+- `envs/qa`, `envs/uat`, `envs/prod`: promotion environments (same modules; different image tags and hostnames)
 - `modules/*`: reusable building blocks (VPC, EKS, RDS, platform add-ons, app blue/green)
 
 ### Quick start (dev)
@@ -19,6 +20,18 @@ terraform apply
 ### Remote state (required for rubric)
 This repo includes a placeholder `backend.tf` in `envs/dev`.
 For grading, you should use an S3 backend + DynamoDB lock (all via Terraform).
+
+### Promotion workflow (git-driven)
+CI/CD is implemented via GitHub Actions in [`.github/workflows/promotion.yml`](../.github/workflows/promotion.yml):
+- **Dev**: push to `main` builds/pushes images tagged `:dev` and applies Terraform in `envs/dev`
+- **QA (nightly)**: scheduled run retags `:dev` → `:qa` and applies Terraform in `envs/qa`
+- **UAT**: commits to `main` containing `RC` retag `:qa` → `:uat` and applies Terraform in `envs/uat`
+- **Prod**: pushing a tag like `v1.0.1` retags `:uat` → `:prod` and applies Terraform in `envs/prod`
+
+You must configure repo secrets:
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+- `AWS_SESSION_TOKEN` (required for AWS Academy/Vocareum sessions)
 
 ### Domain / HTTPS (required for rubric)
 The frontend must be reachable at a custom DNS name over HTTPS.

@@ -36,13 +36,15 @@ Claiset is a **React + Go microservices** app for tracking wardrobe **items**, b
 
 | Requirement | Status |
 | ----------- | ------ |
-| Dev → nightly QA → UAT → Prod pipelines | **Not implemented** |
-| Auto promotion Dev/QA → UAT (Conventional Commits / PR merges) | **Not implemented** |
-| UAT → Prod only via release tags / labels (no console click deploy) | **Not implemented** |
+| Dev → nightly QA → UAT → Prod pipelines | **Implemented (initial)** — see `.github/workflows/promotion.yml` |
+| Auto promotion Dev/QA → UAT (Conventional Commits / PR merges) | **Implemented (initial)** — “RC” in commit message triggers UAT |
+| UAT → Prod only via release tags / labels (no console click deploy) | **Implemented (initial)** — `v*` tags trigger prod |
 | Documented choice: blue/green **or** canary | **Incomplete** |
 | Rolling updates help avoid downtime **for in-place Deployments** when probes/replicas permit | **Partial** |
 
-Current automation: **`go test`** in [`.github/workflows/go-tests.yml`](.github/workflows/go-tests.yml) only.
+Current automation:
+- Tests: [`.github/workflows/go-tests.yml`](.github/workflows/go-tests.yml)
+- Promotion: [`.github/workflows/promotion.yml`](.github/workflows/promotion.yml)
 
 ### 3. Day 2 scenarios
 
