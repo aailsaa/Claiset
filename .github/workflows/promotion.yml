@@ -79,6 +79,15 @@ jobs:
         working-directory: infra/envs/dev
         run: |
           terraform init
+          # Phase 1: create AWS resources first (EKS/RDS/ECR/platform).
+          # This avoids plan-time unknowns for Kubernetes providers and app module gating.
+          terraform apply -auto-approve \
+            -target=module.network \
+            -target=module.eks \
+            -target=module.rds \
+            -target=module.ecr \
+            -target=module.platform
+          # Phase 2: apply everything (Kubernetes resources + app deploy).
           terraform apply -auto-approve
 
   qa:
@@ -114,6 +123,12 @@ jobs:
         working-directory: infra/envs/qa
         run: |
           terraform init
+          terraform apply -auto-approve \
+            -target=module.network \
+            -target=module.eks \
+            -target=module.rds \
+            -target=module.ecr \
+            -target=module.platform
           terraform apply -auto-approve
 
   uat:
@@ -150,6 +165,12 @@ jobs:
         working-directory: infra/envs/uat
         run: |
           terraform init
+          terraform apply -auto-approve \
+            -target=module.network \
+            -target=module.eks \
+            -target=module.rds \
+            -target=module.ecr \
+            -target=module.platform
           terraform apply -auto-approve
 
   prod:
@@ -185,5 +206,11 @@ jobs:
         working-directory: infra/envs/prod
         run: |
           terraform init
+          terraform apply -auto-approve \
+            -target=module.network \
+            -target=module.eks \
+            -target=module.rds \
+            -target=module.ecr \
+            -target=module.platform
           terraform apply -auto-approve
 
