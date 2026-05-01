@@ -3,6 +3,7 @@ import { createOutfit, deleteOutfit, fetchItems, fetchOutfits, updateOutfit } fr
 import { MultiSelectDropdown } from '../components/MultiSelectDropdown'
 import { OutfitCoverEditorModal } from '../components/OutfitCoverEditorModal'
 import { closetLabel, CLOSET_CATEGORIES, CLOSET_COLORS, closetColorSwatch, SUBCATEGORIES_BY_CATEGORY } from '../closetCatalog'
+import { ensureBrowserReadableImage } from '../heicConvert'
 import { fileToDataUrl, removeBackgroundToDataUrl } from '../removeBackground'
 import type { Item, Outfit, OutfitExtra, OutfitLayoutLayer, OutfitPicture } from '../types'
 
@@ -530,7 +531,7 @@ export function OutfitsPage() {
                   <input
                     ref={outfitPhotoInputRef}
                     type="file"
-                    accept="image/*,.heic,.heif"
+                    accept="image/*,image/heic,image/heif,.heic,.heif"
                     className="hidden"
                     onChange={onPickOutfitPhoto}
                   />
@@ -791,20 +792,3 @@ async function dataUrlToFile(dataUrl: string, name: string): Promise<File> {
   return new File([blob], name, { type: blob.type || 'image/png' })
 }
 
-async function ensureBrowserReadableImage(file: File): Promise<File> {
-  const n = file.name || ''
-  const lower = n.toLowerCase()
-  const isHeic =
-    file.type === 'image/heic' || file.type === 'image/heif' || lower.endsWith('.heic') || lower.endsWith('.heif')
-  if (!isHeic) return file
-  try {
-    const mod = await import('heic2any')
-    const heic2any = (mod as { default: (opts: { blob: Blob; toType: string; quality?: number }) => Promise<Blob | Blob[]> }).default
-    const out = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.92 })
-    const blob = Array.isArray(out) ? out[0] : out
-    const nextName = n.replace(/\.(heic|heif)$/i, '') + '.jpg'
-    return new File([blob], nextName, { type: 'image/jpeg', lastModified: file.lastModified })
-  } catch {
-    return file
-  }
-}

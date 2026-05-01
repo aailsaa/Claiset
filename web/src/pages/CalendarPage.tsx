@@ -6,6 +6,7 @@ import {
   fetchOutfits,
   updateOutfit,
 } from '../api'
+import { ensureBrowserReadableImage } from '../heicConvert'
 import { fileToDataUrl } from '../removeBackground'
 import type { Assignment, Outfit, OutfitPicture } from '../types'
 
@@ -507,7 +508,7 @@ export function CalendarPage() {
             <input
               ref={dayPhotoInputRef}
               type="file"
-              accept="image/*,.heic,.heif"
+              accept="image/*,image/heic,image/heif,.heic,.heif"
               className="hidden"
               onChange={onDayPhotoPicked}
             />
@@ -564,21 +565,3 @@ function calendarCellThumb(outfit: Outfit, dayStr: string, mode: 'cover' | 'self
   return null
 }
 
-async function ensureBrowserReadableImage(file: File): Promise<File> {
-  const n = file.name || ''
-  const lower = n.toLowerCase()
-  const isHeic =
-    file.type === 'image/heic' || file.type === 'image/heif' || lower.endsWith('.heic') || lower.endsWith('.heif')
-  if (!isHeic) return file
-  try {
-    const mod = await import('heic2any')
-    const heic2any = (mod as { default: (opts: { blob: Blob; toType: string; quality?: number }) => Promise<Blob | Blob[]> })
-      .default
-    const out = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.92 })
-    const blob = Array.isArray(out) ? out[0] : out
-    const nextName = n.replace(/\.(heic|heif)$/i, '') + '.jpg'
-    return new File([blob], nextName, { type: 'image/jpeg', lastModified: file.lastModified })
-  } catch {
-    return file
-  }
-}

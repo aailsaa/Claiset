@@ -11,6 +11,7 @@ import {
   SUBCATEGORIES_BY_CATEGORY,
   type ClosetCategoryId,
 } from '../closetCatalog'
+import { ensureBrowserReadableImage } from '../heicConvert'
 import { fileToDataUrl, removeBackgroundToDataUrl, type BgModel, type BgPostprocessTuning } from '../removeBackground'
 import type { Item } from '../types'
 
@@ -168,33 +169,6 @@ export function ClosetPage() {
       // ignore
     }
   }, [nametagKey])
-
-  const ensureBrowserReadableImage = useCallback(async (file: File): Promise<File> => {
-    const name = file.name || ''
-    const lower = name.toLowerCase()
-    const isHeic =
-      file.type === 'image/heic' ||
-      file.type === 'image/heif' ||
-      lower.endsWith('.heic') ||
-      lower.endsWith('.heif')
-
-    if (!isHeic) return file
-
-    try {
-      const mod = await import('heic2any')
-      const heic2any = (mod as any).default as (opts: {
-        blob: Blob
-        toType: string
-        quality?: number
-      }) => Promise<Blob | Blob[]>
-      const out = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.92 })
-      const blob = Array.isArray(out) ? out[0] : out
-      const nextName = name.replace(/\.(heic|heif)$/i, '') + '.jpg'
-      return new File([blob], nextName, { type: 'image/jpeg', lastModified: file.lastModified })
-    } catch {
-      return file
-    }
-  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -459,14 +433,14 @@ export function ClosetPage() {
     setModalOpen(true)
   }
 
-  async function onPickPhoto(file: File | null) {
+  async function onPickPhoto(file: File | null, fileInput: HTMLInputElement | null) {
     if (!file) return
-    const usable = await ensureBrowserReadableImage(file)
-    setPhotoOriginalFile(usable)
-    setPhotoEditOriginalSrc(await fileToDataUrl(usable))
     setPhotoMessage(null)
     setRemovingBg(true)
     try {
+      const usable = await ensureBrowserReadableImage(file)
+      setPhotoOriginalFile(usable)
+      setPhotoEditOriginalSrc(await fileToDataUrl(usable))
       const { dataUrl, removed, modelUsed } = await removeBackgroundToDataUrl(usable, {
         model: 'isnet',
         device: 'gpu',
@@ -480,8 +454,18 @@ export function ClosetPage() {
           ? null
           : 'Background removal is unavailable right now. You can still crop and rotate your photo.',
       )
+    } catch (e) {
+      setPhotoMessage(
+        e instanceof Error ? e.message : 'Could not load that photo. Try JPEG or PNG.',
+      )
+      setPhotoOriginalFile(null)
+      setPhotoEditOriginalSrc(null)
+      setPhotoEditSrc(null)
+      setPhotoEditOpen(false)
     } finally {
       setRemovingBg(false)
+      // Same file twice does not fire change unless we clear the value.
+      if (fileInput) fileInput.value = ''
     }
   }
 
@@ -1028,13 +1012,13 @@ export function ClosetPage() {
                   <div>
                     <input
                       type="file"
-                      accept="image/*,.heic,.heif"
-                      disabled={saving || removingBg}
-                      onChange={(e) => void onPickPhoto(e.target.files?.[0] ?? null)}
-                      className="block w-full text-sm text-[var(--color-muted)] file:mr-3 file:rounded-full file:border-0 file:bg-[var(--color-surface)] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-[var(--color-ink)] hover:file:bg-[var(--color-hover)]"
+                      accept="image/*,image/heic,image/heif,.heic,.heif"
+                      disabled={saving}
+                      onChange={(e) => void onPickPhoto(e.target.files?.[0] ?? null, e.target)}
+                      className="block w-full text-sm text-[var(--color-muted)] file:mr-3 file:rounded-full file:border-0 file:bg-[var(--color-surface)] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-[var(--color-ink)] hover:file:bg-[var(--color-hover)] disabled:opacity-50"
                     />
                     {removingBg ? (
-                      <p className="mt-2 text-xs text-[var(--color-muted)]">Removing background…</p>
+                      <p className="mt-2 text-xs text-[var(--color-muted)]">Preparing photo (HEIC conversion / background removal)…</p>
                     ) : null}
                     {photoMessage ? (
                       <p className="mt-2 text-xs text-[var(--color-sage)]">{photoMessage}</p>
