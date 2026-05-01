@@ -42,6 +42,9 @@ jobs:
   dev:
     name: Build + deploy dev
     runs-on: ubuntu-latest
+    concurrency:
+      group: tf-dev-${{ github.repository }}
+      cancel-in-progress: false
     if: github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'dev')
     steps:
       - name: Checkout
@@ -100,6 +103,9 @@ jobs:
   qa:
     name: Promote to QA (nightly)
     runs-on: ubuntu-latest
+    concurrency:
+      group: tf-qa-${{ github.repository }}
+      cancel-in-progress: false
     if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'qa')
     steps:
       - name: Checkout
@@ -146,6 +152,9 @@ jobs:
   uat:
     name: Promote to UAT (RC commits)
     runs-on: ubuntu-latest
+    concurrency:
+      group: tf-uat-${{ github.repository }}
+      cancel-in-progress: false
     # GitHub Expressions have no `toLower()` — match RC / rc substring (e.g. RC1, chore: RC2).
     if: (github.ref == 'refs/heads/main' && github.event.head_commit != null && (contains(github.event.head_commit.message, 'RC') || contains(github.event.head_commit.message, 'rc'))) || (github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'uat')
     steps:
@@ -193,6 +202,9 @@ jobs:
   prod:
     name: Promote to production (tags)
     runs-on: ubuntu-latest
+    concurrency:
+      group: tf-prod-${{ github.repository }}
+      cancel-in-progress: false
     if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'prod')
     steps:
       - name: Checkout
