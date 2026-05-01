@@ -1,0 +1,85 @@
+locals {
+  tags = {
+    Project = var.project
+    Env     = var.env
+  }
+}
+
+module "network" {
+  source  = "../../modules/network"
+  project = var.project
+  env     = var.env
+  region  = var.aws_region
+  tags    = local.tags
+}
+
+module "eks" {
+  source          = "../../modules/eks"
+  project         = var.project
+  env             = var.env
+  region          = var.aws_region
+  vpc_id          = module.network.vpc_id
+  subnet_ids      = module.network.private_subnet_ids
+  cluster_version = var.eks_cluster_version
+  tags            = local.tags
+
+  create_iam_roles = false
+  cluster_role_arn = "arn:aws:iam::973087143131:role/LabRole"
+  node_role_arn    = "arn:aws:iam::973087143131:role/LabRole"
+}
+
+module "rds" {
+  source             = "../../modules/rds"
+  project            = var.project
+  env                = var.env
+  vpc_id             = module.network.vpc_id
+  private_subnet_ids = module.network.private_subnet_ids
+  eks_node_sg_id     = module.eks.node_security_group_id
+  tags               = local.tags
+}
+
+module "ecr" {
+  source  = "../../modules/ecr"
+  project = var.project
+  env     = var.env
+  tags    = local.tags
+
+  repositories = ["items", "outfits", "schedule", "web", "migrate"]
+}
+
+module "platform" {
+  source       = "../../modules/platform"
+  project      = var.project
+  env          = var.env
+  tags         = local.tags
+  region       = var.aws_region
+  cluster_name = module.eks.cluster_name
+  vpc_id       = module.network.vpc_id
+
+  domain_root        = var.domain_root
+  frontend_subdomain = var.frontend_subdomain
+}
+
+module "app_bluegreen" {
+  source  = "../../modules/app-bluegreen"
+  project = var.project
+  env     = var.env
+  tags    = local.tags
+
+  aws_region               = var.aws_region
+  domain_root              = var.domain_root
+  frontend_subdomain       = var.frontend_subdomain
+  frontend_certificate_arn = module.platform.frontend_certificate_arn
+  google_client_id         = var.google_client_id
+
+  database_url = "postgres://${module.rds.username}:${module.rds.password}@${module.rds.address}:${module.rds.port}/${module.rds.db_name}?sslmode=require"
+
+  images = {
+    items    = "${module.ecr.repository_urls.items}:prod"
+    outfits  = "${module.ecr.repository_urls.outfits}:prod"
+    schedule = "${module.ecr.repository_urls.schedule}:prod"
+    web      = "${module.ecr.repository_urls.web}:prod"
+    migrate  = "${module.ecr.repository_urls.migrate}:prod"
+  }
+}
+
