@@ -1,6 +1,15 @@
 import { authHeaders } from './authHeaders'
-import { itemsApi, outfitsApi, scheduleApi } from './config'
+import { apiUrl } from './config'
 import type { Assignment, Item, Outfit, OutfitPicture } from './types'
+
+async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
+  try {
+    return await fetch(input, init)
+  } catch (e) {
+    const inner = e instanceof Error ? e.message : String(e)
+    throw new Error(`${inner} (${input})`)
+  }
+}
 
 async function unauthorizedMessage(res: Response): Promise<never> {
   const detail = (await res.text()).trim()
@@ -128,7 +137,7 @@ function normalizeAssignment(raw: unknown): Assignment | null {
 }
 
 export async function fetchItems(): Promise<Item[]> {
-  const res = await fetch(`${itemsApi}/api/v1/items`, { headers: mergeHeaders() })
+  const res = await apiFetch(apiUrl('items', '/api/v1/items'), { headers: mergeHeaders() })
   const raw = await parseJson<unknown>(res)
   if (!Array.isArray(raw)) return []
   return raw.map(normalizeItem).filter((x): x is Item => x !== null)
@@ -146,7 +155,7 @@ export async function createItem(body: {
   extra?: Item['extra'] | null
   archived?: boolean
 }): Promise<Item> {
-  const res = await fetch(`${itemsApi}/api/v1/items`, {
+  const res = await apiFetch(apiUrl('items', '/api/v1/items'), {
     method: 'POST',
     headers: mergeHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(body),
@@ -172,7 +181,7 @@ export async function updateItem(
     archived?: boolean
   },
 ): Promise<Item> {
-  const res = await fetch(`${itemsApi}/api/v1/items/${id}`, {
+  const res = await apiFetch(apiUrl('items', `/api/v1/items/${id}`), {
     method: 'PUT',
     headers: mergeHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(body),
@@ -184,7 +193,7 @@ export async function updateItem(
 }
 
 export async function deleteItem(id: number): Promise<void> {
-  const res = await fetch(`${itemsApi}/api/v1/items/${id}`, {
+  const res = await apiFetch(apiUrl('items', `/api/v1/items/${id}`), {
     method: 'DELETE',
     headers: mergeHeaders(),
   })
@@ -198,7 +207,7 @@ export async function deleteItem(id: number): Promise<void> {
 }
 
 export async function fetchOutfits(): Promise<Outfit[]> {
-  const res = await fetch(`${outfitsApi}/api/v1/outfits`, { headers: mergeHeaders() })
+  const res = await apiFetch(apiUrl('outfits', '/api/v1/outfits'), { headers: mergeHeaders() })
   const raw = await parseJson<unknown>(res)
   if (!Array.isArray(raw)) return []
   return raw.map(normalizeOutfit).filter((x): x is Outfit => x !== null)
@@ -213,7 +222,7 @@ export async function createOutfit(body: {
   layout?: Outfit['layout'] | null
   pictures?: Outfit['pictures'] | null
 }): Promise<Outfit> {
-  const res = await fetch(`${outfitsApi}/api/v1/outfits`, {
+  const res = await apiFetch(apiUrl('outfits', '/api/v1/outfits'), {
     method: 'POST',
     headers: mergeHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(body),
@@ -236,7 +245,7 @@ export async function updateOutfit(
     pictures?: Outfit['pictures'] | null
   },
 ): Promise<Outfit> {
-  const res = await fetch(`${outfitsApi}/api/v1/outfits/${id}`, {
+  const res = await apiFetch(apiUrl('outfits', `/api/v1/outfits/${id}`), {
     method: 'PUT',
     headers: mergeHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(body),
@@ -248,7 +257,7 @@ export async function updateOutfit(
 }
 
 export async function deleteOutfit(id: number): Promise<void> {
-  const res = await fetch(`${outfitsApi}/api/v1/outfits/${id}`, {
+  const res = await apiFetch(apiUrl('outfits', `/api/v1/outfits/${id}`), {
     method: 'DELETE',
     headers: mergeHeaders(),
   })
@@ -263,7 +272,7 @@ export async function deleteOutfit(id: number): Promise<void> {
 
 export async function fetchAssignments(month: string): Promise<Assignment[]> {
   const q = new URLSearchParams({ month })
-  const res = await fetch(`${scheduleApi}/api/v1/assignments?${q}`, {
+  const res = await apiFetch(apiUrl('schedule', `/api/v1/assignments?${q}`), {
     headers: mergeHeaders(),
   })
   const raw = await parseJson<unknown>(res)
@@ -276,7 +285,7 @@ export async function createAssignment(body: {
   day: string
   notes?: string
 }): Promise<Assignment> {
-  const res = await fetch(`${scheduleApi}/api/v1/assignments`, {
+  const res = await apiFetch(apiUrl('schedule', '/api/v1/assignments'), {
     method: 'POST',
     headers: mergeHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(body),
@@ -288,7 +297,7 @@ export async function createAssignment(body: {
 }
 
 export async function deleteAssignment(id: number): Promise<void> {
-  const res = await fetch(`${scheduleApi}/api/v1/assignments/${id}`, {
+  const res = await apiFetch(apiUrl('schedule', `/api/v1/assignments/${id}`), {
     method: 'DELETE',
     headers: mergeHeaders(),
   })
