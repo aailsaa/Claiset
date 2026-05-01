@@ -59,7 +59,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build + push images (tag: dev)
+      - name: "Build + push images (tag: dev)"
         run: |
           set -euo pipefail
           docker buildx build --platform linux/amd64 -f cmd/items-service/Dockerfile   -t "${ECR_REGISTRY}/${ECR_ITEMS_REPO}:dev"   --push .
