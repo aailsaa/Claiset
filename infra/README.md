@@ -18,8 +18,19 @@ terraform apply
 ```
 
 ### Remote state (required for rubric)
-This repo includes a placeholder `backend.tf` in `envs/dev`.
-For grading, you should use an S3 backend + DynamoDB lock (all via Terraform).
+This repo uses an S3 backend + DynamoDB lock so **local** and **CI/CD** share the same Terraform state.
+
+1. Create the remote state resources once:
+
+```bash
+cd infra/bootstrap
+terraform init
+terraform apply
+```
+
+2. Create two GitHub Actions secrets (repo settings):
+- `TF_STATE_BUCKET` (S3 bucket name)
+- `TF_LOCK_TABLE` (DynamoDB lock table name)
 
 ### Promotion workflow (git-driven)
 CI/CD is implemented via GitHub Actions in [`.github/workflows/promotion.yml`](../.github/workflows/promotion.yml):
