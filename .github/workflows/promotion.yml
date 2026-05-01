@@ -27,6 +27,8 @@ permissions:
 env:
   AWS_REGION: us-east-1
   ECR_REGISTRY: 973087143131.dkr.ecr.us-east-1.amazonaws.com
+  # Opt into Node.js 24 for JavaScript-based actions (GitHub runner deprecation notice).
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
   # Repo names (match Terraform `infra/modules/ecr` naming).
   ECR_ITEMS_REPO: onlinecloset-items
   ECR_OUTFITS_REPO: onlinecloset-outfits
@@ -44,11 +46,20 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Configure AWS credentials
+        if: ${{ secrets.AWS_SESSION_TOKEN != '' }}
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Configure AWS credentials (no session token)
+        if: ${{ secrets.AWS_SESSION_TOKEN == '' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to ECR
@@ -83,11 +94,20 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Configure AWS credentials
+        if: ${{ secrets.AWS_SESSION_TOKEN != '' }}
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Configure AWS credentials (no session token)
+        if: ${{ secrets.AWS_SESSION_TOKEN == '' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Retag ECR images dev → qa
@@ -114,11 +134,20 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Configure AWS credentials
+        if: ${{ secrets.AWS_SESSION_TOKEN != '' }}
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Configure AWS credentials (no session token)
+        if: ${{ secrets.AWS_SESSION_TOKEN == '' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Retag ECR images qa → uat
@@ -144,11 +173,20 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Configure AWS credentials
+        if: ${{ secrets.AWS_SESSION_TOKEN != '' }}
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Configure AWS credentials (no session token)
+        if: ${{ secrets.AWS_SESSION_TOKEN == '' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Retag ECR images uat → prod
