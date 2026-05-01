@@ -107,7 +107,8 @@ jobs:
   uat:
     name: Promote to UAT (RC commits)
     runs-on: ubuntu-latest
-    if: (github.ref == 'refs/heads/main' && contains(toLower(github.event.head_commit.message), 'rc')) || (github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'uat')
+    # GitHub Expressions have no `toLower()` — match RC / rc substring (e.g. RC1, chore: RC2).
+    if: (github.ref == 'refs/heads/main' && github.event.head_commit != null && (contains(github.event.head_commit.message, 'RC') || contains(github.event.head_commit.message, 'rc'))) || (github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'uat')
     steps:
       - name: Checkout
         uses: actions/checkout@v4
