@@ -1,0 +1,166 @@
+name: Promotion (dev → qa → uat → prod)
+
+on:
+  push:
+    branches: ["main"]
+    tags:
+      - "v*"
+  schedule:
+    # Nightly QA promotion (UTC). Adjust as needed.
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Environment to deploy (dev|qa|uat|prod)"
+        required: true
+        default: "dev"
+        type: choice
+        options:
+          - dev
+          - qa
+          - uat
+          - prod
+
+permissions:
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REGISTRY: 973087143131.dkr.ecr.us-east-1.amazonaws.com
+  # Repo names (match Terraform `infra/modules/ecr` naming).
+  ECR_ITEMS_REPO: onlinecloset-items
+  ECR_OUTFITS_REPO: onlinecloset-outfits
+  ECR_SCHEDULE_REPO: onlinecloset-schedule
+  ECR_WEB_REPO: onlinecloset-web
+  ECR_MIGRATE_REPO: onlinecloset-migrate
+
+jobs:
+  dev:
+    name: Build + deploy dev
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'dev')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        run: |
+          aws ecr get-login-password --region "${AWS_REGION}" \
+            | docker login --username AWS --password-stdin "${ECR_REGISTRY}"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build + push images (tag: dev)
+        run: |
+          set -euo pipefail
+          docker buildx build --platform linux/amd64 -f cmd/items-service/Dockerfile   -t "${ECR_REGISTRY}/${ECR_ITEMS_REPO}:dev"   --push .
+          docker buildx build --platform linux/amd64 -f cmd/outfits-service/Dockerfile -t "${ECR_REGISTRY}/${ECR_OUTFITS_REPO}:dev" --push .
+          docker buildx build --platform linux/amd64 -f cmd/schedule-service/Dockerfile -t "${ECR_REGISTRY}/${ECR_SCHEDULE_REPO}:dev" --push .
+          docker buildx build --platform linux/amd64 -f cmd/migrate/Dockerfile        -t "${ECR_REGISTRY}/${ECR_MIGRATE_REPO}:dev" --push .
+          docker buildx build --platform linux/amd64 -f web/Dockerfile                -t "${ECR_REGISTRY}/${ECR_WEB_REPO}:dev"     --push .
+
+      - name: Terraform apply (dev)
+        working-directory: infra/envs/dev
+        run: |
+          terraform init
+          terraform apply -auto-approve
+
+  qa:
+    name: Promote to QA (nightly)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'qa')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Retag ECR images dev → qa
+        run: |
+          set -euo pipefail
+          for repo in "${ECR_ITEMS_REPO}" "${ECR_OUTFITS_REPO}" "${ECR_SCHEDULE_REPO}" "${ECR_WEB_REPO}" "${ECR_MIGRATE_REPO}"; do
+            aws ecr batch-get-image --repository-name "$repo" --image-ids imageTag=dev --query 'images[0].imageManifest' --output text > manifest.json
+            aws ecr put-image --repository-name "$repo" --image-tag qa --image-manifest file://manifest.json >/dev/null
+          done
+
+      - name: Terraform apply (qa)
+        working-directory: infra/envs/qa
+        run: |
+          terraform init
+          terraform apply -auto-approve
+
+  uat:
+    name: Promote to UAT (RC commits)
+    runs-on: ubuntu-latest
+    if: (github.ref == 'refs/heads/main' && contains(toLower(github.event.head_commit.message), 'rc')) || (github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'uat')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Retag ECR images qa → uat
+        run: |
+          set -euo pipefail
+          for repo in "${ECR_ITEMS_REPO}" "${ECR_OUTFITS_REPO}" "${ECR_SCHEDULE_REPO}" "${ECR_WEB_REPO}" "${ECR_MIGRATE_REPO}"; do
+            aws ecr batch-get-image --repository-name "$repo" --image-ids imageTag=qa --query 'images[0].imageManifest' --output text > manifest.json
+            aws ecr put-image --repository-name "$repo" --image-tag uat --image-manifest file://manifest.json >/dev/null
+          done
+
+      - name: Terraform apply (uat)
+        working-directory: infra/envs/uat
+        run: |
+          terraform init
+          terraform apply -auto-approve
+
+  prod:
+    name: Promote to production (tags)
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'prod')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Retag ECR images uat → prod
+        run: |
+          set -euo pipefail
+          for repo in "${ECR_ITEMS_REPO}" "${ECR_OUTFITS_REPO}" "${ECR_SCHEDULE_REPO}" "${ECR_WEB_REPO}" "${ECR_MIGRATE_REPO}"; do
+            aws ecr batch-get-image --repository-name "$repo" --image-ids imageTag=uat --query 'images[0].imageManifest' --output text > manifest.json
+            aws ecr put-image --repository-name "$repo" --image-tag prod --image-manifest file://manifest.json >/dev/null
+          done
+
+      - name: Terraform apply (prod)
+        working-directory: infra/envs/prod
+        run: |
+          terraform init
+          terraform apply -auto-approve
+
