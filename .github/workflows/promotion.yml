@@ -70,6 +70,11 @@ jobs:
           docker buildx build --platform linux/amd64 -f cmd/migrate/Dockerfile        -t "${ECR_REGISTRY}/${ECR_MIGRATE_REPO}:dev" --push .
           docker buildx build --platform linux/amd64 -f web/Dockerfile                -t "${ECR_REGISTRY}/${ECR_WEB_REPO}:dev"     --push .
 
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+
       - name: Terraform apply (dev)
         working-directory: infra/envs/dev
         run: |
@@ -99,6 +104,11 @@ jobs:
             aws ecr batch-get-image --repository-name "$repo" --image-ids imageTag=dev --query 'images[0].imageManifest' --output text > manifest.json
             aws ecr put-image --repository-name "$repo" --image-tag qa --image-manifest file://manifest.json >/dev/null
           done
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
 
       - name: Terraform apply (qa)
         working-directory: infra/envs/qa
@@ -131,6 +141,11 @@ jobs:
             aws ecr put-image --repository-name "$repo" --image-tag uat --image-manifest file://manifest.json >/dev/null
           done
 
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+
       - name: Terraform apply (uat)
         working-directory: infra/envs/uat
         run: |
@@ -160,6 +175,11 @@ jobs:
             aws ecr batch-get-image --repository-name "$repo" --image-ids imageTag=uat --query 'images[0].imageManifest' --output text > manifest.json
             aws ecr put-image --repository-name "$repo" --image-tag prod --image-manifest file://manifest.json >/dev/null
           done
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
 
       - name: Terraform apply (prod)
         working-directory: infra/envs/prod
