@@ -27,7 +27,7 @@ export function LoginPage() {
     <div className="flex min-h-screen flex-col items-center justify-center px-4">
       <div className="w-full max-w-md rounded-[2rem] border border-[var(--color-line)] bg-white p-10 shadow-lg">
         <h1 className="text-center text-3xl font-bold tracking-tight text-[var(--color-sage)] sm:text-4xl">
-          Online Closet
+          Claiset
         </h1>
         <p className="mt-3 text-center text-sm text-[var(--color-muted)]">
           Sign in with Google to open your closet, outfits, and calendar.
