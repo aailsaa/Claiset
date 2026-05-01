@@ -40,6 +40,15 @@ module "rds" {
   tags               = local.tags
 }
 
+module "ecr" {
+  source  = "../../modules/ecr"
+  project = var.project
+  env     = var.env
+  tags    = local.tags
+
+  repositories = ["items", "outfits", "schedule", "web", "migrate"]
+}
+
 # Cluster add-ons that the rubric expects (Ingress/ALB, DNS, certs, monitoring/logging)
 # will live here, installed via Terraform (helm_release / kubernetes_manifest).
 module "platform" {
@@ -64,7 +73,20 @@ module "app_bluegreen" {
   tags    = local.tags
 
   # Will be used for Ingress hostnames once domain is configured.
-  domain_root        = var.domain_root
-  frontend_subdomain = var.frontend_subdomain
+  aws_region               = var.aws_region
+  domain_root              = var.domain_root
+  frontend_subdomain       = var.frontend_subdomain
+  frontend_certificate_arn = module.platform.frontend_certificate_arn
+  google_client_id         = var.google_client_id
+
+  database_url = "postgres://${module.rds.username}:${module.rds.password}@${module.rds.address}:${module.rds.port}/${module.rds.db_name}?sslmode=require"
+
+  images = {
+    items    = "${module.ecr.repository_urls.items}:dev"
+    outfits  = "${module.ecr.repository_urls.outfits}:dev"
+    schedule = "${module.ecr.repository_urls.schedule}:dev"
+    web      = "${module.ecr.repository_urls.web}:dev"
+    migrate  = "${module.ecr.repository_urls.migrate}:dev"
+  }
 }
 

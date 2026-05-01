@@ -27,3 +27,32 @@ variable "frontend_certificate_arn" {
   default     = ""
 }
 
+variable "google_client_id" {
+  type        = string
+  description = "GOOGLE_CLIENT_ID env var for backend services."
+  default     = ""
+}
+
+variable "database_url" {
+  type        = string
+  description = "DATABASE_URL for backend services (Postgres)."
+  default     = ""
+}
+
+variable "aws_region" {
+  type        = string
+  description = "Region where ECR registries live (used to build ECR docker pull credentials when app is enabled)."
+  default     = ""
+}
+
+variable "images" {
+  type = object({
+    items    = string
+    outfits  = string
+    schedule = string
+    web      = string
+    migrate  = string
+  })
+  description = "Container images for each service."
+}
+

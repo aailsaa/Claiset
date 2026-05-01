@@ -22,6 +22,12 @@ variable "eks_cluster_version" {
   default     = "1.31"
 }
 
+variable "google_client_id" {
+  type        = string
+  description = "OAuth Web Client ID used to validate Google ID tokens in backend services."
+  default     = "551920137993-5re842ov91rtdbtil3o6vi8lglmvpool.apps.googleusercontent.com"
+}
+
 variable "domain_root" {
   type        = string
   description = "Root domain you control (e.g. example.com). Terraform can create a hosted zone, but you must update your registrar name servers."

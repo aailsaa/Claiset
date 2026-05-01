@@ -18,3 +18,8 @@ output "frontend_certificate_arn" {
   description = "ACM certificate ARN for app.<domain> (once validated)."
 }
 
+output "ecr_repository_urls" {
+  value       = module.ecr.repository_urls
+  description = "ECR repo URLs for app images."
+}
+
