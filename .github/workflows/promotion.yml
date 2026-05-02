@@ -93,6 +93,10 @@ jobs:
             -backend-config="dynamodb_table=${TF_LOCK_TABLE}" \
             -backend-config="encrypt=true"
 
+      - name: VPC duplicate guard (dev)
+        working-directory: infra/envs/dev
+        run: bash ../../scripts/terraform-vpc-guard.sh
+
       # Switching to route53_hosted_zone_id drops aws_route53_zone from config; Terraform would
       # otherwise try DeleteHostedZone on the old duplicate — fails while ACM/other records exist.
       # Stop managing it in state; delete the duplicate zone in AWS console later if needed.
@@ -160,7 +164,7 @@ jobs:
         with:
           terraform_version: "1.9.8"
 
-      - name: Terraform apply (qa)
+      - name: Terraform init (qa)
         working-directory: infra/envs/qa
         run: |
           terraform init \
@@ -169,6 +173,14 @@ jobs:
             -backend-config="region=${AWS_REGION}" \
             -backend-config="dynamodb_table=${TF_LOCK_TABLE}" \
             -backend-config="encrypt=true"
+
+      - name: VPC duplicate guard (qa)
+        working-directory: infra/envs/qa
+        run: bash ../../scripts/terraform-vpc-guard.sh
+
+      - name: Terraform apply (qa)
+        working-directory: infra/envs/qa
+        run: |
           terraform apply -auto-approve \
             -target=module.network \
             -target=module.eks \
@@ -223,7 +235,7 @@ jobs:
         with:
           terraform_version: "1.9.8"
 
-      - name: Terraform apply (uat)
+      - name: Terraform init (uat)
         working-directory: infra/envs/uat
         run: |
           terraform init \
@@ -232,6 +244,14 @@ jobs:
             -backend-config="region=${AWS_REGION}" \
             -backend-config="dynamodb_table=${TF_LOCK_TABLE}" \
             -backend-config="encrypt=true"
+
+      - name: VPC duplicate guard (uat)
+        working-directory: infra/envs/uat
+        run: bash ../../scripts/terraform-vpc-guard.sh
+
+      - name: Terraform apply (uat)
+        working-directory: infra/envs/uat
+        run: |
           terraform apply -auto-approve \
             -target=module.network \
             -target=module.eks \
@@ -284,7 +304,7 @@ jobs:
         with:
           terraform_version: "1.9.8"
 
-      - name: Terraform apply (prod)
+      - name: Terraform init (prod)
         working-directory: infra/envs/prod
         run: |
           terraform init \
@@ -293,6 +313,14 @@ jobs:
             -backend-config="region=${AWS_REGION}" \
             -backend-config="dynamodb_table=${TF_LOCK_TABLE}" \
             -backend-config="encrypt=true"
+
+      - name: VPC duplicate guard (prod)
+        working-directory: infra/envs/prod
+        run: bash ../../scripts/terraform-vpc-guard.sh
+
+      - name: Terraform apply (prod)
+        working-directory: infra/envs/prod
+        run: |
           terraform apply -auto-approve \
             -target=module.network \
             -target=module.eks \
