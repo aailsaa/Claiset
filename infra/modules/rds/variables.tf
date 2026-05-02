@@ -25,8 +25,9 @@ variable "postgres_version" {
 }
 
 variable "instance_class" {
-  type    = string
-  default = "db.t4g.micro"
+  type        = string
+  default     = "db.t3.micro"
+  description = "Default db.t3.micro is a micro class often covered under RDS free tier for new accounts (confirm for your account/region)."
 }
 
 variable "allocated_storage_gb" {
@@ -35,8 +36,9 @@ variable "allocated_storage_gb" {
 }
 
 variable "max_allocated_storage_gb" {
-  type    = number
-  default = 100
+  type        = number
+  default     = 30
+  description = "Autoscale cap for gp storage; lower default to limit surprise bills."
 }
 
 variable "db_name" {
