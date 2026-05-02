@@ -31,6 +31,8 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
   TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
   TF_LOCK_TABLE: ${{ secrets.TF_LOCK_TABLE }}
+  # Passed to Terraform as var.route53_hosted_zone_id (see infra/envs/*/variables.tf).
+  TF_VAR_route53_hosted_zone_id: ${{ secrets.ROUTE53_HOSTED_ZONE_ID }}
   # Single canonical ECR namespace (provisioned in infra/envs/dev; qa+ reference URLs only).
   ECR_ITEMS_REPO: claiset-items
   ECR_OUTFITS_REPO: claiset-outfits

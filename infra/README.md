@@ -28,9 +28,10 @@ terraform init
 terraform apply
 ```
 
-2. Create two GitHub Actions secrets (repo settings):
+2. Create GitHub Actions secrets (repo settings):
 - `TF_STATE_BUCKET` (S3 bucket name)
 - `TF_LOCK_TABLE` (DynamoDB lock table name)
+- `ROUTE53_HOSTED_ZONE_ID` (public hosted zone ID for `domain_root`, e.g. `Z123...`; CI sets `TF_VAR_route53_hosted_zone_id`)
 
 ### Promotion workflow (git-driven)
 CI/CD is implemented via GitHub Actions in [`.github/workflows/promotion.yml`](../.github/workflows/promotion.yml):
@@ -43,6 +44,8 @@ You must configure repo secrets:
 - `AWS_ACCESS_KEY_ID`
 - `AWS_SECRET_ACCESS_KEY`
 - `AWS_SESSION_TOKEN` (required for AWS Academy/Vocareum sessions)
+
+(See also state/backend secrets and `ROUTE53_HOSTED_ZONE_ID` in the list above.)
 
 ### Domain / HTTPS (required for rubric)
 The frontend must be reachable at a custom DNS name over HTTPS.
