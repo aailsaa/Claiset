@@ -31,12 +31,12 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
   TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
   TF_LOCK_TABLE: ${{ secrets.TF_LOCK_TABLE }}
-  # Repo names (match Terraform `infra/modules/ecr` naming).
-  ECR_ITEMS_REPO: onlinecloset-items
-  ECR_OUTFITS_REPO: onlinecloset-outfits
-  ECR_SCHEDULE_REPO: onlinecloset-schedule
-  ECR_WEB_REPO: onlinecloset-web
-  ECR_MIGRATE_REPO: onlinecloset-migrate
+  # Single canonical ECR namespace (provisioned in infra/envs/dev; qa+ reference URLs only).
+  ECR_ITEMS_REPO: claiset-items
+  ECR_OUTFITS_REPO: claiset-outfits
+  ECR_SCHEDULE_REPO: claiset-schedule
+  ECR_WEB_REPO: claiset-web
+  ECR_MIGRATE_REPO: claiset-migrate
 
 jobs:
   dev:
@@ -90,15 +90,14 @@ jobs:
             -backend-config="region=${AWS_REGION}" \
             -backend-config="dynamodb_table=${TF_LOCK_TABLE}" \
             -backend-config="encrypt=true"
-          # Phase 1: create AWS resources first (EKS/RDS/ECR/platform).
-          # This avoids plan-time unknowns for Kubernetes providers and app module gating.
+          # Phase 1: base AWS only (no platform/ACM/Helm) so a bad DNS/ACM run does not
+          # half-apply Helm or leave -target state inconsistent with AWS.
           terraform apply -auto-approve \
             -target=module.network \
             -target=module.eks \
             -target=module.rds \
-            -target=module.ecr \
-            -target=module.platform
-          # Phase 2: apply everything (Kubernetes resources + app deploy).
+            -target=module.ecr
+          # Phase 2: platform (ACM, controllers) + app_bluegreen and the rest.
           terraform apply -auto-approve
 
   qa:
@@ -156,9 +155,7 @@ jobs:
           terraform apply -auto-approve \
             -target=module.network \
             -target=module.eks \
-            -target=module.rds \
-            -target=module.ecr \
-            -target=module.platform
+            -target=module.rds
           terraform apply -auto-approve
 
   uat:
@@ -217,9 +214,7 @@ jobs:
           terraform apply -auto-approve \
             -target=module.network \
             -target=module.eks \
-            -target=module.rds \
-            -target=module.ecr \
-            -target=module.platform
+            -target=module.rds
           terraform apply -auto-approve
 
   prod:
@@ -277,8 +272,6 @@ jobs:
           terraform apply -auto-approve \
             -target=module.network \
             -target=module.eks \
-            -target=module.rds \
-            -target=module.ecr \
-            -target=module.platform
+            -target=module.rds
           terraform apply -auto-approve
 

@@ -5,6 +5,16 @@ locals {
   }
 }
 
+data "aws_caller_identity" "current" {}
+
+locals {
+  ecr_suffixes = ["items", "outfits", "schedule", "web", "migrate"]
+  ecr_repository_urls = {
+    for s in local.ecr_suffixes :
+    s => "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/${var.ecr_repository_prefix}-${s}"
+  }
+}
+
 module "network" {
   source  = "../../modules/network"
   project = var.project
@@ -40,15 +50,6 @@ module "rds" {
   tags               = local.tags
 }
 
-module "ecr" {
-  source  = "../../modules/ecr"
-  project = var.project
-  env     = var.env
-  tags    = local.tags
-
-  repositories = ["items", "outfits", "schedule", "web", "migrate"]
-}
-
 module "platform" {
   source       = "../../modules/platform"
   project      = var.project
@@ -58,9 +59,11 @@ module "platform" {
   cluster_name = module.eks.cluster_name
   vpc_id       = module.network.vpc_id
 
-  domain_root        = var.domain_root
-  hosted_zone_id     = var.route53_hosted_zone_id
-  frontend_subdomain = var.frontend_subdomain
+  domain_root                = var.domain_root
+  hosted_zone_id             = var.route53_hosted_zone_id
+  frontend_subdomain         = var.frontend_subdomain
+  wait_for_acm_validation    = var.wait_for_acm_validation
+  create_hosted_zone         = var.create_hosted_zone
 }
 
 module "app_bluegreen" {
@@ -78,11 +81,11 @@ module "app_bluegreen" {
   database_url = "postgres://${module.rds.username}:${module.rds.password}@${module.rds.address}:${module.rds.port}/${module.rds.db_name}?sslmode=require"
 
   images = {
-    items    = "${module.ecr.repository_urls.items}:qa"
-    outfits  = "${module.ecr.repository_urls.outfits}:qa"
-    schedule = "${module.ecr.repository_urls.schedule}:qa"
-    web      = "${module.ecr.repository_urls.web}:qa"
-    migrate  = "${module.ecr.repository_urls.migrate}:qa"
+    items    = "${local.ecr_repository_urls.items}:qa"
+    outfits  = "${local.ecr_repository_urls.outfits}:qa"
+    schedule = "${local.ecr_repository_urls.schedule}:qa"
+    web      = "${local.ecr_repository_urls.web}:qa"
+    migrate  = "${local.ecr_repository_urls.migrate}:qa"
   }
 }
 

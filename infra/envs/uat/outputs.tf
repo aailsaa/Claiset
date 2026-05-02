@@ -19,7 +19,7 @@ output "frontend_certificate_arn" {
 }
 
 output "ecr_repository_urls" {
-  value       = module.ecr.repository_urls
-  description = "ECR repo URLs for app images."
+  value       = local.ecr_repository_urls
+  description = "ECR repo URLs (repos created in envs/dev; shared across environments)."
 }
 

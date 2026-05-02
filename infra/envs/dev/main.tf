@@ -46,7 +46,8 @@ module "ecr" {
   env     = var.env
   tags    = local.tags
 
-  repositories = ["items", "outfits", "schedule", "web", "migrate"]
+  repository_name_prefix = var.ecr_repository_prefix
+  repositories           = ["items", "outfits", "schedule", "web", "migrate"]
 }
 
 # Cluster add-ons that the rubric expects (Ingress/ALB, DNS, certs, monitoring/logging)
@@ -61,9 +62,11 @@ module "platform" {
   vpc_id       = module.network.vpc_id
 
   # Domain wiring is scaffolded but optional until you create a domain.
-  domain_root        = var.domain_root
-  hosted_zone_id     = var.route53_hosted_zone_id
-  frontend_subdomain = var.frontend_subdomain
+  domain_root                = var.domain_root
+  hosted_zone_id             = var.route53_hosted_zone_id
+  frontend_subdomain         = var.frontend_subdomain
+  wait_for_acm_validation    = var.wait_for_acm_validation
+  create_hosted_zone         = var.create_hosted_zone
 }
 
 # Blue/Green deployment scaffolding (two stacks + traffic switch) will live here.

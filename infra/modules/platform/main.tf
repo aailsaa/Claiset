@@ -1,18 +1,44 @@
 locals {
   name = "${var.project}-${var.env}"
-  zone_id = var.hosted_zone_id != "" ? var.hosted_zone_id : try(aws_route53_zone.this[0].zone_id, null)
+  # Prefer explicit ID (avoids ambiguity when duplicate zones exist for the same domain).
+  create_new_zone      = var.domain_root != "" && var.hosted_zone_id == "" && var.create_hosted_zone
+  lookup_zone_by_name  = var.domain_root != "" && var.hosted_zone_id == "" && !var.create_hosted_zone
 }
 
-# DNS hosted zone (Terraform-managed). You still need to update your registrar
-# to use the Route53 nameservers that Terraform creates.
-resource "aws_route53_zone" "this" {
-  count = var.domain_root != "" && var.hosted_zone_id == "" ? 1 : 0
-  name  = var.domain_root
+data "aws_route53_zone" "by_id" {
+  count   = var.hosted_zone_id != "" ? 1 : 0
+  zone_id = var.hosted_zone_id
+}
 
-  tags = var.tags
+data "aws_route53_zone" "lookup" {
+  count = local.lookup_zone_by_name ? 1 : 0
+
+  name         = var.domain_root
+  private_zone = false
+}
+
+# Only when explicitly requested — otherwise we reuse hosted_zone_id or lookup by domain_root.
+resource "aws_route53_zone" "this" {
+  count = local.create_new_zone ? 1 : 0
+  name  = var.domain_root
+  tags  = var.tags
+}
+
+locals {
+  # coalesce avoids referencing lookup[0] when that data source has count = 0.
+  zone_id = var.domain_root == "" ? null : coalesce(
+    var.hosted_zone_id != "" ? var.hosted_zone_id : null,
+    length(aws_route53_zone.this) > 0 ? aws_route53_zone.this[0].zone_id : null,
+    length(data.aws_route53_zone.lookup) > 0 ? data.aws_route53_zone.lookup[0].zone_id : null,
+  )
 }
 
 # ACM certificate for the frontend hostname (DNS validated in Route53).
+#
+# If aws_acm_certificate_validation hangs for many minutes, ACM cannot see the
+# validation CNAME publicly. Typical causes: duplicate Route53 zones (records go
+# into the wrong zone_id), or your registrar still points at different nameservers
+# than the hosted zone in `route53_hosted_zone_id`. Fix public NS/DNS, then re-apply.
 resource "aws_acm_certificate" "frontend" {
   count             = var.domain_root != "" ? 1 : 0
   domain_name       = "${var.frontend_subdomain}.${var.domain_root}"
@@ -38,9 +64,14 @@ resource "aws_route53_record" "frontend_cert_validation" {
 }
 
 resource "aws_acm_certificate_validation" "frontend" {
-  count                   = var.domain_root != "" ? 1 : 0
+  count = var.domain_root != "" && var.wait_for_acm_validation ? 1 : 0
+
   certificate_arn         = aws_acm_certificate.frontend[0].arn
   validation_record_fqdns = [for r in aws_route53_record.frontend_cert_validation : r.fqdn]
+
+  timeouts {
+    create = "25m"
+  }
 }
 
 # Placeholder module: in follow-ups we will install:
@@ -65,6 +96,10 @@ resource "kubernetes_namespace" "platform" {
 # AWS Load Balancer Controller (IngressClass: alb)
 # Note: AWS Academy accounts often restrict IAM role creation (IRSA). This install
 # relies on the node IAM role (LabRole) having permission.
+#
+# Recovery: "cannot re-use a name that is still in use" → a failed prior release.
+#   helm uninstall aws-load-balancer-controller -n kube-system
+# or import: terraform import 'module.platform.helm_release.aws_load_balancer_controller' 'kube-system/aws-load-balancer-controller'
 resource "helm_release" "aws_load_balancer_controller" {
   name       = "aws-load-balancer-controller"
   repository = "https://aws.github.io/eks-charts"
@@ -154,7 +189,7 @@ resource "helm_release" "external_dns" {
   }
   set {
     name  = "txtOwnerId"
-    value = aws_route53_zone.this[0].zone_id
+    value = local.zone_id
   }
   set {
     name  = "serviceAccount.create"

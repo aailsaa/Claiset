@@ -16,6 +16,12 @@ variable "project" {
   default     = "onlinecloset"
 }
 
+variable "ecr_repository_prefix" {
+  type        = string
+  description = "Shared ECR repo prefix for this account (e.g. claiset-items). Must match Actions image repo names."
+  default     = "claiset"
+}
+
 variable "eks_cluster_version" {
   type        = string
   description = "EKS Kubernetes version for this environment."
@@ -36,13 +42,25 @@ variable "domain_root" {
 
 variable "route53_hosted_zone_id" {
   type        = string
-  description = "Existing Route53 hosted zone ID to reuse (prevents creating duplicate zones)."
+  description = "Use this zone ID when it is set. Strongly recommended if multiple hosted zones exist for the same domain."
   default     = ""
+}
+
+variable "create_hosted_zone" {
+  type        = bool
+  default     = false
+  description = "If true, Terraform creates a new public zone for domain_root. If false, looks up an existing zone by name (or use route53_hosted_zone_id)."
 }
 
 variable "frontend_subdomain" {
   type        = string
   description = "Subdomain for the frontend (e.g. app). Full name becomes app.<domain_root>."
   default     = "app"
+}
+
+variable "wait_for_acm_validation" {
+  type        = bool
+  default     = true
+  description = "Set false if DNS/Route53 is not yet delegating correctly; avoids multi-hour apply waits (TLS may stay PENDING until fixed)."
 }
 
