@@ -83,7 +83,7 @@ jobs:
         with:
           terraform_version: "1.9.8"
 
-      - name: Terraform apply (dev)
+      - name: Terraform init (dev)
         working-directory: infra/envs/dev
         run: |
           terraform init \
@@ -92,6 +92,35 @@ jobs:
             -backend-config="region=${AWS_REGION}" \
             -backend-config="dynamodb_table=${TF_LOCK_TABLE}" \
             -backend-config="encrypt=true"
+
+      # Prefix rename (onlinecloset-* → claiset-*): Terraform cannot empty-delete in the same apply that adds force_delete.
+      # If state still tracks legacy names, force-delete in AWS and drop state so apply only creates claiset-*.
+      - name: Migrate legacy onlinecloset-* ECR from Terraform state
+        working-directory: infra/envs/dev
+        run: |
+          set -euo pipefail
+          migrate_if_legacy() {
+            local key="$1"
+            local addr="module.ecr.aws_ecr_repository.this[\"${key}\"]"
+            local name
+            name="$(terraform state show -json "$addr" 2>/dev/null | jq -r '.values.name // empty')" || true
+            if [[ -z "$name" ]]; then
+              return 0
+            fi
+            if [[ ! "$name" =~ ^onlinecloset- ]]; then
+              return 0
+            fi
+            echo "Migrating legacy ECR repository: $name"
+            aws ecr delete-repository --repository-name "$name" --force --region "${AWS_REGION}" 2>/dev/null || true
+            terraform state rm "$addr" || true
+          }
+          for key in items outfits schedule web migrate; do
+            migrate_if_legacy "$key"
+          done
+
+      - name: Terraform apply (dev)
+        working-directory: infra/envs/dev
+        run: |
           # Phase 1: base AWS only (no platform/ACM/Helm) so a bad DNS/ACM run does not
           # half-apply Helm or leave -target state inconsistent with AWS.
           terraform apply -auto-approve \

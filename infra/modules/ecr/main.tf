@@ -18,5 +18,9 @@ resource "aws_ecr_repository" "this" {
   }
 
   tags = var.tags
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
