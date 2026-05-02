@@ -93,41 +93,6 @@ jobs:
             -backend-config="dynamodb_table=${TF_LOCK_TABLE}" \
             -backend-config="encrypt=true"
 
-      # Prefix rename (onlinecloset-* → claiset-*): drop legacy from AWS/state; import claiset-* if they already
-      # exist (otherwise apply creates them). Avoids RepositoryAlreadyExistsException on replace.
-      - name: Sync ECR repos (legacy cleanup + import existing claiset-*)
-        working-directory: infra/envs/dev
-        env:
-          # Must match infra/envs/dev default var.ecr_repository_prefix ("claiset").
-          ECR_NAME_PREFIX: claiset
-        run: |
-          set -euo pipefail
-          sync_ecr_repo() {
-            local key="$1"
-            local addr="module.ecr.aws_ecr_repository.this[\"${key}\"]"
-            local new_name="${ECR_NAME_PREFIX}-${key}"
-            local name_in_state=""
-            name_in_state="$(terraform state show -json "$addr" 2>/dev/null | jq -r '.values.name // empty')" || true
-
-            if [[ -n "$name_in_state" && "$name_in_state" =~ ^onlinecloset- ]]; then
-              echo "Removing legacy ECR ${name_in_state} from AWS and Terraform state"
-              aws ecr delete-repository --repository-name "$name_in_state" --force --region "${AWS_REGION}" 2>/dev/null || true
-              terraform state rm "$addr" || true
-              name_in_state=""
-            fi
-
-            if aws ecr describe-repositories --repository-names "$new_name" --region "${AWS_REGION}" &>/dev/null; then
-              if [[ -z "$name_in_state" || "$name_in_state" != "$new_name" ]]; then
-                echo "Importing existing ${new_name} into Terraform state"
-                terraform state rm "$addr" 2>/dev/null || true
-                terraform import "$addr" "$new_name"
-              fi
-            fi
-          }
-          for key in items outfits schedule web migrate; do
-            sync_ecr_repo "$key"
-          done
-
       # Switching to route53_hosted_zone_id drops aws_route53_zone from config; Terraform would
       # otherwise try DeleteHostedZone on the old duplicate — fails while ACM/other records exist.
       # Stop managing it in state; delete the duplicate zone in AWS console later if needed.
