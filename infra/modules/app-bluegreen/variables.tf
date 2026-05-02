@@ -56,3 +56,9 @@ variable "images" {
   description = "Container images for each service."
 }
 
+variable "enable_kubernetes_app" {
+  type        = bool
+  default     = true
+  description = "When false, skips counted app workloads so counts do not depend on database_url / ACM (e.g. terraform import). Re-enable for normal apply."
+}
+

@@ -64,3 +64,9 @@ variable "wait_for_acm_validation" {
   description = "Set false if DNS/Route53 is not yet delegating correctly; avoids multi-hour apply waits (TLS may stay PENDING until fixed)."
 }
 
+variable "enable_kubernetes_app" {
+  type        = bool
+  default     = true
+  description = "Set false only for targeted terraform import when app inputs may be unknown."
+}
+

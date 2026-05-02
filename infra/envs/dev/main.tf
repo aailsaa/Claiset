@@ -62,11 +62,11 @@ module "platform" {
   vpc_id       = module.network.vpc_id
 
   # Domain wiring is scaffolded but optional until you create a domain.
-  domain_root                = var.domain_root
-  hosted_zone_id             = var.route53_hosted_zone_id
-  frontend_subdomain         = var.frontend_subdomain
-  wait_for_acm_validation    = var.wait_for_acm_validation
-  create_hosted_zone         = var.create_hosted_zone
+  domain_root             = var.domain_root
+  hosted_zone_id          = var.route53_hosted_zone_id
+  frontend_subdomain      = var.frontend_subdomain
+  wait_for_acm_validation = var.wait_for_acm_validation
+  create_hosted_zone      = var.create_hosted_zone
 }
 
 # Blue/Green deployment scaffolding (two stacks + traffic switch) will live here.
@@ -75,6 +75,8 @@ module "app_bluegreen" {
   project = var.project
   env     = var.env
   tags    = local.tags
+
+  enable_kubernetes_app = var.enable_kubernetes_app
 
   # Will be used for Ingress hostnames once domain is configured.
   aws_region               = var.aws_region

@@ -4,7 +4,15 @@ locals {
   apex_host     = var.domain_root
   www_host      = var.domain_root != "" ? "www.${var.domain_root}" : ""
   # Require aws_region so we can build a working ECR imagePullSecret (LabRole often cannot pull from ECR without it).
-  enabled = local.frontend_host != "" && var.frontend_certificate_arn != "" && var.database_url != "" && var.aws_region != ""
+  # inputs_ready_for_app can be unknown during targeted import (RDS/ACM not in refresh graph); place
+  # enable_kubernetes_app first so `false && unknown` short-circuits to a known false count.
+  inputs_ready_for_app = (
+    local.frontend_host != "" &&
+    var.frontend_certificate_arn != "" &&
+    var.database_url != "" &&
+    var.aws_region != ""
+  )
+  enabled = var.enable_kubernetes_app && local.inputs_ready_for_app
 }
 
 # Private ECR pulls from cluster nodes rely on IAM. AWS Academy LabRole often lacks AmazonECR*;
@@ -86,7 +94,7 @@ resource "kubernetes_job" "migrate" {
     template {
       metadata { labels = { app = "migrate" } }
       spec {
-        restart_policy       = "OnFailure"
+        restart_policy = "OnFailure"
         image_pull_secrets { name = kubernetes_secret.ecr_pull[0].metadata[0].name }
         container {
           name              = "migrate"

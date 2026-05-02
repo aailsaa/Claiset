@@ -59,11 +59,11 @@ module "platform" {
   cluster_name = module.eks.cluster_name
   vpc_id       = module.network.vpc_id
 
-  domain_root                = var.domain_root
-  hosted_zone_id             = var.route53_hosted_zone_id
-  frontend_subdomain         = var.frontend_subdomain
-  wait_for_acm_validation    = var.wait_for_acm_validation
-  create_hosted_zone         = var.create_hosted_zone
+  domain_root             = var.domain_root
+  hosted_zone_id          = var.route53_hosted_zone_id
+  frontend_subdomain      = var.frontend_subdomain
+  wait_for_acm_validation = var.wait_for_acm_validation
+  create_hosted_zone      = var.create_hosted_zone
 }
 
 module "app_bluegreen" {
@@ -71,6 +71,8 @@ module "app_bluegreen" {
   project = var.project
   env     = var.env
   tags    = local.tags
+
+  enable_kubernetes_app = var.enable_kubernetes_app
 
   aws_region               = var.aws_region
   domain_root              = var.domain_root
