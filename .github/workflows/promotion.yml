@@ -43,6 +43,9 @@ env:
 jobs:
   dev:
     name: Build + deploy dev
+    env:
+      # Must match infra/envs/dev defaults: project onlinecloset + env dev (VPC Name tag).
+      EXPECTED_VPC_NAME: onlinecloset-dev
     runs-on: ubuntu-latest
     concurrency:
       group: tf-dev-${{ github.repository }}
@@ -100,7 +103,7 @@ jobs:
       # Switching to route53_hosted_zone_id drops aws_route53_zone from config; Terraform would
       # otherwise try DeleteHostedZone on the old duplicate — fails while ACM/other records exist.
       # Stop managing it in state; delete the duplicate zone in AWS console later if needed.
-      - name: Drop Terraform-managed Route53 zone from state when using ROUTE53_HOSTED_ZONE_ID
+      - name: Route53 state rm (external hosted zone secret)
         working-directory: infra/envs/dev
         run: |
           set -euo pipefail
@@ -123,6 +126,8 @@ jobs:
 
   qa:
     name: Promote to QA (nightly)
+    env:
+      EXPECTED_VPC_NAME: claiset-qa
     runs-on: ubuntu-latest
     concurrency:
       group: tf-qa-${{ github.repository }}
@@ -189,6 +194,8 @@ jobs:
 
   uat:
     name: Promote to UAT (RC commits)
+    env:
+      EXPECTED_VPC_NAME: claiset-uat
     runs-on: ubuntu-latest
     concurrency:
       group: tf-uat-${{ github.repository }}
@@ -260,6 +267,8 @@ jobs:
 
   prod:
     name: Promote to production (tags)
+    env:
+      EXPECTED_VPC_NAME: claiset-prod
     runs-on: ubuntu-latest
     concurrency:
       group: tf-prod-${{ github.repository }}

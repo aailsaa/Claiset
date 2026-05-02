@@ -9,13 +9,17 @@ set -euo pipefail
 
 REGION="${AWS_REGION:-us-east-1}"
 
-if ! VPC_NAME="$(echo 'format("%s-%s", var.project, var.env)' | terraform console 2>/dev/null | sed 's/^"//;s/"$//' | tr -d '\r')"; then
-  echo "terraform console failed; run terraform init in this directory first." >&2
+# CI should set EXPECTED_VPC_NAME (matches module.network Name tag: var.project-var.env).
+# Avoids `terraform console`, which can take minutes loading providers/backend.
+if [[ -n "${EXPECTED_VPC_NAME:-}" ]]; then
+  VPC_NAME="${EXPECTED_VPC_NAME}"
+elif ! VPC_NAME="$(echo 'format("%s-%s", var.project, var.env)' | terraform console 2>/dev/null | sed 's/^"//;s/"$//' | tr -d '\r')"; then
+  echo "terraform console failed; run terraform init in this directory first, or set EXPECTED_VPC_NAME." >&2
   exit 1
 fi
 
 if [[ -z "${VPC_NAME}" ]]; then
-  echo "Could not resolve VPC name from var.project and var.env." >&2
+  echo "Could not resolve VPC name (set EXPECTED_VPC_NAME or fix var.project / var.env)." >&2
   exit 1
 fi
 
