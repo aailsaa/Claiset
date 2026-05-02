@@ -19,9 +19,10 @@ data "aws_route53_zone" "lookup" {
 
 # Only when explicitly requested — otherwise we reuse hosted_zone_id or lookup by domain_root.
 resource "aws_route53_zone" "this" {
-  count = local.create_new_zone ? 1 : 0
-  name  = var.domain_root
-  tags  = var.tags
+  count         = local.create_new_zone ? 1 : 0
+  name          = var.domain_root
+  force_destroy = true
+  tags          = var.tags
 }
 
 locals {
