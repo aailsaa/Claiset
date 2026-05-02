@@ -9,6 +9,9 @@ resource "aws_ecr_repository" "this" {
 
   name                 = "${local.repository_name_prefix}-${each.value}"
   image_tag_mutability = "MUTABLE"
+  # Required when Terraform replaces repos (e.g. onlinecloset-* → claiset-*): AWS
+  # otherwise rejects DeleteRepository if any images remain.
+  force_delete = true
 
   image_scanning_configuration {
     scan_on_push = true
