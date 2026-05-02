@@ -180,7 +180,8 @@ jobs:
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Retag ECR images qa → uat
+      # QA job (nightly/manual) may not have run; ensure dev→qa then qa→uat so :qa exists.
+      - name: Retag ECR images dev → qa → uat
         run: |
           set -euo pipefail
           ecr_promote() {
@@ -195,6 +196,9 @@ jobs:
             aws ecr batch-get-image --repository-name "$repo" --image-ids imageTag="$from" --query 'images[0].imageManifest' --output text > manifest.json
             aws ecr put-image --repository-name "$repo" --image-tag "$to" --image-manifest file://manifest.json >/dev/null
           }
+          for repo in "${ECR_ITEMS_REPO}" "${ECR_OUTFITS_REPO}" "${ECR_SCHEDULE_REPO}" "${ECR_WEB_REPO}" "${ECR_MIGRATE_REPO}"; do
+            ecr_promote "$repo" dev qa
+          done
           for repo in "${ECR_ITEMS_REPO}" "${ECR_OUTFITS_REPO}" "${ECR_SCHEDULE_REPO}" "${ECR_WEB_REPO}" "${ECR_MIGRATE_REPO}"; do
             ecr_promote "$repo" qa uat
           done
@@ -238,7 +242,8 @@ jobs:
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Retag ECR images uat → prod
+      # Ensure full chain so :uat exists even if UAT/QA jobs did not run before this tag push.
+      - name: Retag ECR images dev → qa → uat → prod
         run: |
           set -euo pipefail
           ecr_promote() {
@@ -254,6 +259,8 @@ jobs:
             aws ecr put-image --repository-name "$repo" --image-tag "$to" --image-manifest file://manifest.json >/dev/null
           }
           for repo in "${ECR_ITEMS_REPO}" "${ECR_OUTFITS_REPO}" "${ECR_SCHEDULE_REPO}" "${ECR_WEB_REPO}" "${ECR_MIGRATE_REPO}"; do
+            ecr_promote "$repo" dev qa
+            ecr_promote "$repo" qa uat
             ecr_promote "$repo" uat prod
           done
 
