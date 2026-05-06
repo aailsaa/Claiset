@@ -12,7 +12,7 @@ NAMESPACE="${K8S_APP_NAMESPACE:-${TF_VAR_env:-dev}}"
 
 in_state() {
   local addr="$1"
-  terraform state list 2>/dev/null | grep -qF -- "${addr}"
+  terraform state show -no-color "${addr}" >/dev/null 2>&1
 }
 
 has_deploy() { kubectl -n "${NAMESPACE}" get deploy "$1" >/dev/null 2>&1; }
@@ -21,6 +21,13 @@ has_job() { kubectl -n "${NAMESPACE}" get job "$1" >/dev/null 2>&1; }
 has_ing() { kubectl -n "${NAMESPACE}" get ingress "$1" >/dev/null 2>&1; }
 
 echo "K8s import guard: namespace=${NAMESPACE}"
+
+# Ensure Terraform state is readable; otherwise we may try to import into the wrong backend
+# or mis-detect what is already managed.
+if ! terraform state list >/dev/null 2>&1; then
+  echo "::error::Unable to read Terraform state. Run terraform init in this directory (and ensure backend env vars are set in CI) before running this guard." >&2
+  exit 1
+fi
 
 # Deployments
 for name in items outfits schedule web; do
