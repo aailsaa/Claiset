@@ -132,6 +132,9 @@ jobs:
             -target=module.eks \
             -target=module.rds \
             -target=module.ecr
+          # If a previous apply was cancelled, K8s objects may already exist but not be in state.
+          # Import them so Phase 2 can converge (avoids "already exists" errors).
+          bash ../../scripts/terraform-k8s-import-guard.sh
           # Phase 2: platform (ACM, controllers) + app_bluegreen and the rest.
           terraform apply -auto-approve
 
@@ -212,6 +215,7 @@ jobs:
             -target=module.network \
             -target=module.eks \
             -target=module.rds
+          K8S_APP_NAMESPACE=qa bash ../../scripts/terraform-k8s-import-guard.sh
           terraform apply -auto-approve
 
   uat:
@@ -296,6 +300,7 @@ jobs:
             -target=module.network \
             -target=module.eks \
             -target=module.rds
+          K8S_APP_NAMESPACE=uat bash ../../scripts/terraform-k8s-import-guard.sh
           terraform apply -auto-approve
 
   prod:
@@ -378,5 +383,6 @@ jobs:
             -target=module.network \
             -target=module.eks \
             -target=module.rds
+          K8S_APP_NAMESPACE=prod bash ../../scripts/terraform-k8s-import-guard.sh
           terraform apply -auto-approve
 
