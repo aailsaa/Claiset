@@ -126,7 +126,7 @@ resource "kubernetes_deployment" "items" {
   }
 
   spec {
-    replicas = 2
+    replicas = var.replicas
     selector {
       match_labels = { app = "items" }
     }
@@ -212,7 +212,7 @@ resource "kubernetes_deployment" "outfits" {
   }
 
   spec {
-    replicas = 2
+    replicas = var.replicas
     selector { match_labels = { app = "outfits" } }
     template {
       metadata { labels = { app = "outfits" } }
@@ -294,7 +294,7 @@ resource "kubernetes_deployment" "schedule" {
   }
 
   spec {
-    replicas = 2
+    replicas = var.replicas
     selector { match_labels = { app = "schedule" } }
     template {
       metadata { labels = { app = "schedule" } }
@@ -376,7 +376,7 @@ resource "kubernetes_deployment" "web" {
   }
 
   spec {
-    replicas = 2
+    replicas = var.replicas
     selector { match_labels = { app = "web" } }
     template {
       metadata { labels = { app = "web" } }

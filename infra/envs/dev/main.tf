@@ -81,6 +81,7 @@ module "app_bluegreen" {
 
   enable_kubernetes_app = var.enable_kubernetes_app
   depends_on            = [module.platform]
+  replicas              = 1
 
   # Will be used for Ingress hostnames once domain is configured.
   aws_region               = var.aws_region

@@ -62,3 +62,9 @@ variable "enable_kubernetes_app" {
   description = "When false, skips counted app workloads so counts do not depend on database_url / ACM (e.g. terraform import). Re-enable for normal apply."
 }
 
+variable "replicas" {
+  type        = number
+  default     = 2
+  description = "Replica count per service Deployment (items/outfits/schedule/web). Use 1 on tiny dev node groups to avoid pod-IP limits."
+}
+

@@ -91,6 +91,7 @@ jobs:
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "1.9.8"
+          terraform_wrapper: false
 
       - name: Terraform init (dev)
         working-directory: infra/envs/dev
@@ -184,6 +185,7 @@ jobs:
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "1.9.8"
+          terraform_wrapper: false
 
       - name: Terraform init (qa)
         working-directory: infra/envs/qa
@@ -267,6 +269,7 @@ jobs:
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "1.9.8"
+          terraform_wrapper: false
 
       - name: Terraform init (uat)
         working-directory: infra/envs/uat
@@ -348,6 +351,7 @@ jobs:
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "1.9.8"
+          terraform_wrapper: false
 
       - name: Terraform init (prod)
         working-directory: infra/envs/prod
