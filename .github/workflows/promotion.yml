@@ -51,8 +51,9 @@ jobs:
     concurrency:
       group: tf-dev-${{ github.repository }}
       cancel-in-progress: false
-    # Manual/scheduled runs still use refs/heads/main; require push or explicit dispatch so QA doesn't spawn dev too.
-    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'dev')
+    # Push to main runs dev unless the tip commit subject/body contains [skip-dev] (e.g. QA-only infra tweaks).
+    # Manual dispatch with target dev always runs. Nightly QA does not use this job.
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main' && !(github.event.head_commit != null && contains(github.event.head_commit.message, '[skip-dev]'))) || (github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'dev')
     steps:
       - name: Checkout
         uses: actions/checkout@v4
