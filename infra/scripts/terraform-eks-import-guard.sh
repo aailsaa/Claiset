@@ -22,23 +22,41 @@ echo "EKS import guard: cluster=${CLUSTER} nodegroup=${NODEGROUP} region=${REGIO
 
 in_state() {
   local addr="$1"
-  terraform state list 2>/dev/null | grep -qF -- "${addr}"
+  terraform state show -no-color "${addr}" >/dev/null 2>&1
+}
+
+# Ensure Terraform state is readable; otherwise we may try to import into the wrong backend.
+if ! terraform state list >/dev/null 2>&1; then
+  echo "::error::Unable to read Terraform state. Run terraform init in this directory (and ensure backend env vars are set in CI) before running this guard." >&2
+  exit 1
+fi
+
+try_import() {
+  local addr="$1" id="$2" desc="$3"
+
+  if in_state "${addr}"; then
+    echo "${desc} already managed in state, skipping import"
+    return 0
+  fi
+
+  echo "Importing existing ${desc} into state"
+  if terraform import "${addr}" "${id}"; then
+    return 0
+  fi
+
+  # If another step imported it first, treat as OK.
+  echo "Skipping ${desc}: import failed (may already be managed)" >&2
+  return 0
 }
 
 # Cluster
 if aws eks describe-cluster --name "${CLUSTER}" --region "${REGION}" >/dev/null 2>&1; then
-  if ! in_state "module.eks.aws_eks_cluster.this"; then
-    echo "Importing existing EKS cluster into state"
-    terraform import "module.eks.aws_eks_cluster.this" "${CLUSTER}"
-  fi
+  try_import "module.eks.aws_eks_cluster.this" "${CLUSTER}" "EKS cluster"
 fi
 
 # Node group (cluster must exist in AWS for this call)
 if aws eks describe-nodegroup --cluster-name "${CLUSTER}" --nodegroup-name "${NODEGROUP}" --region "${REGION}" >/dev/null 2>&1; then
-  if ! in_state "module.eks.aws_eks_node_group.default"; then
-    echo "Importing existing EKS node group into state"
-    terraform import "module.eks.aws_eks_node_group.default" "${CLUSTER}:${NODEGROUP}"
-  fi
+  try_import "module.eks.aws_eks_node_group.default" "${CLUSTER}:${NODEGROUP}" "EKS node group"
 fi
 
 echo "EKS import guard OK."

@@ -25,6 +25,12 @@ fi
 
 echo "VPC guard: Name tag=${VPC_NAME} region=${REGION}"
 
+# Ensure Terraform state is readable; otherwise we may mis-detect state and create duplicates.
+if ! terraform state list >/dev/null 2>&1; then
+  echo "::error::Unable to read Terraform state. Run terraform init in this directory (and ensure backend env vars are set in CI) before running this guard." >&2
+  exit 1
+fi
+
 COUNT="$(aws ec2 describe-vpcs --region "${REGION}" \
   --filters "Name=tag:Name,Values=${VPC_NAME}" \
   --query 'length(Vpcs)' --output text)"
@@ -43,7 +49,7 @@ if [[ "${COUNT}" -gt 1 ]]; then
 fi
 
 VPC_IN_STATE=0
-if terraform state list 2>/dev/null | grep -q 'module\.network\.module\.vpc\.aws_vpc\.this'; then
+if terraform state show -no-color 'module.network.module.vpc.aws_vpc.this[0]' >/dev/null 2>&1; then
   VPC_IN_STATE=1
 fi
 
