@@ -239,8 +239,15 @@ jobs:
     concurrency:
       group: tf-uat-${{ github.repository }}
       cancel-in-progress: false
-    # GitHub Expressions have no `toLower()` — match RC / rc substring (e.g. RC1, chore: RC2).
-    if: (github.ref == 'refs/heads/main' && github.event.head_commit != null && (contains(github.event.head_commit.message, 'RC') || contains(github.event.head_commit.message, 'rc'))) || (github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'uat')
+    # Only trigger UAT when the commit message contains RC as its own token (start/end or whitespace
+    # boundaries). This prevents accidental triggers from words like "resources".
+    if: |
+      (github.ref == 'refs/heads/main' && github.event.head_commit != null && (
+        github.event.head_commit.message == 'RC' ||
+        startsWith(github.event.head_commit.message, 'RC ') ||
+        endsWith(github.event.head_commit.message, ' RC') ||
+        contains(github.event.head_commit.message, ' RC ')
+      )) || (github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'uat')
     steps:
       - name: Checkout
         uses: actions/checkout@v4
