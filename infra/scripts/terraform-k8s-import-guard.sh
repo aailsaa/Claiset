@@ -15,10 +15,22 @@ in_state() {
   terraform state show -no-color "${addr}" >/dev/null 2>&1
 }
 
-has_deploy() { kubectl -n "${NAMESPACE}" get deploy "$1" >/dev/null 2>&1; }
-has_svc() { kubectl -n "${NAMESPACE}" get svc "$1" >/dev/null 2>&1; }
-has_job() { kubectl -n "${NAMESPACE}" get job "$1" >/dev/null 2>&1; }
-has_ing() { kubectl -n "${NAMESPACE}" get ingress "$1" >/dev/null 2>&1; }
+try_import() {
+  local addr="$1" id="$2" desc="$3"
+
+  if in_state "${addr}"; then
+    return 0
+  fi
+
+  echo "Importing ${desc} ${id} into state"
+  if terraform import "${addr}" "${id}"; then
+    return 0
+  fi
+
+  # Common/expected when the object truly doesn't exist yet.
+  echo "Skipping ${desc} ${id}: import failed (object may not exist yet)" >&2
+  return 0
+}
 
 echo "K8s import guard: namespace=${NAMESPACE}"
 
@@ -32,35 +44,23 @@ fi
 # Deployments
 for name in items outfits schedule web; do
   addr="module.app_bluegreen.kubernetes_deployment.${name}[0]"
-  if has_deploy "${name}" && ! in_state "${addr}"; then
-    echo "Importing Deployment ${NAMESPACE}/${name} into state"
-    terraform import "${addr}" "${NAMESPACE}/${name}"
-  fi
+  try_import "${addr}" "${NAMESPACE}/${name}" "Deployment"
 done
 
 # Services
 for name in items outfits schedule web; do
   addr="module.app_bluegreen.kubernetes_service.${name}[0]"
-  if has_svc "${name}" && ! in_state "${addr}"; then
-    echo "Importing Service ${NAMESPACE}/${name} into state"
-    terraform import "${addr}" "${NAMESPACE}/${name}"
-  fi
+  try_import "${addr}" "${NAMESPACE}/${name}" "Service"
 done
 
 # Ingress (name is var.project; currently claiset)
 INGRESS_NAME="${K8S_INGRESS_NAME:-${TF_VAR_project:-claiset}}"
 addr_ing="module.app_bluegreen.kubernetes_ingress_v1.app[0]"
-if has_ing "${INGRESS_NAME}" && ! in_state "${addr_ing}"; then
-  echo "Importing Ingress ${NAMESPACE}/${INGRESS_NAME} into state"
-  terraform import "${addr_ing}" "${NAMESPACE}/${INGRESS_NAME}"
-fi
+try_import "${addr_ing}" "${NAMESPACE}/${INGRESS_NAME}" "Ingress"
 
 # Migrate Job
 addr_job="module.app_bluegreen.kubernetes_job.migrate[0]"
-if has_job "migrate" && ! in_state "${addr_job}"; then
-  echo "Importing Job ${NAMESPACE}/migrate into state"
-  terraform import "${addr_job}" "${NAMESPACE}/migrate"
-fi
+try_import "${addr_job}" "${NAMESPACE}/migrate" "Job"
 
 echo "K8s import guard OK."
 
