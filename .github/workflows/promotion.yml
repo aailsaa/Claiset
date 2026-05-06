@@ -227,6 +227,18 @@ jobs:
             -target=module.network \
             -target=module.eks \
             -target=module.rds
+
+          # Burst node capacity for Phase 2 rollout, then scale down again for cost.
+          # QA is cheap-by-default (desired=1) but needs headroom to avoid "Too many pods".
+          BASE_MIN=1
+          BASE_DESIRED=1
+          BASE_MAX=3
+          BURST_DESIRED=2
+          CLUSTER="${EXPECTED_CLUSTER_NAME}"
+          NODEGROUP="${EXPECTED_CLUSTER_NAME}-default"
+          trap 'echo "Scaling nodegroup back down"; AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" "${BASE_MIN}" "${BASE_DESIRED}" "${BASE_MAX}" || true' EXIT
+          AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" "${BASE_MIN}" "${BURST_DESIRED}" "${BASE_MAX}"
+
           K8S_APP_NAMESPACE=qa bash ../../scripts/terraform-k8s-import-guard.sh
           terraform apply -auto-approve
 
