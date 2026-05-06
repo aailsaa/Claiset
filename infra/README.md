@@ -43,7 +43,7 @@ CI/CD is implemented via GitHub Actions in [`.github/workflows/promotion.yml`](.
 You must configure repo secrets:
 - `AWS_ACCESS_KEY_ID`
 - `AWS_SECRET_ACCESS_KEY`
-- `AWS_SESSION_TOKEN` (required for AWS Academy/Vocareum sessions)
+- `AWS_SESSION_TOKEN` — **omit** for a normal IAM user access key. Set only when using **temporary** credentials (AWS Academy/Vocareum, STS, etc.); the workflow does not require this input for IAM users.
 
 (See also state/backend secrets and `ROUTE53_HOSTED_ZONE_ID` in the list above.)
 

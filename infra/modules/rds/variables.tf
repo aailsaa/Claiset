@@ -43,7 +43,7 @@ variable "max_allocated_storage_gb" {
 
 variable "db_name" {
   type    = string
-  default = "onlinecloset"
+  default = "claiset"
 }
 
 variable "db_username" {

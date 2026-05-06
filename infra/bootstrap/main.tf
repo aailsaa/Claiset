@@ -2,8 +2,21 @@ provider "aws" {
   region = var.aws_region
 }
 
+data "aws_caller_identity" "current" {}
+
+resource "random_id" "suffix" {
+  byte_length = 3
+}
+
+locals {
+  # S3 bucket names must be globally unique. Using account id + a short random suffix avoids collisions.
+  computed_state_bucket_name = "claiset-tf-state-${data.aws_caller_identity.current.account_id}-${random_id.suffix.hex}"
+  state_bucket_name          = var.state_bucket_name != "" ? var.state_bucket_name : local.computed_state_bucket_name
+  lock_table_name            = var.lock_table_name != "" ? var.lock_table_name : "claiset-tf-locks"
+}
+
 resource "aws_s3_bucket" "tf_state" {
-  bucket = var.state_bucket_name
+  bucket = local.state_bucket_name
 }
 
 resource "aws_s3_bucket_versioning" "tf_state" {
@@ -27,7 +40,7 @@ resource "aws_s3_bucket_public_access_block" "tf_state" {
 }
 
 resource "aws_dynamodb_table" "tf_locks" {
-  name         = var.lock_table_name
+  name         = local.lock_table_name
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "LockID"
 

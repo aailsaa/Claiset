@@ -3,16 +3,10 @@ locals {
   frontend_host = var.domain_root != "" ? "${var.frontend_subdomain}.${var.domain_root}" : ""
   apex_host     = var.domain_root
   www_host      = var.domain_root != "" ? "www.${var.domain_root}" : ""
-  # Require aws_region so we can build a working ECR imagePullSecret (LabRole often cannot pull from ECR without it).
-  # inputs_ready_for_app can be unknown during targeted import (RDS/ACM not in refresh graph); place
-  # enable_kubernetes_app first so `false && unknown` short-circuits to a known false count.
-  inputs_ready_for_app = (
-    local.frontend_host != "" &&
-    var.frontend_certificate_arn != "" &&
-    var.database_url != "" &&
-    var.aws_region != ""
-  )
-  enabled = var.enable_kubernetes_app && local.inputs_ready_for_app
+  # Keep count decisions based only on root input variables, not on values computed from
+  # other modules during the same plan (e.g. RDS address/password, ACM ARN). Those can be
+  # unknown at plan time and would make count invalid.
+  enabled = var.enable_kubernetes_app
 }
 
 # Private ECR pulls from cluster nodes rely on IAM. AWS Academy LabRole often lacks AmazonECR*;
@@ -69,7 +63,7 @@ resource "kubernetes_secret" "app_env" {
   count = local.enabled ? 1 : 0
 
   metadata {
-    name      = "onlinecloset-env"
+    name      = "${var.project}-env"
     namespace = kubernetes_namespace.app.metadata[0].name
   }
 
@@ -452,7 +446,7 @@ resource "kubernetes_ingress_v1" "app" {
   count = local.enabled ? 1 : 0
 
   metadata {
-    name      = "onlinecloset"
+    name      = var.project
     namespace = kubernetes_namespace.app.metadata[0].name
     annotations = {
       "kubernetes.io/ingress.class"               = "alb"

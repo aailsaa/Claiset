@@ -26,7 +26,7 @@ permissions:
 
 env:
   AWS_REGION: us-east-1
-  ECR_REGISTRY: 973087143131.dkr.ecr.us-east-1.amazonaws.com
+  # ECR_REGISTRY is set per job after AWS credentials (see "Set ECR registry from AWS account").
   # Opt into Node.js 24 for JavaScript-based actions (GitHub runner deprecation notice).
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
   TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
@@ -44,8 +44,9 @@ jobs:
   dev:
     name: Build + deploy dev
     env:
-      # Must match infra/envs/dev defaults: project onlinecloset + env dev (VPC Name tag).
-      EXPECTED_VPC_NAME: onlinecloset-dev
+      # Must match infra/envs/dev defaults: project claiset + env dev (VPC/EKS Name tag).
+      EXPECTED_VPC_NAME: claiset-dev
+      EXPECTED_CLUSTER_NAME: claiset-dev
     runs-on: ubuntu-latest
     concurrency:
       group: tf-dev-${{ github.repository }}
@@ -61,8 +62,13 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set ECR registry from AWS account
+        run: |
+          acct="$(aws sts get-caller-identity --query Account --output text)"
+          echo "ECR_REGISTRY=${acct}.dkr.ecr.${AWS_REGION}.amazonaws.com" >> "${GITHUB_ENV}"
+          echo "Using ECR registry ${acct}.dkr.ecr.${AWS_REGION}.amazonaws.com"
 
       - name: Login to ECR
         run: |
@@ -100,6 +106,10 @@ jobs:
         working-directory: infra/envs/dev
         run: bash ../../scripts/terraform-vpc-guard.sh
 
+      - name: EKS import guard (dev)
+        working-directory: infra/envs/dev
+        run: bash ../../scripts/terraform-eks-import-guard.sh
+
       # Switching to route53_hosted_zone_id drops aws_route53_zone from config; Terraform would
       # otherwise try DeleteHostedZone on the old duplicate — fails while ACM/other records exist.
       # Stop managing it in state; delete the duplicate zone in AWS console later if needed.
@@ -128,6 +138,7 @@ jobs:
     name: Promote to QA (nightly)
     env:
       EXPECTED_VPC_NAME: claiset-qa
+      EXPECTED_CLUSTER_NAME: claiset-qa
     runs-on: ubuntu-latest
     concurrency:
       group: tf-qa-${{ github.repository }}
@@ -142,8 +153,13 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set ECR registry from AWS account
+        run: |
+          acct="$(aws sts get-caller-identity --query Account --output text)"
+          echo "ECR_REGISTRY=${acct}.dkr.ecr.${AWS_REGION}.amazonaws.com" >> "${GITHUB_ENV}"
+          echo "Using ECR registry ${acct}.dkr.ecr.${AWS_REGION}.amazonaws.com"
 
       - name: Retag ECR images dev → qa
         run: |
@@ -183,6 +199,10 @@ jobs:
         working-directory: infra/envs/qa
         run: bash ../../scripts/terraform-vpc-guard.sh
 
+      - name: EKS import guard (qa)
+        working-directory: infra/envs/qa
+        run: bash ../../scripts/terraform-eks-import-guard.sh
+
       - name: Terraform apply (qa)
         working-directory: infra/envs/qa
         run: |
@@ -196,6 +216,7 @@ jobs:
     name: Promote to UAT (RC commits)
     env:
       EXPECTED_VPC_NAME: claiset-uat
+      EXPECTED_CLUSTER_NAME: claiset-uat
     runs-on: ubuntu-latest
     concurrency:
       group: tf-uat-${{ github.repository }}
@@ -211,8 +232,13 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set ECR registry from AWS account
+        run: |
+          acct="$(aws sts get-caller-identity --query Account --output text)"
+          echo "ECR_REGISTRY=${acct}.dkr.ecr.${AWS_REGION}.amazonaws.com" >> "${GITHUB_ENV}"
+          echo "Using ECR registry ${acct}.dkr.ecr.${AWS_REGION}.amazonaws.com"
 
       # QA job (nightly/manual) may not have run; ensure dev→qa then qa→uat so :qa exists.
       - name: Retag ECR images dev → qa → uat
@@ -256,6 +282,10 @@ jobs:
         working-directory: infra/envs/uat
         run: bash ../../scripts/terraform-vpc-guard.sh
 
+      - name: EKS import guard (uat)
+        working-directory: infra/envs/uat
+        run: bash ../../scripts/terraform-eks-import-guard.sh
+
       - name: Terraform apply (uat)
         working-directory: infra/envs/uat
         run: |
@@ -269,6 +299,7 @@ jobs:
     name: Promote to production (tags)
     env:
       EXPECTED_VPC_NAME: claiset-prod
+      EXPECTED_CLUSTER_NAME: claiset-prod
     runs-on: ubuntu-latest
     concurrency:
       group: tf-prod-${{ github.repository }}
@@ -283,8 +314,13 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set ECR registry from AWS account
+        run: |
+          acct="$(aws sts get-caller-identity --query Account --output text)"
+          echo "ECR_REGISTRY=${acct}.dkr.ecr.${AWS_REGION}.amazonaws.com" >> "${GITHUB_ENV}"
+          echo "Using ECR registry ${acct}.dkr.ecr.${AWS_REGION}.amazonaws.com"
 
       # Ensure full chain so :uat exists even if UAT/QA jobs did not run before this tag push.
       - name: Retag ECR images dev → qa → uat → prod
@@ -326,6 +362,10 @@ jobs:
       - name: VPC duplicate guard (prod)
         working-directory: infra/envs/prod
         run: bash ../../scripts/terraform-vpc-guard.sh
+
+      - name: EKS import guard (prod)
+        working-directory: infra/envs/prod
+        run: bash ../../scripts/terraform-eks-import-guard.sh
 
       - name: Terraform apply (prod)
         working-directory: infra/envs/prod

@@ -13,7 +13,7 @@ variable "env" {
 variable "project" {
   type        = string
   description = "Project name prefix used for resource names/tags."
-  default     = "onlinecloset"
+  default     = "claiset"
 }
 
 variable "ecr_repository_prefix" {
@@ -26,6 +26,30 @@ variable "eks_cluster_version" {
   type        = string
   description = "EKS Kubernetes version for this environment."
   default     = "1.31"
+}
+
+variable "node_instance_types" {
+  type        = list(string)
+  description = "EKS node instance types (passed to infra/modules/eks)."
+  default     = ["t3.micro"]
+}
+
+variable "node_group_desired_size" {
+  type        = number
+  description = "EKS managed node group desired capacity."
+  default     = 3
+}
+
+variable "node_group_min_size" {
+  type        = number
+  description = "EKS managed node group minimum capacity."
+  default     = 2
+}
+
+variable "node_group_max_size" {
+  type        = number
+  description = "EKS managed node group maximum capacity."
+  default     = 3
 }
 
 variable "google_client_id" {

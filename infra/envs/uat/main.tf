@@ -33,9 +33,12 @@ module "eks" {
   cluster_version = var.eks_cluster_version
   tags            = local.tags
 
-  create_iam_roles = false
-  cluster_role_arn = "arn:aws:iam::973087143131:role/LabRole"
-  node_role_arn    = "arn:aws:iam::973087143131:role/LabRole"
+  create_iam_roles = true
+
+  node_instance_types     = var.node_instance_types
+  node_group_desired_size = var.node_group_desired_size
+  node_group_min_size     = var.node_group_min_size
+  node_group_max_size     = var.node_group_max_size
 }
 
 module "rds" {
@@ -71,6 +74,7 @@ module "app_bluegreen" {
   tags    = local.tags
 
   enable_kubernetes_app = var.enable_kubernetes_app
+  depends_on            = [module.platform]
 
   aws_region               = var.aws_region
   domain_root              = var.domain_root

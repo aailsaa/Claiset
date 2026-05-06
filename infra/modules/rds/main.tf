@@ -38,9 +38,9 @@ resource "aws_db_subnet_group" "this" {
 resource "aws_db_instance" "this" {
   identifier = "${local.name}-postgres"
 
-  engine               = "postgres"
-  instance_class       = var.instance_class
-  allocated_storage    = var.allocated_storage_gb
+  engine                = "postgres"
+  instance_class        = var.instance_class
+  allocated_storage     = var.allocated_storage_gb
   max_allocated_storage = var.max_allocated_storage_gb
 
   db_name  = var.db_name
@@ -54,7 +54,9 @@ resource "aws_db_instance" "this" {
   skip_final_snapshot = true
   deletion_protection = false
 
-  backup_retention_period = 7
+  # Free-tier accounts can restrict backup retention. Set 0 to disable automated backups by default.
+  # Raise this (e.g. 7) when your account supports it and you want point-in-time recovery.
+  backup_retention_period = 0
 
   tags = var.tags
 }

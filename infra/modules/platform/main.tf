@@ -1,8 +1,8 @@
 locals {
   name = "${var.project}-${var.env}"
   # Prefer explicit ID (avoids ambiguity when duplicate zones exist for the same domain).
-  create_new_zone      = var.domain_root != "" && var.hosted_zone_id == "" && var.create_hosted_zone
-  lookup_zone_by_name  = var.domain_root != "" && var.hosted_zone_id == "" && !var.create_hosted_zone
+  create_new_zone     = var.domain_root != "" && var.hosted_zone_id == "" && var.create_hosted_zone
+  lookup_zone_by_name = var.domain_root != "" && var.hosted_zone_id == "" && !var.create_hosted_zone
 }
 
 data "aws_route53_zone" "by_id" {
@@ -107,6 +107,19 @@ resource "helm_release" "aws_load_balancer_controller" {
   chart      = "aws-load-balancer-controller"
   namespace  = "kube-system"
 
+  timeout         = 1200
+  atomic          = true
+  cleanup_on_fail = true
+  replace         = true
+
+  # With hostNetwork enabled this chart binds fixed host ports; running >1 replica can
+  # fail to schedule on small node groups ("didn't have free ports"). One replica is
+  # enough for this project and keeps costs low.
+  set {
+    name  = "replicaCount"
+    value = "1"
+  }
+
   # Avoid AWS Academy IAM/IRSA constraints by using node credentials (IMDS).
   # hostNetwork removes extra network hops to IMDS in some CNI setups.
   set {
@@ -147,6 +160,13 @@ resource "helm_release" "external_dns" {
   repository = "https://kubernetes-sigs.github.io/external-dns/"
   chart      = "external-dns"
   namespace  = kubernetes_namespace.platform.metadata[0].name
+
+  depends_on = [helm_release.aws_load_balancer_controller]
+
+  timeout         = 1200
+  atomic          = true
+  cleanup_on_fail = true
+  replace         = true
 
   set {
     name  = "hostNetwork"

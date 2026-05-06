@@ -23,11 +23,14 @@ module "eks" {
   cluster_version = var.eks_cluster_version
   tags            = local.tags
 
-  # AWS Academy often denies iam:CreateRole. If you hit that, set create_iam_roles=false
-  # and provide existing role ARNs (typically something like LabRole).
-  create_iam_roles = false
-  cluster_role_arn = "arn:aws:iam::973087143131:role/LabRole"
-  node_role_arn    = "arn:aws:iam::973087143131:role/LabRole"
+  # IAM user / own account: Terraform creates cluster + node IAM roles.
+  # AWS Academy (LabRole): set create_iam_roles=false and set cluster_role_arn / node_role_arn.
+  create_iam_roles = true
+
+  node_instance_types     = var.node_instance_types
+  node_group_desired_size = var.node_group_desired_size
+  node_group_min_size     = var.node_group_min_size
+  node_group_max_size     = var.node_group_max_size
 }
 
 module "rds" {
@@ -77,6 +80,7 @@ module "app_bluegreen" {
   tags    = local.tags
 
   enable_kubernetes_app = var.enable_kubernetes_app
+  depends_on            = [module.platform]
 
   # Will be used for Ingress hostnames once domain is configured.
   aws_region               = var.aws_region

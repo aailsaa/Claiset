@@ -28,6 +28,30 @@ variable "eks_cluster_version" {
   default     = "1.31"
 }
 
+variable "node_instance_types" {
+  type        = list(string)
+  description = "EKS node instance types (passed to infra/modules/eks)."
+  default     = ["t3.micro"]
+}
+
+variable "node_group_desired_size" {
+  type        = number
+  description = "EKS managed node group desired capacity."
+  default     = 1
+}
+
+variable "node_group_min_size" {
+  type        = number
+  description = "EKS managed node group minimum capacity."
+  default     = 1
+}
+
+variable "node_group_max_size" {
+  type        = number
+  description = "EKS managed node group maximum capacity."
+  default     = 2
+}
+
 variable "google_client_id" {
   type        = string
   description = "OAuth Web Client ID used to validate Google ID tokens in backend services."

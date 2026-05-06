@@ -148,6 +148,38 @@ Detailed layout and conventions: **`infra/README.md`**.
 
 ---
 
+## Tearing down to save AWS costs
+
+EKS control planes, NAT gateways, RDS, and ALBs are the main cost drivers. Use these scripts to shut things down when you’re not using them:
+
+### Destroy all environments (dev, qa, uat, prod)
+
+From the repo root:
+
+```bash
+export TF_STATE_BUCKET=YOUR_STATE_BUCKET        # from infra/bootstrap output
+export TF_LOCK_TABLE=YOUR_LOCK_TABLE            # from infra/bootstrap output
+export AWS_REGION=us-east-1                     # or your region
+
+./infra/scripts/terraform-destroy-all.sh        # destroys dev, qa, uat, prod
+# or just one env:
+./infra/scripts/terraform-destroy-all.sh dev
+```
+
+### Destroy non-prod only (keep dev up)
+
+```bash
+export TF_STATE_BUCKET=YOUR_STATE_BUCKET
+export TF_LOCK_TABLE=YOUR_LOCK_TABLE
+export AWS_REGION=us-east-1
+
+./infra/scripts/terraform-destroy-nonprod.sh    # destroys qa, uat, prod
+```
+
+**Important:** Make sure no GitHub Action is currently running Terraform for those environments when you call these scripts.
+
+---
+
 ## Notes / architecture (implemented)
 
 - **Frontend:** React + Vite (`web/`). In production it calls **same-origin** (`window.location.origin`) so it works behind an ALB Ingress at `/api/v1/...`.
