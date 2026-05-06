@@ -132,6 +132,18 @@ jobs:
             -target=module.eks \
             -target=module.rds \
             -target=module.ecr
+
+          # Burst node capacity for Phase 2 rollout, then scale down again for cost.
+          # This prevents "Too many pods" from stalling Deployments on tiny nodes.
+          BASE_MIN=1
+          BASE_DESIRED=2
+          BASE_MAX=6
+          BURST_DESIRED=4
+          CLUSTER="${EXPECTED_CLUSTER_NAME}"
+          NODEGROUP="${EXPECTED_CLUSTER_NAME}-default"
+          trap 'echo "Scaling nodegroup back down"; AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" "${BASE_MIN}" "${BASE_DESIRED}" "${BASE_MAX}" || true' EXIT
+          AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" "${BASE_MIN}" "${BURST_DESIRED}" "${BASE_MAX}"
+
           # If a previous apply was cancelled, K8s objects may already exist but not be in state.
           # Import them so Phase 2 can converge (avoids "already exists" errors).
           bash ../../scripts/terraform-k8s-import-guard.sh

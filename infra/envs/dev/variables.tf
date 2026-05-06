@@ -37,13 +37,15 @@ variable "node_instance_types" {
 variable "node_group_desired_size" {
   type        = number
   description = "EKS managed node group desired capacity."
-  default     = 3
+  # Cost-efficient baseline: keep a small steady-state and let autoscaling burst when needed.
+  default     = 2
 }
 
 variable "node_group_min_size" {
   type        = number
   description = "EKS managed node group minimum capacity."
-  default     = 2
+  # Allow scale-down to 1 when idle to reduce cost.
+  default     = 1
 }
 
 variable "node_group_max_size" {
