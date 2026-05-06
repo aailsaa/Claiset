@@ -209,10 +209,27 @@ resource "aws_eks_node_group" "default" {
     aws_iam_role_policy_attachment.node_ecr,
   ]
 
-  tags = var.tags
+  # Tags required for Cluster Autoscaler ASG auto-discovery.
+  # These propagate to the underlying Auto Scaling Group created by the managed node group.
+  tags = merge(var.tags, {
+    "k8s.io/cluster-autoscaler/enabled"             = "true"
+    "k8s.io/cluster-autoscaler/${aws_eks_cluster.this.name}" = "owned"
+  })
 }
 
 data "aws_eks_cluster_auth" "this" {
   name = aws_eks_cluster.this.name
+}
+
+# IRSA / OIDC provider (needed for controllers like cluster-autoscaler).
+data "tls_certificate" "eks_oidc" {
+  url = aws_eks_cluster.this.identity[0].oidc[0].issuer
+}
+
+resource "aws_iam_openid_connect_provider" "eks" {
+  url             = aws_eks_cluster.this.identity[0].oidc[0].issuer
+  client_id_list  = ["sts.amazonaws.com"]
+  thumbprint_list = [data.tls_certificate.eks_oidc.certificates[0].sha1_fingerprint]
+  tags            = var.tags
 }
 

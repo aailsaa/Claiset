@@ -49,7 +49,7 @@ variable "node_group_min_size" {
 variable "node_group_max_size" {
   type        = number
   description = "EKS managed node group maximum capacity."
-  default     = 3
+  default     = 6
 }
 
 variable "google_client_id" {

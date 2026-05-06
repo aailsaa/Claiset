@@ -222,3 +222,109 @@ resource "helm_release" "external_dns" {
   }
 }
 
+# Cluster Autoscaler (scales managed nodegroup up/down automatically).
+# This prevents "Too many pods" hangs on tiny nodes by adding capacity only when required.
+locals {
+  enable_cluster_autoscaler = var.oidc_provider_arn != "" && var.oidc_issuer_url != ""
+}
+
+data "aws_iam_policy_document" "cluster_autoscaler_assume" {
+  count = local.enable_cluster_autoscaler ? 1 : 0
+
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+    principals {
+      type        = "Federated"
+      identifiers = [var.oidc_provider_arn]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "${replace(var.oidc_issuer_url, "https://", "")}:sub"
+      values   = ["system:serviceaccount:kube-system:cluster-autoscaler"]
+    }
+  }
+}
+
+resource "aws_iam_role" "cluster_autoscaler" {
+  count              = local.enable_cluster_autoscaler ? 1 : 0
+  name               = "${local.name}-cluster-autoscaler"
+  assume_role_policy = data.aws_iam_policy_document.cluster_autoscaler_assume[0].json
+  tags               = var.tags
+}
+
+data "aws_iam_policy_document" "cluster_autoscaler" {
+  count = local.enable_cluster_autoscaler ? 1 : 0
+
+  statement {
+    effect = "Allow"
+    actions = [
+      "autoscaling:DescribeAutoScalingGroups",
+      "autoscaling:DescribeAutoScalingInstances",
+      "autoscaling:DescribeLaunchConfigurations",
+      "autoscaling:DescribeTags",
+      "autoscaling:SetDesiredCapacity",
+      "autoscaling:TerminateInstanceInAutoScalingGroup",
+      "ec2:DescribeLaunchTemplateVersions",
+    ]
+    resources = ["*"]
+  }
+}
+
+resource "aws_iam_role_policy" "cluster_autoscaler" {
+  count  = local.enable_cluster_autoscaler ? 1 : 0
+  name   = "${local.name}-cluster-autoscaler"
+  role   = aws_iam_role.cluster_autoscaler[0].id
+  policy = data.aws_iam_policy_document.cluster_autoscaler[0].json
+}
+
+resource "helm_release" "cluster_autoscaler" {
+  count      = local.enable_cluster_autoscaler ? 1 : 0
+  name       = "cluster-autoscaler"
+  repository = "https://kubernetes.github.io/autoscaler"
+  chart      = "cluster-autoscaler"
+  namespace  = "kube-system"
+
+  timeout         = 1200
+  atomic          = true
+  cleanup_on_fail = true
+  replace         = true
+
+  set {
+    name  = "autoDiscovery.clusterName"
+    value = var.cluster_name
+  }
+  set {
+    name  = "awsRegion"
+    value = var.region
+  }
+
+  # Cost-efficient defaults: scale down when idle.
+  set {
+    name  = "extraArgs.balance-similar-node-groups"
+    value = "true"
+  }
+  set {
+    name  = "extraArgs.scale-down-enabled"
+    value = "true"
+  }
+  set {
+    name  = "extraArgs.scale-down-unneeded-time"
+    value = "5m"
+  }
+
+  set {
+    name  = "rbac.serviceAccount.create"
+    value = "true"
+  }
+  set {
+    name  = "rbac.serviceAccount.name"
+    value = "cluster-autoscaler"
+  }
+  set {
+    name  = "rbac.serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
+    value = aws_iam_role.cluster_autoscaler[0].arn
+  }
+}
+

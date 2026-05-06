@@ -63,6 +63,8 @@ module "platform" {
   region       = var.aws_region
   cluster_name = module.eks.cluster_name
   vpc_id       = module.network.vpc_id
+  oidc_provider_arn = module.eks.oidc_provider_arn
+  oidc_issuer_url   = module.eks.oidc_issuer_url
 
   # Domain wiring is scaffolded but optional until you create a domain.
   domain_root             = var.domain_root

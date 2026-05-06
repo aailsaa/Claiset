@@ -21,6 +21,18 @@ variable "vpc_id" {
   description = "VPC ID (used by ALB controller)."
 }
 
+variable "oidc_provider_arn" {
+  type        = string
+  description = "EKS cluster OIDC provider ARN (for IRSA)."
+  default     = ""
+}
+
+variable "oidc_issuer_url" {
+  type        = string
+  description = "EKS cluster OIDC issuer URL (for IRSA)."
+  default     = ""
+}
+
 variable "tags" {
   type    = map(string)
   default = {}
