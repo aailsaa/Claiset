@@ -1,63 +1,77 @@
-## Assignment requirements
+# Assignment requirements
 
-### Overview
-
-- **Presentation length**: 8 minutes per student
-
-### 1. Application Architecture
-
-- **Original application**: Must consist of a **Frontend** (make it nice), a **Database** (**AWS RDS only**), and a **Backend** with **at least 3 microservices**.
-- **Frontend requirements**: Must be accessible via a **custom DNS name** with **SSL (HTTPS)** fully configured.
-- **Infrastructure as Code (IaC)**: Every resource (**EKS, RDS, VPC**) must be managed **exclusively via Terraform**. **Day 1** (initial setup) and **Day 2** (updates) must be **fully automated**.
-
-### 2. Deployment & CI/CD (Git-Driven Promotion)
-
-- **Promotion flow**: Dev → Nightly Build (QA) → UAT → Prod
-- **Automation logic**:
-  - **Dev/QA → UAT**: Triggered automatically via **Conventional Commits** (e.g. `RC1`, `RC2`, …) or **Pull Request merges**
-  - **UAT → Production**: Triggered via **Release Labels/Tags** (e.g. `v1.0.1`). Manual “click-to-deploy” in the AWS Console is **prohibited**.
-- **Strategy**: Pick and justify either **Blue/Green** or **Canary** for EKS.
-- **Zero downtime**: All promotions and updates must result in **zero dropped requests**.
-
-### 3. Mandatory “Day 2” Scenarios
-
-Students must demonstrate these scenarios live or via narrated video. They will be graded on the logic and thought process used to maintain stability:
-
-- **OS/Security patching**: Update the underlying EC2 worker nodes (AMIs) with the latest patches **without interrupting service**.
-- **Schema changes**: Deploy a backend change that updates the RDS database schema.
-  - **Requirement**: Students must explain and demonstrate how DB schema changes are applied.
-
-### 4. Observability & Logging (Self-Hosted Only)
-
-- **Monitoring**: Deploy **Prometheus** and **Grafana** inside the cluster (no AWS managed services).
-- **Dashboards**: Track **CPU**, **Memory**, and **Disk Space** for all nodes.
-- **Alerts**: Email (and/or Slack) notifications for critical resource thresholds.
-- **External access & security**:
-  - Grafana must be reachable from outside AWS
-  - Username/password is prohibited; must implement **OAuth2** (Okta, GitHub, or Google)
-- **Centralized logging**:
-  - Deploy your own stack (**Loki** or **ELK/OpenSearch**) or use a self-hosted 3rd party (e.g. **Sentry**) on EKS
-  - Must support centralized queries across the backend and all 3 microservices
-
-### 5. Presentation & Defense
-
-- **Video rule**: Video is permitted for long-running processes (like Day 1 provisioning), but the video must be **silent**.
-- **Mandatory narration**: Students must narrate live over the video to explain their technical decisions and workflow.
-- **Live chaos defense**: The instructor will trigger a random “Chaos” scenario. Students must use monitoring and logging tools to diagnose the failure and explain recovery in real-time.
+**Back to project overview:** [README.md](README.md)
 
 ---
 
-## Rubric
+## Overview
 
-| Category | Weight | Criteria |
-|---|---:|---|
-| Infrastructure (Terraform) | 20% | All resources (EKS, RDS, IAM, VPC) managed via Terraform. State is managed properly. No “ClickOps” detected. Module structure is clean and reusable. |
-| Application & Networking | 15% | 3+ microservices running. SSL/TLS is active and DNS is correctly mapped to a custom domain. Zero downtime achieved during rollout. |
-| CI/CD & GitOps Logic | 15% | Seamless flow from Dev to Prod. Conventional Commits trigger UAT; Release Tags trigger Prod. Pipeline is fully automated and gate-checked. |
-| Day 2: OS/Security Patching | 10% | Demonstration of AMI/Node rotation without service interruption. Logic for draining nodes and replacing them is clear and automated. |
-| Day 2: Schema Changes | 10% | Clear explanation of DB Schema changes. |
-| Observability & Logging | 15% | Self-hosted (EKS) Prometheus/Loki/Grafana. Alerts fire to email. OAuth2 (Google/GitHub, Okta) is the only way to access Grafana. Multi-service log querying works. |
-| Presentation & Defense | 15% | Students narrated live over silent video. Successful “Chaos Defense”; students used logs/metrics to identify a random failure within 1–2 minutes. Presentation soft-skills: eye-contact, enunciation & pace, minimize verbal fillers (“um”, “like”, “uh”, “you know”), strategic pausing. |
+- [ ] **Presentation** — 8 minutes per student (prepare silent video + live narration per rules below)
+
+---
+
+## 1. Application architecture
+
+- [x] **Frontend** — Single-page app (`web/`, React/Vite)
+- [x] **Database** — **AWS RDS (PostgreSQL)** only in cloud deploy (`infra/modules/rds`)
+- [x] **Backend** — **≥ 3 microservices** (items, outfits, schedule — `cmd/*-service`)
+- [x] **Custom DNS + HTTPS** — ALB Ingress + ACM + Route53 wired in Terraform (`infra/modules/platform`, `infra/modules/app-bluegreen`) when `domain_root` / hosted zone are configured
+- [x] **IaC exclusive** — **VPC, EKS, RDS**, ECR, and app workloads managed via **Terraform** (`infra/`)
+- [x] **Day 1 & Day 2 automation** — Changes applied via **Terraform** and **GitHub Actions** (`.github/workflows/promotion.yml`), not one-off console provisioning
+
+---
+
+## 2. Deployment & CI/CD (git-driven promotion)
+
+- [x] **Promotion flow** — **Dev → QA (nightly + manual) → UAT (`RC` in tip commit) → Prod (`v*` tags + manual)** — see [`.github/workflows/promotion.yml`](.github/workflows/promotion.yml)
+- [ ] **Dev/QA → UAT** — Brief asks **Conventional Commits** (e.g. `RC1`) **or** **PR merge** automation. **Current:** UAT runs when tip commit message contains **`RC` as its own token** (not substrings like `resources`). **PR-based trigger not wired.**
+- [x] **UAT → Production** — **Release tags** (`v*`) and `workflow_dispatch`; **no** “click deploy” in AWS Console as primary path
+- [ ] **Strategy** — **Pick and justify Blue/Green *or* Canary** for EKS (written doc; module name `app-bluegreen` — workloads today use **rolling Deployments**)
+- [ ] **Zero downtime** — Rolling updates + probes in place; **still need** explicit demo / narrative that promotions don’t drop requests
+
+---
+
+## 3. Mandatory “Day 2” scenarios
+
+- [ ] **OS / security patching** — Update **EC2 worker nodes / AMIs** **without** interrupting service. **Infra:** EKS managed node group exists. **Still need:** documented + demonstrated process (drain, roll, verify).
+- [x] **Schema changes** — **Code:** `cmd/migrate` + `schema.sql` + Kubernetes **migrate Job** before app Deployments
+- [ ] **Schema changes (grading)** — **Explain and demonstrate** how schema changes are applied (live or narrated video)
+
+---
+
+## 4. Observability & logging (self-hosted only)
+
+- [ ] **Prometheus + Grafana** on-cluster (no AWS-managed observability as substitute)
+- [ ] **Dashboards** — CPU, memory, and **disk** for **all nodes**
+- [ ] **Alerts** — Email and/or Slack for critical thresholds
+- [ ] **Grafana external access** — Reachable from outside AWS
+- [ ] **Grafana auth** — **OAuth2 only** (Okta, GitHub, or Google); **no** username/password
+- [ ] **Centralized logging** — e.g. **Loki** or **ELK/OpenSearch**, or self-hosted Sentry on EKS
+- [ ] **Multi-service logs** — Central queries across **all three** Go microservices
+
+---
+
+## 5. Presentation & defense
+
+- [ ] **Silent video** — Allowed for long runs (e.g. Day 1); video must be **silent**
+- [ ] **Live narration** — Narrate over video / demo to explain decisions
+- [ ] **Live chaos defense** — Use monitoring + logging to diagnose a random failure and explain recovery **in real time**
+
+---
+
+## Rubric (quick mapping)
+
+Use this table with your self-grading comments (see submission note at bottom).
+
+| Category | Weight | Done in repo? (high level) |
+| -------- | -----: | -------------------------- |
+| Infrastructure (Terraform) | 20% | [x] Modules, remote state, multi-env — keep avoiding ClickOps |
+| Application & networking | 15% | [x] 3 services + TLS/DNS path — [ ] formal zero-downtime proof |
+| CI/CD & GitOps | 15% | [x] Dev→QA→UAT→Prod path — [ ] full “conventional commit / PR → UAT” as written |
+| Day 2: OS patching | 10% | [ ] Demo + automation story |
+| Day 2: Schema | 10% | [x] Tooling — [ ] grader-facing explanation |
+| Observability & logging | 15% | [ ] Not yet implemented |
+| Presentation & defense | 15% | [ ] Your delivery |
 
 ### Presentation soft-skills (expanded)
 
@@ -66,16 +80,4 @@ Students must demonstrate these scenarios live or via narrated video. They will 
 - Narrative Arc (The “Hero’s Journey”)
 - Visual Command
 - Confidence in the “Unknown”
-
----
-
-## WOW-Factor
-
-If you impress me, you will get an A or A+ for the class... No other considerations will be evaluated!
-
----
-
-## Submission note (self-grading)
-
-Provide your comments on the accomplishment for each point and submit them.
 
