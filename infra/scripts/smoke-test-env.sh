@@ -47,12 +47,22 @@ fi
 echo "Ingress LB: ${LB_HOST}"
 
 SMOKE_BASE_HOST="${FRONTEND_HOST}"
-front_code="$(curl -sS -o /dev/null -w '%{http_code}' "https://${SMOKE_BASE_HOST}" || true)"
+SMOKE_CONNECT_TO=()
+
+curl_code() {
+  local url="$1"
+  curl -sS "${SMOKE_CONNECT_TO[@]}" -o /dev/null -w '%{http_code}' "${url}" || true
+}
+
+front_code="$(curl_code "https://${SMOKE_BASE_HOST}")"
 if [[ ! "${front_code}" =~ ^2|3 ]]; then
   echo "Primary frontend host check failed: https://${SMOKE_BASE_HOST} returned ${front_code}" >&2
-  echo "Retrying smoke checks via ingress load balancer host: ${LB_HOST}"
-  SMOKE_BASE_HOST="${LB_HOST}"
-  front_code="$(curl -sS -o /dev/null -w '%{http_code}' "https://${SMOKE_BASE_HOST}" || true)"
+  echo "Retrying via ALB using SNI host ${FRONTEND_HOST} -> ${LB_HOST}"
+  # Keep URL/SNI/Host as FRONTEND_HOST so ACM cert validation passes,
+  # but connect network path directly to the ALB hostname.
+  SMOKE_BASE_HOST="${FRONTEND_HOST}"
+  SMOKE_CONNECT_TO=(--connect-to "${FRONTEND_HOST}:443:${LB_HOST}:443")
+  front_code="$(curl_code "https://${SMOKE_BASE_HOST}")"
 fi
 if [[ ! "${front_code}" =~ ^2|3 ]]; then
   echo "Frontend smoke failed: https://${SMOKE_BASE_HOST} returned ${front_code}" >&2
@@ -63,7 +73,7 @@ echo "Frontend smoke OK (${front_code}) via ${SMOKE_BASE_HOST}"
 check_api() {
   local path="$1"
   local code
-  code="$(curl -sS -o /dev/null -w '%{http_code}' "https://${SMOKE_BASE_HOST}${path}" || true)"
+  code="$(curl_code "https://${SMOKE_BASE_HOST}${path}")"
   # Accepts 2xx/3xx/4xx for smoke; rejects transport failures/5xx.
   if [[ "${code}" == "000" || "${code}" =~ ^5 ]]; then
     echo "Backend smoke failed: https://${SMOKE_BASE_HOST}${path} returned ${code}" >&2
