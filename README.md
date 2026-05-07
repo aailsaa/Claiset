@@ -219,6 +219,17 @@ If the **tip commit message** on `main` contains **`[skip-dev]`**, the **dev** j
 
 ---
 
+---
+
+## Operations docs
+
+To keep this README shorter, runbooks are in dedicated docs:
+
+- Day 2 runbook (node patching + schema change): [`docs/day2-runbook.md`](docs/day2-runbook.md)
+- Failure playbook (common incidents + fixes): [`docs/failure-playbook.md`](docs/failure-playbook.md)
+
+---
+
 ## Notes / architecture (implemented)
 
 - **Frontend:** React + Vite (`web/`). In production it calls **same-origin** (`window.location.origin`) so it works behind an ALB Ingress at `/api/v1/...`.
