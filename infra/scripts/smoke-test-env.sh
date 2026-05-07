@@ -44,13 +44,40 @@ check_internal_health() {
   local local_port="$2"
   local pf_pid=""
   local code="000"
-  local attempts=5
+  local attempts=10
   local i
+  local pf_log
+  pf_log="$(mktemp "/tmp/smoke-pf-${svc}.XXXX.log")"
 
   echo "Checking in-cluster health via service/${svc} -> /health"
-  kubectl -n "${NAMESPACE}" port-forward "svc/${svc}" "${local_port}:80" >/tmp/smoke-pf-"${svc}".log 2>&1 &
+  kubectl -n "${NAMESPACE}" port-forward "svc/${svc}" "${local_port}:80" >"${pf_log}" 2>&1 &
   pf_pid=$!
-  sleep 1
+
+  # Wait until port-forward is actually ready.
+  local ready=0
+  for ((i=1; i<=30; i++)); do
+    if ! kill -0 "${pf_pid}" >/dev/null 2>&1; then
+      echo "port-forward for ${svc} exited early." >&2
+      break
+    fi
+    if rg -q "Forwarding from 127\\.0\\.0\\.1:${local_port}" "${pf_log}"; then
+      ready=1
+      break
+    fi
+    sleep 1
+  done
+
+  if [[ "${ready}" != "1" ]]; then
+    echo "Internal health setup failed for ${svc}; port-forward did not become ready." >&2
+    echo "port-forward log (${svc}):" >&2
+    if [[ -f "${pf_log}" ]]; then
+      sed 's/^/  /' "${pf_log}" >&2 || true
+    fi
+    kill "${pf_pid}" >/dev/null 2>&1 || true
+    wait "${pf_pid}" 2>/dev/null || true
+    rm -f "${pf_log}" || true
+    return 1
+  fi
 
   for ((i=1; i<=attempts; i++)); do
     code="$(curl -sS -o /dev/null -w '%{http_code}' "http://127.0.0.1:${local_port}/health" || true)"
@@ -58,6 +85,7 @@ check_internal_health() {
       echo "Internal health OK for ${svc} (${code})"
       kill "${pf_pid}" >/dev/null 2>&1 || true
       wait "${pf_pid}" 2>/dev/null || true
+      rm -f "${pf_log}" || true
       return 0
     fi
     sleep 2
@@ -65,6 +93,7 @@ check_internal_health() {
 
   kill "${pf_pid}" >/dev/null 2>&1 || true
   wait "${pf_pid}" 2>/dev/null || true
+  rm -f "${pf_log}" || true
   echo "Internal health failed for ${svc}: /health returned ${code}" >&2
   return 1
 }
