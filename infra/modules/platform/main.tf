@@ -37,6 +37,7 @@ locals {
     length(aws_route53_zone.this) > 0 ? aws_route53_zone.this[0].zone_id : null,
     length(data.aws_route53_zone.lookup) > 0 ? data.aws_route53_zone.lookup[0].zone_id : null,
   )
+  frontend_cert_dvo = var.domain_root != "" ? one(aws_acm_certificate.frontend[0].domain_validation_options) : null
 }
 
 # ACM certificate for the frontend hostname (DNS validated in Route53).
@@ -63,9 +64,9 @@ resource "aws_route53_record" "frontend_cert_validation" {
   count = var.domain_root != "" ? 1 : 0
 
   zone_id = local.zone_id
-  name    = aws_acm_certificate.frontend[0].domain_validation_options[0].resource_record_name
-  type    = aws_acm_certificate.frontend[0].domain_validation_options[0].resource_record_type
-  records = [aws_acm_certificate.frontend[0].domain_validation_options[0].resource_record_value]
+  name    = local.frontend_cert_dvo.resource_record_name
+  type    = local.frontend_cert_dvo.resource_record_type
+  records = [local.frontend_cert_dvo.resource_record_value]
   ttl     = 60
 }
 
