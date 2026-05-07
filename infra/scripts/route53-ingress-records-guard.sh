@@ -11,6 +11,7 @@
 # - ROUTE53_HOSTED_ZONE_ID or TF_VAR_route53_hosted_zone_id (optional; looked up if unset)
 # - K8S_APP_NAMESPACE (default TF_VAR_env or dev)
 # - K8S_INGRESS_NAME (default TF_VAR_project or claiset)
+# - EXPECTED_CLUSTER_NAME (optional, used to auto-run `aws eks update-kubeconfig` in CI)
 
 set -euo pipefail
 
@@ -20,6 +21,7 @@ INGRESS_NAME="${K8S_INGRESS_NAME:-${TF_VAR_project:-claiset}}"
 DOMAIN_ROOT="${DOMAIN_ROOT:-${TF_VAR_domain_root:-}}"
 FRONTEND_SUBDOMAIN="${FRONTEND_SUBDOMAIN:-${TF_VAR_frontend_subdomain:-app}}"
 HOSTED_ZONE_ID="${ROUTE53_HOSTED_ZONE_ID:-${TF_VAR_route53_hosted_zone_id:-}}"
+CLUSTER_NAME="${EXPECTED_CLUSTER_NAME:-}"
 
 if [[ -z "${DOMAIN_ROOT}" ]]; then
   echo "Route53 guard: DOMAIN_ROOT/TF_VAR_domain_root is empty; skipping DNS upsert."
@@ -34,7 +36,18 @@ fi
 
 echo "Route53 guard: namespace=${NAMESPACE} ingress=${INGRESS_NAME} domain=${DOMAIN_ROOT} frontend=${FRONTEND_HOST} region=${REGION}"
 
-ALB_DNS="$(kubectl get ingress -n "${NAMESPACE}" "${INGRESS_NAME}" -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)"
+ALB_DNS=""
+if command -v kubectl >/dev/null 2>&1; then
+  ALB_DNS="$(kubectl get ingress -n "${NAMESPACE}" "${INGRESS_NAME}" -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)"
+fi
+
+# CI runners may not have kubeconfig preconfigured even though Terraform already applied.
+if [[ -z "${ALB_DNS}" && -n "${CLUSTER_NAME}" ]]; then
+  echo "Route53 guard: attempting kubeconfig bootstrap for cluster ${CLUSTER_NAME}"
+  aws eks update-kubeconfig --region "${REGION}" --name "${CLUSTER_NAME}" >/dev/null
+  ALB_DNS="$(kubectl get ingress -n "${NAMESPACE}" "${INGRESS_NAME}" -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)"
+fi
+
 if [[ -z "${ALB_DNS}" ]]; then
   echo "Route53 guard: ingress has no load balancer hostname yet; skipping."
   exit 0
