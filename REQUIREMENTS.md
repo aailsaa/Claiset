@@ -26,6 +26,8 @@
 - [x] **Promotion flow** — **Dev → QA (nightly + manual) → UAT (`RC` in tip commit) → Prod (`v*` tags + manual)** — see [`.github/workflows/promotion.yml`](.github/workflows/promotion.yml)
 - [ ] **Dev/QA → UAT** — Brief asks **Conventional Commits** (e.g. `RC1`) **or** **PR merge** automation. **Current:** UAT runs when tip commit message contains **`RC` as its own token** (not substrings like `resources`). **PR-based trigger not wired.**
 - [x] **UAT → Production** — **Release tags** (`v*`) and `workflow_dispatch`; **no** “click deploy” in AWS Console as primary path
+- [x] **Nightly QA cost control** — Scheduled QA deploy has a follow-up teardown workflow (`.github/workflows/qa-teardown-after-nightly.yml`) to avoid overnight spend
+- [x] **DNS record guardrails** — CI upserts frontend Route53 records from live Ingress ALB (`infra/scripts/route53-ingress-records-guard.sh`)
 - [ ] **Strategy** — **Pick and justify Blue/Green *or* Canary** for EKS (written doc; module name `app-bluegreen` — workloads today use **rolling Deployments**)
 - [ ] **Zero downtime** — Rolling updates + probes in place; **still need** explicit demo / narrative that promotions don’t drop requests
 
@@ -33,9 +35,9 @@
 
 ## 3. Mandatory “Day 2” scenarios
 
-- [ ] **OS / security patching** — Update **EC2 worker nodes / AMIs** **without** interrupting service. **Infra:** EKS managed node group exists. **Still need:** documented + demonstrated process (drain, roll, verify).
+- [ ] **OS / security patching** — Update **EC2 worker nodes / AMIs** **without** interrupting service. **Status:** documented runbook exists (`docs/day2-runbook.md`), but live/narrated demonstration is still pending.
 - [x] **Schema changes** — **Code:** `cmd/migrate` + `schema.sql` + Kubernetes **migrate Job** before app Deployments
-- [ ] **Schema changes (grading)** — **Explain and demonstrate** how schema changes are applied (live or narrated video)
+- [ ] **Schema changes (grading)** — Runbook narrative exists (`docs/day2-runbook.md`), but graded live/video demonstration is still pending
 
 ---
 
@@ -68,8 +70,8 @@ Use this table with your self-grading comments (see submission note at bottom).
 | Infrastructure (Terraform) | 20% | [x] Modules, remote state, multi-env — keep avoiding ClickOps |
 | Application & networking | 15% | [x] 3 services + TLS/DNS path — [ ] formal zero-downtime proof |
 | CI/CD & GitOps | 15% | [x] Dev→QA→UAT→Prod path — [ ] full “conventional commit / PR → UAT” as written |
-| Day 2: OS patching | 10% | [ ] Demo + automation story |
-| Day 2: Schema | 10% | [x] Tooling — [ ] grader-facing explanation |
+| Day 2: OS patching | 10% | [ ] Runbook documented — [ ] live demo/narration pending |
+| Day 2: Schema | 10% | [x] Tooling + runbook — [ ] grader-facing demo pending |
 | Observability & logging | 15% | [ ] Not yet implemented |
 | Presentation & defense | 15% | [ ] Your delivery |
 
