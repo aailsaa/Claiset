@@ -39,9 +39,32 @@ for d in web items outfits schedule; do
   kubectl -n "${NAMESPACE}" rollout status "deployment/${d}" --timeout=8m
 done
 
+wait_for_no_pending_app_pods() {
+  local attempts=36
+  local sleep_s=5
+  local i pending
+  echo "Waiting for app pods to leave Pending state..."
+  for ((i=1; i<=attempts; i++)); do
+    pending="$(kubectl -n "${NAMESPACE}" get pods -l 'app in (web,items,outfits,schedule)' --no-headers 2>/dev/null | awk '$3=="Pending"{c++} END{print c+0}')"
+    if [[ "${pending}" == "0" ]]; then
+      echo "No Pending app pods."
+      return 0
+    fi
+    echo "Pending app pods: ${pending} (attempt ${i}/${attempts})"
+    sleep "${sleep_s}"
+  done
+  echo "App pods remained Pending too long; failing smoke test." >&2
+  kubectl -n "${NAMESPACE}" get pods -l 'app in (web,items,outfits,schedule)' -o wide || true
+  return 1
+}
+
+wait_for_no_pending_app_pods
+
 check_internal_health() {
   local svc="$1"
   local local_port="$2"
+  local target_port="$3"
+  local app_label="$4"
   local pf_pid=""
   local code="000"
   local attempts=10
@@ -49,8 +72,9 @@ check_internal_health() {
   local pf_log
   pf_log="$(mktemp "/tmp/smoke-pf-${svc}.XXXX.log")"
 
-  echo "Checking in-cluster health via service/${svc} -> /health"
-  kubectl -n "${NAMESPACE}" port-forward "svc/${svc}" "${local_port}:80" >"${pf_log}" 2>&1 &
+  echo "Checking in-cluster health for ${svc} (app=${app_label}) -> /health"
+  kubectl -n "${NAMESPACE}" wait --for=condition=Ready pod -l "app=${app_label}" --timeout=120s >/dev/null
+  kubectl -n "${NAMESPACE}" port-forward "deployment/${svc}" "${local_port}:${target_port}" >"${pf_log}" 2>&1 &
   pf_pid=$!
 
   # Wait until port-forward is actually ready.
@@ -98,9 +122,9 @@ check_internal_health() {
   return 1
 }
 
-check_internal_health "items" 18081
-check_internal_health "outfits" 18082
-check_internal_health "schedule" 18083
+check_internal_health "items" 18081 8081 "items"
+check_internal_health "outfits" 18082 8082 "outfits"
+check_internal_health "schedule" 18083 8083 "schedule"
 
 LB_HOST="$(kubectl get ingress -n "${NAMESPACE}" "${PROJECT}" -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)"
 if [[ -z "${LB_HOST}" ]]; then

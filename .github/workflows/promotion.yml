@@ -178,7 +178,7 @@ jobs:
           BASE_MIN=1
           BASE_DESIRED=2
           BASE_MAX=6
-          BURST_DESIRED=4
+          BURST_DESIRED=5
           CLUSTER="${EXPECTED_CLUSTER_NAME}"
           NODEGROUP="${EXPECTED_CLUSTER_NAME}-default"
           trap 'echo "Scaling nodegroup back down"; AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" "${BASE_MIN}" "${BASE_DESIRED}" "${BASE_MAX}" || true' EXIT
@@ -189,7 +189,7 @@ jobs:
           bash ../../scripts/terraform-k8s-import-guard.sh
           # Phase 2: platform (ACM, controllers) + app_bluegreen and the rest.
           terraform apply -auto-approve
-          K8S_APP_NAMESPACE=dev bash ../../scripts/route53-ingress-records-guard.sh
+          DOMAIN_ROOT=claiset.xyz FRONTEND_SUBDOMAIN= K8S_APP_NAMESPACE=dev bash ../../scripts/route53-ingress-records-guard.sh
           EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=dev FRONTEND_HOST=claiset.xyz bash ../../scripts/smoke-test-env.sh
 
   qa:
@@ -287,7 +287,7 @@ jobs:
           BASE_MIN=1
           BASE_DESIRED=2
           BASE_MAX=6
-          BURST_DESIRED=4
+          BURST_DESIRED=5
           CLUSTER="${EXPECTED_CLUSTER_NAME}"
           NODEGROUP="${EXPECTED_CLUSTER_NAME}-default"
           trap 'echo "Scaling nodegroup back down"; AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" "${BASE_MIN}" "${BASE_DESIRED}" "${BASE_MAX}" || true' EXIT
@@ -305,7 +305,7 @@ jobs:
 
           K8S_APP_NAMESPACE=qa bash ../../scripts/terraform-k8s-import-guard.sh
           terraform apply -auto-approve
-          K8S_APP_NAMESPACE=qa FRONTEND_SUBDOMAIN=app-qa bash ../../scripts/route53-ingress-records-guard.sh
+          DOMAIN_ROOT=claiset.xyz K8S_APP_NAMESPACE=qa FRONTEND_SUBDOMAIN=app-qa bash ../../scripts/route53-ingress-records-guard.sh
           EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=qa FRONTEND_HOST=app-qa.claiset.xyz bash ../../scripts/smoke-test-env.sh
 
   uat:
@@ -414,7 +414,7 @@ jobs:
           BASE_MIN=1
           BASE_DESIRED=2
           BASE_MAX=6
-          BURST_DESIRED=4
+          BURST_DESIRED=5
           CLUSTER="${EXPECTED_CLUSTER_NAME}"
           NODEGROUP="${EXPECTED_CLUSTER_NAME}-default"
           trap 'echo "Scaling nodegroup back down"; AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" "${BASE_MIN}" "${BASE_DESIRED}" "${BASE_MAX}" || true' EXIT
@@ -422,7 +422,7 @@ jobs:
 
           K8S_APP_NAMESPACE=uat bash ../../scripts/terraform-k8s-import-guard.sh
           terraform apply -auto-approve
-          K8S_APP_NAMESPACE=uat FRONTEND_SUBDOMAIN=app-uat bash ../../scripts/route53-ingress-records-guard.sh
+          DOMAIN_ROOT=claiset.xyz K8S_APP_NAMESPACE=uat FRONTEND_SUBDOMAIN=app-uat bash ../../scripts/route53-ingress-records-guard.sh
           EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=uat FRONTEND_HOST=app-uat.claiset.xyz bash ../../scripts/smoke-test-env.sh
 
   prod:
@@ -521,7 +521,7 @@ jobs:
           BASE_MIN=1
           BASE_DESIRED=2
           BASE_MAX=6
-          BURST_DESIRED=4
+          BURST_DESIRED=5
           CLUSTER="${EXPECTED_CLUSTER_NAME}"
           NODEGROUP="${EXPECTED_CLUSTER_NAME}-default"
           trap 'echo "Scaling nodegroup back down"; AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" "${BASE_MIN}" "${BASE_DESIRED}" "${BASE_MAX}" || true' EXIT
@@ -529,5 +529,5 @@ jobs:
 
           K8S_APP_NAMESPACE=prod bash ../../scripts/terraform-k8s-import-guard.sh
           terraform apply -auto-approve
-          K8S_APP_NAMESPACE=prod FRONTEND_SUBDOMAIN=app-prod bash ../../scripts/route53-ingress-records-guard.sh
+          DOMAIN_ROOT=claiset.xyz K8S_APP_NAMESPACE=prod FRONTEND_SUBDOMAIN=app-prod bash ../../scripts/route53-ingress-records-guard.sh
 
