@@ -59,19 +59,13 @@ resource "aws_acm_certificate" "frontend" {
 }
 
 resource "aws_route53_record" "frontend_cert_validation" {
-  for_each = var.domain_root != "" ? {
-    for dvo in aws_acm_certificate.frontend[0].domain_validation_options :
-    dvo.domain_name => {
-      name   = dvo.resource_record_name
-      type   = dvo.resource_record_type
-      record = dvo.resource_record_value
-    }
-  } : {}
+  # Single-domain cert; use count to avoid for_each keys derived from apply-time values.
+  count = var.domain_root != "" ? 1 : 0
 
   zone_id = local.zone_id
-  name    = each.value.name
-  type    = each.value.type
-  records = [each.value.record]
+  name    = aws_acm_certificate.frontend[0].domain_validation_options[0].resource_record_name
+  type    = aws_acm_certificate.frontend[0].domain_validation_options[0].resource_record_type
+  records = [aws_acm_certificate.frontend[0].domain_validation_options[0].resource_record_value]
   ttl     = 60
 }
 
@@ -79,7 +73,7 @@ resource "aws_acm_certificate_validation" "frontend" {
   count = var.domain_root != "" && var.wait_for_acm_validation ? 1 : 0
 
   certificate_arn         = aws_acm_certificate.frontend[0].arn
-  validation_record_fqdns = [for r in aws_route53_record.frontend_cert_validation : r.fqdn]
+  validation_record_fqdns = [aws_route53_record.frontend_cert_validation[0].fqdn]
 
   timeouts {
     create = "25m"
