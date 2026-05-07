@@ -50,6 +50,12 @@ resource "aws_acm_certificate" "frontend" {
   domain_name       = local.frontend_host
   validation_method = "DNS"
   tags              = var.tags
+
+  # When hostnames/cert fields change, replace cert by creating the new one first.
+  # Prevents "ResourceInUseException" from deleting a cert still attached to ALB listeners.
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_route53_record" "frontend_cert_validation" {
