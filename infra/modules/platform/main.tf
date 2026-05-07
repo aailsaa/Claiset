@@ -107,7 +107,7 @@ resource "helm_release" "aws_load_balancer_controller" {
   chart      = "aws-load-balancer-controller"
   namespace  = "kube-system"
 
-  timeout         = 1200
+  timeout         = 1800
   atomic          = true
   cleanup_on_fail = true
   replace         = true
@@ -163,10 +163,16 @@ resource "helm_release" "external_dns" {
 
   depends_on = [helm_release.aws_load_balancer_controller]
 
-  timeout         = 1200
+  # 30m: CI sometimes waits on new nodes + image pull; 20m flakes with atomic=true.
+  timeout         = 1800
   atomic          = true
   cleanup_on_fail = true
   replace         = true
+
+  set {
+    name  = "replicaCount"
+    value = "1"
+  }
 
   set {
     name  = "hostNetwork"
@@ -300,7 +306,7 @@ resource "helm_release" "cluster_autoscaler" {
     value = var.region
   }
 
-  # Cost-efficient defaults: scale down when idle.
+  # Cost-efficient defaults: scale down when idle, but not so fast that rollouts lose pod slots.
   set {
     name  = "extraArgs.balance-similar-node-groups"
     value = "true"
@@ -311,7 +317,11 @@ resource "helm_release" "cluster_autoscaler" {
   }
   set {
     name  = "extraArgs.scale-down-unneeded-time"
-    value = "5m"
+    value = "10m"
+  }
+  set {
+    name  = "extraArgs.scale-down-delay-after-add"
+    value = "10m"
   }
 
   set {
