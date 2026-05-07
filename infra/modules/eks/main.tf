@@ -103,6 +103,23 @@ resource "aws_iam_role_policy_attachment" "node_ecr" {
   policy_arn = "arn:${data.aws_partition.current.partition}:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
 }
 
+# AWS Load Balancer Controller is installed without IRSA and uses the node instance role (IMDS).
+# Without ELBv2 permissions the controller cannot create ALBs; Ingress ADDRESS stays empty.
+# Policy source: kubernetes-sigs/aws-load-balancer-controller docs/install/iam_policy.json (v2.10.0).
+resource "aws_iam_policy" "node_aws_load_balancer_controller" {
+  count       = var.create_iam_roles ? 1 : 0
+  name        = "${local.name}-node-aws-lb-controller"
+  description = "Permissions for AWS Load Balancer Controller when using node IAM role instead of IRSA."
+  policy      = file("${path.module}/policies/aws-load-balancer-controller-iam-policy.json")
+  tags        = var.tags
+}
+
+resource "aws_iam_role_policy_attachment" "node_aws_load_balancer_controller" {
+  count      = var.create_iam_roles ? 1 : 0
+  role       = aws_iam_role.node[0].name
+  policy_arn = aws_iam_policy.node_aws_load_balancer_controller[0].arn
+}
+
 resource "aws_security_group" "node" {
   name        = "${local.name}-eks-nodes"
   description = "EKS worker node security group"
