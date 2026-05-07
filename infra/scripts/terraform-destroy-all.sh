@@ -10,7 +10,8 @@
 #
 # Notes:
 # - Uses the same backend layout as promotion.yml: envs/<env>/terraform.tfstate
-# - Run this from your laptop, not inside GitHub Actions.
+# - In CI, set TF_DESTROY_AUTO_APPROVE=1 and pass env names (e.g. qa) to skip the prompt.
+# - Run this from your laptop, not inside GitHub Actions (unless TF_DESTROY_AUTO_APPROVE=1).
 # - Make sure no CI job is currently running terraform for these envs.
 
 set -euo pipefail
@@ -34,11 +35,17 @@ if [[ ${#ENVS[@]} -eq 0 ]]; then
   ENVS=(dev qa uat prod)
 fi
 
-echo "About to destroy environments: ${ENVS[*]}"
-read -r -p "Type 'yes' to continue: " CONFIRM
-if [[ "${CONFIRM}" != "yes" ]]; then
-  echo "Aborted."
-  exit 0
+DESTROY_OPTS=()
+if [[ "${TF_DESTROY_AUTO_APPROVE:-0}" == "1" ]]; then
+  echo "TF_DESTROY_AUTO_APPROVE=1: destroying without confirmation: ${ENVS[*]}"
+  DESTROY_OPTS=(-auto-approve)
+else
+  echo "About to destroy environments: ${ENVS[*]}"
+  read -r -p "Type 'yes' to continue: " CONFIRM
+  if [[ "${CONFIRM}" != "yes" ]]; then
+    echo "Aborted."
+    exit 0
+  fi
 fi
 
 for ENV in "${ENVS[@]}"; do
@@ -59,7 +66,7 @@ for ENV in "${ENVS[@]}"; do
       -backend-config="dynamodb_table=${LOCK_TABLE}" \
       -backend-config="encrypt=true"
 
-    terraform destroy
+    terraform destroy "${DESTROY_OPTS[@]}"
   )
 done
 

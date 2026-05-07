@@ -1,0 +1,60 @@
+# Tear down QA after the scheduled nightly Promotion run so NAT/RDS/EKS for QA
+# do not keep billing. Dev / UAT / prod are untouched.
+#
+# Manual "Run workflow" destroys QA on demand (e.g. after a manual QA deploy).
+
+name: QA teardown (after nightly)
+
+on:
+  workflow_run:
+    workflows:
+      - "Promotion (dev → qa → uat → prod)"
+    types:
+      - completed
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tf-qa-teardown-${{ github.repository }}
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-east-1
+  TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
+  TF_LOCK_TABLE: ${{ secrets.TF_LOCK_TABLE }}
+  TF_VAR_route53_hosted_zone_id: ${{ secrets.ROUTE53_HOSTED_ZONE_ID }}
+  TF_DESTROY_AUTO_APPROVE: "1"
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  destroy-qa:
+    name: Terraform destroy (qa only)
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch'
+      || (github.event_name == 'workflow_run' && github.event.workflow_run.event == 'schedule')
+    steps:
+      - name: Checkout (match nightly commit when triggered by workflow_run)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Destroy QA
+        run: |
+          set -euo pipefail
+          if [[ -z "${TF_STATE_BUCKET}" || -z "${TF_LOCK_TABLE}" ]]; then
+            echo "TF_STATE_BUCKET and TF_LOCK_TABLE secrets must be set." >&2
+            exit 1
+          fi
+          bash infra/scripts/terraform-destroy-all.sh qa
