@@ -136,10 +136,10 @@ jobs:
 
           # Burst node capacity for Phase 2 rollout, then scale down again for cost.
           # This prevents "Too many pods" from stalling Deployments on tiny nodes.
-          BASE_MIN=2
-          BASE_DESIRED=3
+          BASE_MIN=1
+          BASE_DESIRED=2
           BASE_MAX=6
-          BURST_DESIRED=5
+          BURST_DESIRED=4
           CLUSTER="${EXPECTED_CLUSTER_NAME}"
           NODEGROUP="${EXPECTED_CLUSTER_NAME}-default"
           trap 'echo "Scaling nodegroup back down"; AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" "${BASE_MIN}" "${BASE_DESIRED}" "${BASE_MAX}" || true' EXIT

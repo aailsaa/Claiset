@@ -30,21 +30,22 @@ variable "eks_cluster_version" {
 
 variable "node_instance_types" {
   type        = list(string)
-  description = "EKS node instance types (passed to infra/modules/eks). Dev defaults to t3.micro for cost; CI bursts capacity during apply. Use t3.small (see qa/uat/prod) if you hit Too many pods outside CI."
-  default     = ["t3.micro"]
+  description = "EKS node instance types (passed to infra/modules/eks). Dev uses t3.small to keep enough pod/IP capacity for always-on web availability between deploys."
+  default     = ["t3.small"]
 }
 
 variable "node_group_desired_size" {
   type        = number
-  description = "EKS managed node group desired capacity. Keep enough steady-state pods so ingress targets stay healthy between deploys."
-  default     = 3
+  description = "EKS managed node group desired capacity."
+  # Middle-ground baseline: keep cost lower than 3-node steady state while retaining better pod capacity than t3.micro.
+  default     = 2
 }
 
 variable "node_group_min_size" {
   type        = number
   description = "EKS managed node group minimum capacity."
-  # Keep at least 2 nodes so deploy scale-back does not strand app pods in Pending.
-  default     = 2
+  # Allow scale-down to 1 for cost when idle; CI bursts capacity during deploy.
+  default     = 1
 }
 
 variable "node_group_max_size" {
