@@ -111,7 +111,7 @@ jobs:
           terraform_version: "1.9.8"
           terraform_wrapper: false
 
-      - name: Terraform init (dev)
+      - name: Terraform init
         working-directory: infra/envs/dev
         run: |
           terraform init \
@@ -121,19 +121,19 @@ jobs:
             -backend-config="dynamodb_table=${TF_LOCK_TABLE}" \
             -backend-config="encrypt=true"
 
-      - name: VPC duplicate guard (dev)
+      - name: VPC duplicate guard
         working-directory: infra/envs/dev
         run: bash ../../scripts/terraform-vpc-guard.sh
 
-      - name: EKS import guard (dev)
+      - name: EKS import guard
         working-directory: infra/envs/dev
         run: bash ../../scripts/terraform-eks-import-guard.sh
 
-      - name: ECR import guard (dev)
+      - name: ECR import guard
         working-directory: infra/envs/dev
         run: bash ../../scripts/terraform-ecr-import-guard.sh
 
-      - name: ECR state reconcile (dev)
+      - name: ECR state reconcile
         working-directory: infra/envs/dev
         run: |
           set -euo pipefail
@@ -162,7 +162,7 @@ jobs:
             terraform state rm 'module.platform.aws_route53_zone.this[0]' 2>/dev/null || true
           fi
 
-      - name: Terraform apply (dev)
+      - name: Terraform apply
         working-directory: infra/envs/dev
         run: |
           # Phase 1: base AWS only (no platform/ACM/Helm) so a bad DNS/ACM run does not
@@ -191,12 +191,12 @@ jobs:
           terraform apply -auto-approve
           DOMAIN_ROOT=claiset.xyz FRONTEND_SUBDOMAIN= K8S_APP_NAMESPACE=dev bash ../../scripts/route53-ingress-records-guard.sh
 
-      - name: Wait for readiness (dev)
+      - name: Wait for readiness
         working-directory: infra/envs/dev
         run: |
           EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=dev FRONTEND_HOST=claiset.xyz bash ../../scripts/smoke-test-env.sh --wait-only
 
-      - name: Smoke tests (dev)
+      - name: Smoke tests
         working-directory: infra/envs/dev
         run: |
           EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=dev FRONTEND_HOST=claiset.xyz bash ../../scripts/smoke-test-env.sh --skip-wait
