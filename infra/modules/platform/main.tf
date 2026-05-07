@@ -5,6 +5,8 @@ locals {
     trimspace(var.frontend_subdomain) == "" ? var.domain_root :
     "${var.frontend_subdomain}.${var.domain_root}"
   )
+  # Ingress serves apex + www + canonical host — ACM must match all HTTPS hostnames listeners use.
+  www_host = var.domain_root == "" ? "" : "www.${var.domain_root}"
   # Prefer explicit ID (avoids ambiguity when duplicate zones exist for the same domain).
   create_new_zone     = var.domain_root != "" && var.hosted_zone_id == "" && var.create_hosted_zone
   lookup_zone_by_name = var.domain_root != "" && var.hosted_zone_id == "" && !var.create_hosted_zone
@@ -37,7 +39,10 @@ locals {
     length(aws_route53_zone.this) > 0 ? aws_route53_zone.this[0].zone_id : null,
     length(data.aws_route53_zone.lookup) > 0 ? data.aws_route53_zone.lookup[0].zone_id : null,
   )
-  frontend_cert_dvo = var.domain_root != "" ? one(aws_acm_certificate.frontend[0].domain_validation_options) : null
+  frontend_cert_sans = var.domain_root == "" ? [] : distinct(compact([
+    local.frontend_host != var.domain_root ? var.domain_root : null,
+    local.www_host != "" && local.frontend_host != local.www_host ? local.www_host : null,
+  ]))
 }
 
 # ACM certificate for the frontend hostname (DNS validated in Route53).
@@ -49,6 +54,7 @@ locals {
 resource "aws_acm_certificate" "frontend" {
   count             = var.domain_root != "" ? 1 : 0
   domain_name       = local.frontend_host
+  subject_alternative_names = length(local.frontend_cert_sans) > 0 ? local.frontend_cert_sans : null
   validation_method = "DNS"
   tags              = var.tags
 
@@ -60,14 +66,19 @@ resource "aws_acm_certificate" "frontend" {
 }
 
 resource "aws_route53_record" "frontend_cert_validation" {
-  # Single-domain cert; use count to avoid for_each keys derived from apply-time values.
-  count = var.domain_root != "" ? 1 : 0
+  for_each = var.domain_root != "" ? {
+    for dvo in aws_acm_certificate.frontend[0].domain_validation_options : dvo.domain_name => {
+      name   = dvo.resource_record_name
+      type   = dvo.resource_record_type
+      values = [dvo.resource_record_value]
+    }
+  } : {}
 
-  zone_id = local.zone_id
-  name    = local.frontend_cert_dvo.resource_record_name
-  type    = local.frontend_cert_dvo.resource_record_type
-  records = [local.frontend_cert_dvo.resource_record_value]
-  ttl     = 60
+  zone_id         = local.zone_id
+  name            = each.value.name
+  type            = each.value.type
+  records         = each.value.values
+  ttl             = 60
   allow_overwrite = true
 }
 
@@ -75,7 +86,7 @@ resource "aws_acm_certificate_validation" "frontend" {
   count = var.domain_root != "" && var.wait_for_acm_validation ? 1 : 0
 
   certificate_arn         = aws_acm_certificate.frontend[0].arn
-  validation_record_fqdns = [aws_route53_record.frontend_cert_validation[0].fqdn]
+  validation_record_fqdns = [for r in aws_route53_record.frontend_cert_validation : r.fqdn]
 
   timeouts {
     create = "25m"
