@@ -275,7 +275,7 @@ export function OutfitsPage() {
           <button
             type="button"
             onClick={openAddModal}
-            className="flex aspect-[3/4] w-full flex-col items-center justify-center rounded-3xl border-2 border-dashed border-[var(--color-sage)]/40 bg-white text-[var(--color-sage)] shadow-sm transition hover:border-[var(--color-sage)] hover:bg-[var(--color-accent-soft)]"
+            className="flex aspect-[3/4] w-full flex-col items-center justify-center rounded-3xl border-2 border-dashed border-[var(--color-sage)]/40 bg-[var(--color-surface)] text-[var(--color-sage)] shadow-sm transition hover:border-[var(--color-sage)] hover:bg-[var(--color-accent-soft)]"
           >
             <span className="text-4xl font-light leading-none">+</span>
             <span className="mt-2 text-xs font-semibold uppercase tracking-wide">Add outfit</span>
@@ -283,11 +283,11 @@ export function OutfitsPage() {
         </li>
         {outfits.map((o) => (
           <li key={o.id}>
-            <div className="group relative flex aspect-[3/4] h-full flex-col overflow-hidden rounded-3xl border border-[var(--color-line)] bg-white p-4 shadow-sm ring-1 ring-transparent transition hover:-translate-y-0.5 hover:shadow-md hover:ring-[var(--color-sage)]/25">
+            <div className="group relative flex aspect-[3/4] h-full flex-col overflow-hidden rounded-3xl border border-[var(--color-line)] bg-[var(--color-surface)] p-4 shadow-sm ring-1 ring-transparent transition hover:-translate-y-0.5 hover:shadow-md hover:ring-[var(--color-sage)]/25">
               <button
                 type="button"
                 onClick={() => openEditModal(o)}
-                className="absolute right-3 top-3 inline-flex items-center justify-center rounded-full border border-[var(--color-line)] bg-white/90 p-2 text-[var(--color-muted)] opacity-0 shadow-sm backdrop-blur transition hover:text-[var(--color-ink)] group-hover:opacity-100"
+                className="absolute right-3 top-3 inline-flex items-center justify-center rounded-full border border-[var(--color-line)] bg-[var(--color-paper)]/90 p-2 text-[var(--color-muted)] opacity-0 shadow-sm backdrop-blur transition hover:text-[var(--color-ink)] group-hover:opacity-100"
                 aria-label={`Edit ${o.name}`}
               >
                 <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
@@ -326,7 +326,7 @@ export function OutfitsPage() {
           onClick={closeModal}
         >
           <div
-            className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-3xl border border-[var(--color-line)] bg-white p-6 shadow-xl"
+            className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-3xl border border-[var(--color-line)] bg-[var(--color-surface)] p-6 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-2">
@@ -341,7 +341,7 @@ export function OutfitsPage() {
                 type="button"
                 onClick={() => setTab('details')}
                 className={`min-w-0 flex-1 rounded-xl px-2 py-2 text-sm font-semibold transition sm:px-3 ${
-                  tab === 'details' ? 'bg-white text-[var(--color-ink)] shadow-sm' : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]'
+                  tab === 'details' ? 'bg-[var(--color-paper)] text-[var(--color-ink)] shadow-sm' : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]'
                 }`}
               >
                 Details
@@ -350,7 +350,7 @@ export function OutfitsPage() {
                 type="button"
                 onClick={() => setTab('cover')}
                 className={`min-w-0 flex-1 rounded-xl px-2 py-2 text-sm font-semibold transition sm:px-3 ${
-                  tab === 'cover' ? 'bg-white text-[var(--color-ink)] shadow-sm' : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]'
+                  tab === 'cover' ? 'bg-[var(--color-paper)] text-[var(--color-ink)] shadow-sm' : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]'
                 }`}
               >
                 Cover
@@ -359,7 +359,7 @@ export function OutfitsPage() {
                 type="button"
                 onClick={() => setTab('pictures')}
                 className={`min-w-0 flex-1 rounded-xl px-2 py-2 text-sm font-semibold transition sm:px-3 ${
-                  tab === 'pictures' ? 'bg-white text-[var(--color-ink)] shadow-sm' : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]'
+                  tab === 'pictures' ? 'bg-[var(--color-paper)] text-[var(--color-ink)] shadow-sm' : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]'
                 }`}
               >
                 Pictures
@@ -368,7 +368,7 @@ export function OutfitsPage() {
                 type="button"
                 onClick={() => setTab('extra')}
                 className={`min-w-0 flex-1 rounded-xl px-2 py-2 text-sm font-semibold transition sm:px-3 ${
-                  tab === 'extra' ? 'bg-white text-[var(--color-ink)] shadow-sm' : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]'
+                  tab === 'extra' ? 'bg-[var(--color-paper)] text-[var(--color-ink)] shadow-sm' : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]'
                 }`}
               >
                 Extra info
@@ -385,7 +385,7 @@ export function OutfitsPage() {
                         required
                         value={name}
                         onChange={(e) => setName(e.target.value)}
-                        className="mt-1 w-full rounded-xl border border-[var(--color-line)] bg-white px-3 py-2 text-sm outline-none ring-[var(--color-sage)]/30 focus:ring-2"
+                        className="mt-1 w-full rounded-xl border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2 text-sm outline-none ring-[var(--color-sage)]/30 focus:ring-2"
                         placeholder="Sunday brunch"
                       />
                     </label>
@@ -396,12 +396,12 @@ export function OutfitsPage() {
                         min={0}
                         value={wears}
                         onChange={(e) => setWears(e.target.value)}
-                        className="mt-1 w-full rounded-xl border border-[var(--color-line)] bg-white px-3 py-2 text-sm outline-none ring-[var(--color-sage)]/30 focus:ring-2"
+                        className="mt-1 w-full rounded-xl border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2 text-sm outline-none ring-[var(--color-sage)]/30 focus:ring-2"
                       />
                     </label>
                   </div>
 
-                  <div className="rounded-2xl border border-[var(--color-line)] bg-white px-4 py-3">
+                  <div className="rounded-2xl border border-[var(--color-line)] bg-[var(--color-paper)] px-4 py-3">
                     <div className="text-xs font-medium text-[var(--color-muted)]">Included items ({selectedItemIds.length})</div>
                     <div className="mt-2 flex flex-wrap gap-2">
                       {selectedItemIds.length === 0 ? (
@@ -415,7 +415,7 @@ export function OutfitsPage() {
                               className="inline-flex items-center gap-2 rounded-full bg-[var(--color-surface)] px-3 py-1 text-xs font-medium text-[var(--color-sage-muted)] ring-1 ring-[var(--color-line)]"
                             >
                               {it ? it.name : `Item ${id}`}
-                              <button type="button" className="rounded-full px-1.5 py-0.5 hover:bg-white" onClick={() => toggleItem(id)}>
+                              <button type="button" className="rounded-full px-1.5 py-0.5 hover:bg-[var(--color-paper)]" onClick={() => toggleItem(id)}>
                                 ×
                               </button>
                             </span>
@@ -425,21 +425,21 @@ export function OutfitsPage() {
                     </div>
                   </div>
 
-                  <div className="rounded-2xl border border-[var(--color-line)] bg-white px-4 py-3">
+                  <div className="rounded-2xl border border-[var(--color-line)] bg-[var(--color-paper)] px-4 py-3">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                       <label className="block flex-1 text-xs font-medium text-[var(--color-muted)]">
                         Search items
                         <input
                           value={itemSearch}
                           onChange={(e) => setItemSearch(e.target.value)}
-                          className="mt-1 w-full rounded-xl border border-[var(--color-line)] bg-white px-3 py-2 text-sm outline-none ring-[var(--color-sage)]/30 focus:ring-2"
+                          className="mt-1 w-full rounded-xl border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2 text-sm outline-none ring-[var(--color-sage)]/30 focus:ring-2"
                           placeholder="Search by name, type, or #id"
                         />
                       </label>
                       <button
                         type="button"
                         onClick={() => setFilterOpen(true)}
-                        className="rounded-full border border-[var(--color-line)] bg-white px-4 py-2 text-sm font-medium text-[var(--color-sage)] shadow-sm hover:bg-[var(--color-hover)]"
+                        className="rounded-full border border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-2 text-sm font-medium text-[var(--color-sage)] shadow-sm hover:bg-[var(--color-hover)]"
                       >
                         Filter
                       </button>
@@ -490,7 +490,7 @@ export function OutfitsPage() {
                 </>
               ) : tab === 'cover' ? (
                 <>
-                  <div className="rounded-2xl border border-[var(--color-line)] bg-white px-4 py-3">
+                  <div className="rounded-2xl border border-[var(--color-line)] bg-[var(--color-paper)] px-4 py-3">
                     <div className="text-xs font-medium text-[var(--color-muted)]">Cover</div>
                     <div className="mt-2 rounded-2xl bg-[var(--color-surface)] p-2">
                       {coverDataUrl ? (
@@ -506,7 +506,7 @@ export function OutfitsPage() {
                         type="button"
                         onClick={() => setCoverEditorOpen(true)}
                         disabled={selectedItemIds.length === 0}
-                        className="flex-1 rounded-full border border-[var(--color-line)] bg-white px-4 py-2 text-sm font-semibold text-[var(--color-sage)] hover:bg-[var(--color-hover)] disabled:opacity-60"
+                        className="flex-1 rounded-full border border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-2 text-sm font-semibold text-[var(--color-sage)] hover:bg-[var(--color-hover)] disabled:opacity-60"
                       >
                         Edit cover
                       </button>
@@ -517,7 +517,7 @@ export function OutfitsPage() {
                             setCoverDataUrl(null)
                             setLayout([])
                           }}
-                          className="rounded-full border border-[var(--color-line)] bg-white px-4 py-2 text-sm font-semibold text-[var(--color-muted)] hover:bg-[var(--color-hover)]"
+                          className="rounded-full border border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-2 text-sm font-semibold text-[var(--color-muted)] hover:bg-[var(--color-hover)]"
                         >
                           Clear
                         </button>
@@ -535,14 +535,14 @@ export function OutfitsPage() {
                     className="hidden"
                     onChange={onPickOutfitPhoto}
                   />
-                  <div className="rounded-2xl border border-[var(--color-line)] bg-white px-4 py-3">
+                  <div className="rounded-2xl border border-[var(--color-line)] bg-[var(--color-paper)] px-4 py-3">
                     <div className="text-xs font-medium text-[var(--color-muted)]">You in this outfit</div>
                     <div className="mt-3">
                       <button
                         type="button"
                         onClick={() => outfitPhotoInputRef.current?.click()}
                         disabled={pictureAddBusy}
-                        className="w-full rounded-full border border-[var(--color-line)] bg-white py-2.5 text-sm font-semibold text-[var(--color-sage)] hover:bg-[var(--color-hover)] disabled:opacity-60 sm:w-auto sm:px-6"
+                        className="w-full rounded-full border border-[var(--color-line)] bg-[var(--color-surface)] py-2.5 text-sm font-semibold text-[var(--color-sage)] hover:bg-[var(--color-hover)] disabled:opacity-60 sm:w-auto sm:px-6"
                       >
                         {pictureAddBusy ? 'Adding…' : 'Add picture'}
                       </button>
@@ -565,7 +565,7 @@ export function OutfitsPage() {
                                 loading="lazy"
                               />
                             </div>
-                            <div className="space-y-2 border-t border-[var(--color-line)] bg-white/90 px-3 py-2.5">
+                            <div className="space-y-2 border-t border-[var(--color-line)] bg-[var(--color-paper)]/90 px-3 py-2.5">
                               <p className="text-[11px] text-[var(--color-muted)]">{formatOutfitPhotoDate(pic.takenAt)}</p>
                               {pic.backgroundRemoved ? (
                                 <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--color-sage)]">Background removed</p>
@@ -576,7 +576,7 @@ export function OutfitsPage() {
                                     type="button"
                                     onClick={() => void onRemoveBackgroundForPicture(pic)}
                                     disabled={removingBgId === pic.id || pictureAddBusy}
-                                    className="flex-1 rounded-full border border-[var(--color-line)] bg-white px-2 py-1.5 text-xs font-semibold text-[var(--color-ink)] hover:bg-[var(--color-hover)] disabled:opacity-50"
+                                    className="flex-1 rounded-full border border-[var(--color-line)] bg-[var(--color-surface)] px-2 py-1.5 text-xs font-semibold text-[var(--color-ink)] hover:bg-[var(--color-hover)] disabled:opacity-50"
                                   >
                                     {removingBgId === pic.id ? 'Removing…' : 'Remove background'}
                                   </button>
@@ -584,7 +584,7 @@ export function OutfitsPage() {
                                 <button
                                   type="button"
                                   onClick={() => setPictures((p) => p.filter((x) => x.id !== pic.id))}
-                                  className={`rounded-full border border-red-200 bg-white px-2 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 ${pic.backgroundRemoved ? 'flex-1' : ''}`}
+                                  className={`rounded-full border border-red-300/40 bg-[var(--color-surface)] px-2 py-1.5 text-xs font-semibold text-red-300 hover:bg-red-900/30 ${pic.backgroundRemoved ? 'flex-1' : ''}`}
                                 >
                                   Remove
                                 </button>
@@ -600,7 +600,7 @@ export function OutfitsPage() {
                 </>
               ) : (
                 <>
-                  <div className="rounded-2xl border border-[var(--color-line)] bg-white px-4 py-3">
+                  <div className="rounded-2xl border border-[var(--color-line)] bg-[var(--color-paper)] px-4 py-3">
                     <div className="text-xs font-medium text-[var(--color-muted)]">Weather</div>
                     <div className="mt-2 flex flex-wrap gap-2">
                       {WEATHER_TAGS.map((t) => {
@@ -628,7 +628,7 @@ export function OutfitsPage() {
                     </div>
                   </div>
 
-                  <div className="rounded-2xl border border-[var(--color-line)] bg-white px-4 py-3">
+                  <div className="rounded-2xl border border-[var(--color-line)] bg-[var(--color-paper)] px-4 py-3">
                     <div className="text-xs font-medium text-[var(--color-muted)]">Season</div>
                     <div className="mt-2 flex flex-wrap gap-2">
                       {SEASONS.map((s) => {
@@ -662,7 +662,7 @@ export function OutfitsPage() {
                       value={extra.notes ?? ''}
                       onChange={(e) => setExtra((x) => ({ ...x, notes: e.target.value }))}
                       rows={4}
-                      className="mt-1 w-full resize-none rounded-xl border border-[var(--color-line)] bg-white px-3 py-2 text-sm outline-none ring-[var(--color-sage)]/30 focus:ring-2"
+                      className="mt-1 w-full resize-none rounded-xl border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2 text-sm outline-none ring-[var(--color-sage)]/30 focus:ring-2"
                       placeholder="Anything you want to remember about this outfit."
                     />
                   </label>
@@ -688,7 +688,7 @@ export function OutfitsPage() {
                         setSaving(false)
                       }
                     }}
-                    className="flex-1 rounded-full border border-red-200 bg-white py-2.5 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-60"
+                    className="flex-1 rounded-full border border-red-300/40 bg-[var(--color-surface)] py-2.5 text-sm font-semibold text-red-300 hover:bg-red-900/30 disabled:opacity-60"
                   >
                     Delete
                   </button>
@@ -712,7 +712,7 @@ export function OutfitsPage() {
                 onClick={() => setFilterOpen(false)}
               >
                 <div
-                  className="w-full max-w-2xl overflow-hidden rounded-3xl border border-[var(--color-line)] bg-white p-6 shadow-xl"
+                  className="w-full max-w-2xl overflow-hidden rounded-3xl border border-[var(--color-line)] bg-[var(--color-surface)] p-6 shadow-xl"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div className="flex items-start justify-between gap-2">

@@ -186,7 +186,7 @@ export function StatsPage() {
 
       {!loading && stats ? (
         <>
-          <section className="rounded-3xl border border-[var(--color-line)] bg-white p-6 shadow-sm">
+          <section className="rounded-3xl border border-[var(--color-line)] bg-[var(--color-surface)] p-6 shadow-sm">
             <h2 className="text-lg font-semibold text-[var(--color-sage)]">Items breakdown</h2>
             <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <div className="rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface)] p-4">
@@ -268,7 +268,7 @@ export function StatsPage() {
             </div>
           </section>
 
-          <section className="rounded-3xl border border-[var(--color-line)] bg-white p-6 shadow-sm">
+          <section className="rounded-3xl border border-[var(--color-line)] bg-[var(--color-surface)] p-6 shadow-sm">
             <h2 className="text-lg font-semibold text-[var(--color-sage)]">Price breakdown</h2>
             <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <div className="rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface)] p-4">
@@ -366,7 +366,7 @@ export function StatsPage() {
             </div>
           </section>
 
-          <section className="rounded-3xl border border-[var(--color-line)] bg-white p-6 shadow-sm">
+          <section className="rounded-3xl border border-[var(--color-line)] bg-[var(--color-surface)] p-6 shadow-sm">
             <h2 className="text-lg font-semibold text-[var(--color-sage)]">Wears breakdown</h2>
 
             <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

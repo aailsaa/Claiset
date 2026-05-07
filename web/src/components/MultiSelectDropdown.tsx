@@ -35,7 +35,7 @@ export function MultiSelectDropdown({ label, options, selected, setSelected, pla
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="mt-2 flex w-full items-center justify-between rounded-2xl border border-[var(--color-line)] bg-white px-4 py-3 text-left text-sm font-semibold text-[var(--color-ink)] shadow-sm hover:bg-[var(--color-hover)]"
+        className="mt-2 flex w-full items-center justify-between rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-3 text-left text-sm font-semibold text-[var(--color-ink)] shadow-sm hover:bg-[var(--color-hover)]"
         aria-haspopup="listbox"
         aria-expanded={open}
       >
@@ -48,7 +48,7 @@ export function MultiSelectDropdown({ label, options, selected, setSelected, pla
       </button>
 
       {open ? (
-        <div className="absolute z-50 mt-2 w-full overflow-hidden rounded-2xl border border-[var(--color-line)] bg-white shadow-xl">
+        <div className="absolute z-50 mt-2 w-full overflow-hidden rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface)] shadow-xl">
           <div className="max-h-64 overflow-auto p-2">
             {options.map((opt) => {
               const on = selectedSet.has(opt.id)
@@ -65,7 +65,7 @@ export function MultiSelectDropdown({ label, options, selected, setSelected, pla
                 >
                   <span
                     className={`flex h-5 w-5 items-center justify-center rounded-md border ${
-                      on ? 'border-[var(--color-sage)] bg-[var(--color-sage)] text-white' : 'border-[var(--color-line)] bg-white text-transparent'
+                      on ? 'border-[var(--color-sage)] bg-[var(--color-sage)] text-white' : 'border-[var(--color-line)] bg-[var(--color-paper)] text-transparent'
                     }`}
                     aria-hidden
                   >
@@ -83,7 +83,7 @@ export function MultiSelectDropdown({ label, options, selected, setSelected, pla
             <button
               type="button"
               onClick={() => setSelected([])}
-              className="flex-1 rounded-xl border border-[var(--color-line)] bg-white px-3 py-2 text-sm font-semibold text-[var(--color-muted)] hover:bg-[var(--color-hover)]"
+              className="flex-1 rounded-xl border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2 text-sm font-semibold text-[var(--color-muted)] hover:bg-[var(--color-hover)]"
             >
               Clear
             </button>

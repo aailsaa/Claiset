@@ -214,14 +214,14 @@ export function CalendarPage() {
           <button
             type="button"
             onClick={() => setViewOpen(true)}
-            className="rounded-full border border-[var(--color-line)] bg-white px-4 py-2 text-sm font-medium text-[var(--color-sage)] shadow-sm hover:bg-[var(--color-hover)]"
+            className="rounded-full border border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-2 text-sm font-medium text-[var(--color-sage)] shadow-sm hover:bg-[var(--color-hover)]"
           >
             View
           </button>
           <button
             type="button"
             onClick={prevMonth}
-            className="rounded-full border border-[var(--color-line)] bg-white px-3 py-2 text-sm font-medium text-[var(--color-sage)] shadow-sm hover:bg-[var(--color-hover)]"
+            className="rounded-full border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2 text-sm font-medium text-[var(--color-sage)] shadow-sm hover:bg-[var(--color-hover)]"
           >
             ←
           </button>
@@ -231,7 +231,7 @@ export function CalendarPage() {
           <button
             type="button"
             onClick={nextMonth}
-            className="rounded-full border border-[var(--color-line)] bg-white px-3 py-2 text-sm font-medium text-[var(--color-sage)] shadow-sm hover:bg-[var(--color-hover)]"
+            className="rounded-full border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2 text-sm font-medium text-[var(--color-sage)] shadow-sm hover:bg-[var(--color-hover)]"
           >
             →
           </button>
@@ -245,7 +245,7 @@ export function CalendarPage() {
       )}
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.9fr)]">
-        <section className="rounded-3xl border border-[var(--color-line)] bg-white p-4 shadow-sm sm:p-6">
+        <section className="rounded-3xl border border-[var(--color-line)] bg-[var(--color-surface)] p-4 shadow-sm sm:p-6">
           {loading ? (
             <p className="text-sm text-[var(--color-muted)]">Loading month…</p>
           ) : (
@@ -291,17 +291,17 @@ export function CalendarPage() {
                           : a && thumb
                             ? 'border-[var(--color-sage)]/40 bg-[var(--color-surface)]'
                             : 'border-transparent bg-[var(--color-surface)] hover:border-[var(--color-line)]',
-                        isToday ? 'border-[var(--color-line)] bg-zinc-200' : '',
+                        isToday ? 'border-[var(--color-line)] bg-[var(--color-hover)]' : '',
                       ].join(' ')}
                     >
                       <span
                         className={[
                           'pointer-events-none absolute left-0.5 top-0.5 z-10 inline-flex h-4 min-w-[1rem] items-center justify-center rounded px-0.5 text-[9px] font-semibold tabular-nums leading-none shadow-sm ring-1 ring-black/[0.06] sm:left-1 sm:top-1 sm:h-[1.125rem] sm:text-[10px]',
                           thumb
-                            ? 'bg-white/92 text-[var(--color-ink)]'
+                            ? 'bg-[var(--color-paper)]/92 text-[var(--color-ink)]'
                             : a
-                              ? 'bg-white/88 text-[var(--color-sage)]'
-                              : 'bg-white/88 text-[var(--color-ink)]',
+                              ? 'bg-[var(--color-paper)]/88 text-[var(--color-sage)]'
+                              : 'bg-[var(--color-paper)]/88 text-[var(--color-ink)]',
                         ].join(' ')}
                         aria-hidden
                       >
@@ -326,7 +326,7 @@ export function CalendarPage() {
         </section>
 
         <aside className="space-y-6">
-          <div className="rounded-3xl border border-[var(--color-line)] bg-white p-6 shadow-sm">
+          <div className="rounded-3xl border border-[var(--color-line)] bg-[var(--color-surface)] p-6 shadow-sm">
             <h2 className="text-lg font-semibold text-[var(--color-sage)]">This month</h2>
             <ul className="mt-4 space-y-3 text-sm">
               {assignments.length === 0 ? (
@@ -364,7 +364,7 @@ export function CalendarPage() {
                       <button
                         type="button"
                         onClick={() => void onRemove(a)}
-                        className="shrink-0 rounded-full border border-red-200 bg-white px-3 py-1 text-xs font-semibold text-red-700 hover:bg-red-50"
+                        className="shrink-0 rounded-full border border-red-300/40 bg-[var(--color-paper)] px-3 py-1 text-xs font-semibold text-red-300 hover:bg-red-900/30"
                       >
                         Clear
                       </button>
@@ -376,7 +376,7 @@ export function CalendarPage() {
           </div>
 
           {pickDate && (
-            <div className="rounded-3xl border border-[var(--color-line)] bg-white p-6 shadow-sm">
+            <div className="rounded-3xl border border-[var(--color-line)] bg-[var(--color-surface)] p-6 shadow-sm">
               <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">
                 {pickDate}
               </p>
@@ -392,7 +392,7 @@ export function CalendarPage() {
                     <select
                       value={outfitId}
                       onChange={(e) => setOutfitId(Number(e.target.value))}
-                      className="mt-1 w-full rounded-xl border border-[var(--color-line)] bg-white px-3 py-2 text-sm outline-none ring-[var(--color-sage)]/30 focus:ring-2"
+                      className="mt-1 w-full rounded-xl border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2 text-sm outline-none ring-[var(--color-sage)]/30 focus:ring-2"
                     >
                       {outfits.map((o) => (
                         <option key={o.id} value={o.id}>
@@ -406,7 +406,7 @@ export function CalendarPage() {
                     <input
                       value={notes}
                       onChange={(e) => setNotes(e.target.value)}
-                      className="mt-1 w-full rounded-xl border border-[var(--color-line)] bg-white px-3 py-2 text-sm outline-none ring-[var(--color-sage)]/30 focus:ring-2"
+                      className="mt-1 w-full rounded-xl border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2 text-sm outline-none ring-[var(--color-sage)]/30 focus:ring-2"
                       placeholder="e.g. dinner reservation"
                     />
                   </label>
@@ -414,7 +414,7 @@ export function CalendarPage() {
                     <button
                       type="button"
                       onClick={() => setPickDate(null)}
-                      className="flex-1 rounded-full border border-[var(--color-line)] bg-white py-2 text-sm font-medium text-[var(--color-muted)]"
+                      className="flex-1 rounded-full border border-[var(--color-line)] bg-[var(--color-paper)] py-2 text-sm font-medium text-[var(--color-muted)]"
                     >
                       Cancel
                     </button>
@@ -443,7 +443,7 @@ export function CalendarPage() {
           onClick={() => setViewOpen(false)}
         >
           <div
-            className="w-full max-w-md overflow-hidden rounded-3xl border border-[var(--color-line)] bg-white shadow-xl"
+            className="w-full max-w-md overflow-hidden rounded-3xl border border-[var(--color-line)] bg-[var(--color-surface)] shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-[var(--color-line)] px-5 py-4">
@@ -506,7 +506,7 @@ export function CalendarPage() {
           }}
         >
           <div
-            className="w-full max-w-md rounded-3xl border border-[var(--color-line)] bg-white p-6 shadow-xl"
+            className="w-full max-w-md rounded-3xl border border-[var(--color-line)] bg-[var(--color-surface)] p-6 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <input
@@ -528,7 +528,7 @@ export function CalendarPage() {
                 type="button"
                 disabled={dayPhotoBusy}
                 onClick={() => setDayPhotoPrompt(null)}
-                className="rounded-full border border-[var(--color-line)] bg-white py-2.5 text-sm font-medium text-[var(--color-muted)] sm:px-4"
+                className="rounded-full border border-[var(--color-line)] bg-[var(--color-paper)] py-2.5 text-sm font-medium text-[var(--color-muted)] sm:px-4"
               >
                 Skip
               </button>

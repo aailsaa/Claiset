@@ -20,6 +20,20 @@
 }
 
 @layer base {
+  :root[data-theme='dark'] {
+    --color-paper: #2f2f2f;
+    --color-surface: #3a3a3a;
+    --color-ink: #f2f2f2;
+    --color-muted: #c5c5c5;
+    --color-line: #555555;
+    --color-hover: #4a4a4a;
+    --color-sage: #f6b3c1;
+    --color-sage-muted: #efc2cc;
+    --color-clay: #f6b3c1;
+    --color-clay-soft: #5a3c45;
+    --color-accent-soft: #5a3c45;
+  }
+
   html {
     @apply antialiased;
     font-family: var(--font-sans);

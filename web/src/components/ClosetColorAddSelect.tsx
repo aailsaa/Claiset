@@ -33,7 +33,7 @@ export function ClosetColorAddSelect({ omit, onAdd, disabled }: Props) {
         aria-expanded={open}
         aria-haspopup="listbox"
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between rounded-xl border border-[var(--color-line)] bg-white px-3 py-2 text-left text-sm text-[var(--color-ink)] outline-none ring-[var(--color-sage)]/30 hover:bg-[var(--color-hover)] focus:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
+        className="flex w-full items-center justify-between rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2 text-left text-sm text-[var(--color-ink)] outline-none ring-[var(--color-sage)]/30 hover:bg-[var(--color-hover)] focus:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
       >
         <span className="text-[var(--color-muted)]">
           {available.length === 0 ? 'All colors added' : 'Add a color…'}
@@ -44,7 +44,7 @@ export function ClosetColorAddSelect({ omit, onAdd, disabled }: Props) {
       </button>
       {open && available.length > 0 ? (
         <ul
-          className="absolute z-50 mt-1 max-h-52 w-full overflow-auto rounded-xl border border-[var(--color-line)] bg-white py-1 shadow-lg"
+          className="absolute z-50 mt-1 max-h-52 w-full overflow-auto rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] py-1 shadow-lg"
           role="listbox"
           aria-label="Choose a color"
         >

@@ -140,7 +140,7 @@ export function OutfitCoverEditorModal({ open, items, layers, onCancel, onSave }
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center" role="dialog" aria-modal="true">
-      <div className="w-full max-w-4xl overflow-visible rounded-3xl border border-[var(--color-line)] bg-white shadow-xl">
+      <div className="w-full max-w-4xl overflow-visible rounded-3xl border border-[var(--color-line)] bg-[var(--color-surface)] shadow-xl">
         <div className="flex items-center justify-between border-b border-[var(--color-line)] px-5 py-4">
           <h3 className="text-sm font-semibold text-[var(--color-ink)]">Build cover</h3>
           <button type="button" onClick={onCancel} className="rounded-full px-2 py-1 text-sm text-[var(--color-muted)] hover:bg-[var(--color-hover)]">
@@ -209,7 +209,7 @@ export function OutfitCoverEditorModal({ open, items, layers, onCancel, onSave }
                     key={l.itemId}
                     type="button"
                     className={`absolute z-20 rounded-2xl p-1 transition ${
-                      on ? 'ring-2 ring-[var(--color-sage)] bg-white/70' : 'bg-white/30 hover:bg-white/50'
+                      on ? 'ring-2 ring-[var(--color-sage)] bg-[var(--color-paper)]/80' : 'bg-[var(--color-paper)]/40 hover:bg-[var(--color-paper)]/60'
                     }`}
                     style={{
                       left: `${xPct}%`,
@@ -248,7 +248,7 @@ export function OutfitCoverEditorModal({ open, items, layers, onCancel, onSave }
           </div>
 
           <div className="relative z-0 space-y-4">
-            <div className="rounded-2xl border border-[var(--color-line)] bg-white p-4">
+            <div className="rounded-2xl border border-[var(--color-line)] bg-[var(--color-paper)] p-4">
               <div className="text-xs font-semibold text-[var(--color-muted)]">Selected</div>
               <div className="mt-1 text-sm font-semibold text-[var(--color-ink)]">
                 {selected ? itemById.get(selected.itemId)?.name ?? `Item ${selected.itemId}` : 'None'}
@@ -285,7 +285,7 @@ export function OutfitCoverEditorModal({ open, items, layers, onCancel, onSave }
               <button
                 type="button"
                 onClick={() => selected && updateLayer(selected.itemId, { scale: DEFAULT_LAYER_SCALE, rotationDeg: 0 })}
-                className="mt-4 w-full rounded-full border border-[var(--color-line)] bg-white px-4 py-2 text-sm font-semibold text-[var(--color-ink)] hover:bg-[var(--color-hover)] disabled:opacity-60"
+                className="mt-4 w-full rounded-full border border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-2 text-sm font-semibold text-[var(--color-ink)] hover:bg-[var(--color-hover)] disabled:opacity-60"
                 disabled={!selected}
               >
                 Reset size & rotation
@@ -295,7 +295,7 @@ export function OutfitCoverEditorModal({ open, items, layers, onCancel, onSave }
                 <button
                   type="button"
                   onClick={() => selected && bring(selected.itemId, 'backward')}
-                  className="rounded-full border border-[var(--color-line)] bg-white px-4 py-2 text-sm font-semibold text-[var(--color-ink)] hover:bg-[var(--color-hover)] disabled:opacity-60"
+                  className="rounded-full border border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-2 text-sm font-semibold text-[var(--color-ink)] hover:bg-[var(--color-hover)] disabled:opacity-60"
                   disabled={!selected}
                 >
                   Send back
@@ -303,7 +303,7 @@ export function OutfitCoverEditorModal({ open, items, layers, onCancel, onSave }
                 <button
                   type="button"
                   onClick={() => selected && bring(selected.itemId, 'forward')}
-                  className="rounded-full border border-[var(--color-line)] bg-white px-4 py-2 text-sm font-semibold text-[var(--color-ink)] hover:bg-[var(--color-hover)] disabled:opacity-60"
+                  className="rounded-full border border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-2 text-sm font-semibold text-[var(--color-ink)] hover:bg-[var(--color-hover)] disabled:opacity-60"
                   disabled={!selected}
                 >
                   Bring forward

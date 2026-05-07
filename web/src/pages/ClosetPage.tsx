@@ -574,7 +574,7 @@ export function ClosetPage() {
           <button
             type="button"
             onClick={() => setViewOpen(true)}
-            className="rounded-full border border-[var(--color-line)] bg-white px-4 py-2 text-sm font-medium text-[var(--color-sage)] shadow-sm hover:bg-[var(--color-hover)]"
+            className="rounded-full border border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-2 text-sm font-medium text-[var(--color-sage)] shadow-sm hover:bg-[var(--color-hover)]"
           >
             View
           </button>
@@ -584,14 +584,14 @@ export function ClosetPage() {
               setDraftFilters(appliedFilters)
               setFiltersOpen(true)
             }}
-            className="rounded-full border border-[var(--color-line)] bg-white px-4 py-2 text-sm font-medium text-[var(--color-sage)] shadow-sm hover:bg-[var(--color-hover)]"
+            className="rounded-full border border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-2 text-sm font-medium text-[var(--color-sage)] shadow-sm hover:bg-[var(--color-hover)]"
           >
             Filter
           </button>
           <button
             type="button"
             onClick={() => setSortOpen(true)}
-            className="rounded-full border border-[var(--color-line)] bg-white px-4 py-2 text-sm font-medium text-[var(--color-sage)] shadow-sm hover:bg-[var(--color-hover)]"
+            className="rounded-full border border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-2 text-sm font-medium text-[var(--color-sage)] shadow-sm hover:bg-[var(--color-hover)]"
           >
             Sort
           </button>
@@ -616,7 +616,7 @@ export function ClosetPage() {
           <button
             type="button"
             onClick={openAddModal}
-            className="flex aspect-square w-full flex-col items-center justify-center rounded-3xl border-2 border-dashed border-[var(--color-sage)]/40 bg-white text-[var(--color-sage)] shadow-sm transition hover:border-[var(--color-sage)] hover:bg-[var(--color-accent-soft)]"
+            className="flex aspect-square w-full flex-col items-center justify-center rounded-3xl border-2 border-dashed border-[var(--color-sage)]/40 bg-[var(--color-surface)] text-[var(--color-sage)] shadow-sm transition hover:border-[var(--color-sage)] hover:bg-[var(--color-accent-soft)]"
           >
             <span className="text-4xl font-light leading-none">+</span>
             <span className="mt-2 text-xs font-semibold uppercase tracking-wide">Add item</span>
@@ -625,11 +625,11 @@ export function ClosetPage() {
         {!loading &&
           visibleItems.map((it) => (
             <li key={it.id}>
-              <div className="group relative flex aspect-square h-full flex-col overflow-hidden rounded-3xl border border-[var(--color-line)] bg-white p-4 shadow-sm ring-1 ring-transparent transition hover:-translate-y-0.5 hover:shadow-md hover:ring-[var(--color-sage)]/25">
+              <div className="group relative flex aspect-square h-full flex-col overflow-hidden rounded-3xl border border-[var(--color-line)] bg-[var(--color-surface)] p-4 shadow-sm ring-1 ring-transparent transition hover:-translate-y-0.5 hover:shadow-md hover:ring-[var(--color-sage)]/25">
                 <button
                   type="button"
                   onClick={() => openEditModal(it)}
-                  className="absolute right-3 top-3 inline-flex items-center justify-center rounded-full border border-[var(--color-line)] bg-white/90 p-2 text-[var(--color-muted)] opacity-0 shadow-sm backdrop-blur transition hover:text-[var(--color-ink)] group-hover:opacity-100"
+                  className="absolute right-3 top-3 inline-flex items-center justify-center rounded-full border border-[var(--color-line)] bg-[var(--color-paper)]/90 p-2 text-[var(--color-muted)] opacity-0 shadow-sm backdrop-blur transition hover:text-[var(--color-ink)] group-hover:opacity-100"
                   aria-label={`Edit ${it.name}`}
                 >
                   <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
@@ -692,7 +692,7 @@ export function ClosetPage() {
           onClick={() => setViewOpen(false)}
         >
           <div
-            className="w-full max-w-md overflow-hidden rounded-3xl border border-[var(--color-line)] bg-white shadow-xl"
+            className="w-full max-w-md overflow-hidden rounded-3xl border border-[var(--color-line)] bg-[var(--color-surface)] shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-[var(--color-line)] px-5 py-4">
@@ -727,7 +727,7 @@ export function ClosetPage() {
                 <select
                   value={nametagKey}
                   onChange={(e) => setNametagKey(e.target.value as NametagKey)}
-                  className="mt-2 w-full rounded-xl border border-[var(--color-line)] bg-white px-3 py-2 text-sm outline-none ring-[var(--color-sage)]/30 focus:ring-2"
+                  className="mt-2 w-full rounded-xl border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2 text-sm outline-none ring-[var(--color-sage)]/30 focus:ring-2"
                 >
                   <option value="name">Name</option>
                   <option value="price">Price</option>
@@ -752,7 +752,7 @@ export function ClosetPage() {
           onClick={() => setFiltersOpen(false)}
         >
           <div
-            className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl border border-[var(--color-line)] bg-white p-6 shadow-xl"
+            className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl border border-[var(--color-line)] bg-[var(--color-surface)] p-6 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-2">
@@ -834,7 +834,7 @@ export function ClosetPage() {
                         className={`rounded-full px-4 py-2 text-sm font-semibold ring-1 transition ${
                           on
                             ? 'bg-[var(--color-sage)] text-white ring-[var(--color-sage)]'
-                            : 'bg-white text-[var(--color-ink)] ring-[var(--color-line)] hover:bg-[var(--color-hover)]'
+                            : 'bg-[var(--color-paper)] text-[var(--color-ink)] ring-[var(--color-line)] hover:bg-[var(--color-hover)]'
                         }`}
                       >
                         {label}
@@ -877,7 +877,7 @@ export function ClosetPage() {
           onClick={() => setSortOpen(false)}
         >
           <div
-            className="w-full max-w-md overflow-hidden rounded-3xl border border-[var(--color-line)] bg-white shadow-xl"
+            className="w-full max-w-md overflow-hidden rounded-3xl border border-[var(--color-line)] bg-[var(--color-surface)] shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-[var(--color-line)] px-5 py-4">
@@ -913,7 +913,7 @@ export function ClosetPage() {
                   className={`flex w-full items-center justify-between rounded-2xl border px-4 py-3 text-left text-sm font-semibold transition ${
                     sortKey === k
                       ? 'border-[var(--color-sage)] bg-[var(--color-surface)] text-[var(--color-ink)]'
-                      : 'border-[var(--color-line)] bg-white text-[var(--color-ink)] hover:bg-[var(--color-hover)]'
+                      : 'border-[var(--color-line)] bg-[var(--color-paper)] text-[var(--color-ink)] hover:bg-[var(--color-hover)]'
                   }`}
                 >
                   <span>{label}</span>
@@ -925,7 +925,7 @@ export function ClosetPage() {
                         e.stopPropagation()
                         setSortReversed((v) => !v)
                       }}
-                      className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold text-[var(--color-muted)] hover:bg-white"
+                      className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold text-[var(--color-muted)] hover:bg-[var(--color-paper)]"
                       aria-label="Reverse sort direction"
                       title="Reverse"
                     >
@@ -950,7 +950,7 @@ export function ClosetPage() {
           onClick={closeItemModal}
         >
           <div
-            className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-3xl border border-[var(--color-line)] bg-white p-6 shadow-xl"
+            className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-3xl border border-[var(--color-line)] bg-[var(--color-surface)] p-6 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-2">
@@ -971,7 +971,7 @@ export function ClosetPage() {
                 onClick={() => setTab('details')}
                 className={`flex-1 rounded-xl px-3 py-2 text-sm font-semibold transition ${
                   tab === 'details'
-                    ? 'bg-white text-[var(--color-ink)] shadow-sm'
+                    ? 'bg-[var(--color-paper)] text-[var(--color-ink)] shadow-sm'
                     : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]'
                 }`}
               >
@@ -982,7 +982,7 @@ export function ClosetPage() {
                 onClick={() => setTab('extra')}
                 className={`flex-1 rounded-xl px-3 py-2 text-sm font-semibold transition ${
                   tab === 'extra'
-                    ? 'bg-white text-[var(--color-ink)] shadow-sm'
+                    ? 'bg-[var(--color-paper)] text-[var(--color-ink)] shadow-sm'
                     : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]'
                 }`}
               >
@@ -1030,7 +1030,7 @@ export function ClosetPage() {
                           <select
                             value={bgTuning}
                             onChange={(e) => setBgTuning(e.target.value as BgPostprocessTuning)}
-                            className="ml-2 rounded-lg border border-[var(--color-line)] bg-white px-2 py-1 text-xs font-semibold text-[var(--color-ink)] outline-none ring-[var(--color-sage)]/30 focus:ring-2"
+                            className="ml-2 rounded-lg border border-[var(--color-line)] bg-[var(--color-paper)] px-2 py-1 text-xs font-semibold text-[var(--color-ink)] outline-none ring-[var(--color-sage)]/30 focus:ring-2"
                           >
                             <option value="balanced">Balanced</option>
                             <option value="cleaner">Cleaner background</option>
@@ -1065,7 +1065,7 @@ export function ClosetPage() {
                   required
                   value={form.name}
                   onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                  className="mt-1 w-full rounded-xl border border-[var(--color-line)] bg-white px-3 py-2 text-sm outline-none ring-[var(--color-sage)]/30 focus:ring-2"
+                  className="mt-1 w-full rounded-xl border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2 text-sm outline-none ring-[var(--color-sage)]/30 focus:ring-2"
                   placeholder="e.g. Linen blazer"
                 />
               </label>
@@ -1092,7 +1092,7 @@ export function ClosetPage() {
                           <span className="max-w-[140px] truncate">{closetLabel(id)}</span>
                           <button
                             type="button"
-                            className="rounded-full px-1.5 py-0.5 text-[var(--color-muted)] hover:bg-white hover:text-[var(--color-ink)]"
+                            className="rounded-full px-1.5 py-0.5 text-[var(--color-muted)] hover:bg-[var(--color-paper)] hover:text-[var(--color-ink)]"
                             aria-label={`Remove ${id}`}
                             onClick={() =>
                               setForm((f) => ({
@@ -1136,7 +1136,7 @@ export function ClosetPage() {
                         subcategory: subs[0] ?? f.subcategory,
                       }))
                     }}
-                    className="mt-1 w-full rounded-xl border border-[var(--color-line)] bg-white px-3 py-2 text-sm outline-none ring-[var(--color-sage)]/30 focus:ring-2"
+                    className="mt-1 w-full rounded-xl border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2 text-sm outline-none ring-[var(--color-sage)]/30 focus:ring-2"
                   >
                     {CLOSET_CATEGORIES.map((c) => (
                       <option key={c} value={c}>
@@ -1150,7 +1150,7 @@ export function ClosetPage() {
                   <select
                     value={form.subcategory}
                     onChange={(e) => setForm((f) => ({ ...f, subcategory: e.target.value }))}
-                    className="mt-1 w-full rounded-xl border border-[var(--color-line)] bg-white px-3 py-2 text-sm outline-none ring-[var(--color-sage)]/30 focus:ring-2"
+                    className="mt-1 w-full rounded-xl border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2 text-sm outline-none ring-[var(--color-sage)]/30 focus:ring-2"
                   >
                     {subcategoryOptions.map((s) => (
                       <option key={s} value={s}>
@@ -1164,7 +1164,7 @@ export function ClosetPage() {
               <div className="grid grid-cols-2 gap-3">
                 <label className="block text-xs font-medium text-[var(--color-muted)]">
                   Price
-                  <div className="mt-1 flex items-center gap-2 rounded-xl border border-[var(--color-line)] bg-white px-3 py-2 text-sm outline-none ring-[var(--color-sage)]/30 focus-within:ring-2">
+                  <div className="mt-1 flex items-center gap-2 rounded-xl border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2 text-sm outline-none ring-[var(--color-sage)]/30 focus-within:ring-2">
                     <span className="select-none font-semibold text-[var(--color-ink)]">$</span>
                     <input
                       type="text"
@@ -1207,7 +1207,7 @@ export function ClosetPage() {
                     min={0}
                     value={form.wears}
                     onChange={(e) => setForm((f) => ({ ...f, wears: e.target.value }))}
-                    className="mt-1 w-full rounded-xl border border-[var(--color-line)] bg-white px-3 py-2 text-sm outline-none ring-[var(--color-sage)]/30 focus:ring-2"
+                    className="mt-1 w-full rounded-xl border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2 text-sm outline-none ring-[var(--color-sage)]/30 focus:ring-2"
                   />
                 </label>
               </div>
@@ -1221,7 +1221,7 @@ export function ClosetPage() {
                         type="date"
                         value={form.purchasedDate}
                         onChange={(e) => setForm((f) => ({ ...f, purchasedDate: e.target.value }))}
-                        className="mt-1 w-full rounded-xl border border-[var(--color-line)] bg-white px-3 py-2 text-sm outline-none ring-[var(--color-sage)]/30 focus:ring-2"
+                        className="mt-1 w-full rounded-xl border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2 text-sm outline-none ring-[var(--color-sage)]/30 focus:ring-2"
                       />
                     </label>
                     <label className="block text-xs font-medium text-[var(--color-muted)]">
@@ -1229,7 +1229,7 @@ export function ClosetPage() {
                       <select
                         value={form.acquisitionMethod}
                         onChange={(e) => setForm((f) => ({ ...f, acquisitionMethod: e.target.value }))}
-                        className="mt-1 w-full rounded-xl border border-[var(--color-line)] bg-white px-3 py-2 text-sm outline-none ring-[var(--color-sage)]/30 focus:ring-2"
+                        className="mt-1 w-full rounded-xl border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2 text-sm outline-none ring-[var(--color-sage)]/30 focus:ring-2"
                       >
                         <option value="">Select…</option>
                         {ACQUISITION_METHODS.map((m) => (
@@ -1242,7 +1242,7 @@ export function ClosetPage() {
                   </div>
 
                   {form.acquisitionMethod === 'Bought' ? (
-                    <label className="flex items-center justify-between rounded-2xl border border-[var(--color-line)] bg-white px-4 py-3">
+                    <label className="flex items-center justify-between rounded-2xl border border-[var(--color-line)] bg-[var(--color-paper)] px-4 py-3">
                       <span className="text-sm font-medium text-[var(--color-ink)]">Second-hand</span>
                       <input
                         type="checkbox"
@@ -1253,7 +1253,7 @@ export function ClosetPage() {
                     </label>
                   ) : null}
 
-                  <div className="rounded-2xl border border-[var(--color-line)] bg-white px-4 py-3">
+                  <div className="rounded-2xl border border-[var(--color-line)] bg-[var(--color-paper)] px-4 py-3">
                     <div className="text-xs font-medium text-[var(--color-muted)]">Weather</div>
                     <div className="mt-2 flex flex-wrap gap-2">
                       {WEATHER_TAGS.map((t) => {
@@ -1281,7 +1281,7 @@ export function ClosetPage() {
                     </div>
                   </div>
 
-                  <div className="rounded-2xl border border-[var(--color-line)] bg-white px-4 py-3">
+                  <div className="rounded-2xl border border-[var(--color-line)] bg-[var(--color-paper)] px-4 py-3">
                     <div className="text-xs font-medium text-[var(--color-muted)]">Season</div>
                     <div className="mt-2 flex flex-wrap gap-2">
                       {SEASONS.map((s) => {
@@ -1315,7 +1315,7 @@ export function ClosetPage() {
                       <input
                         value={form.size}
                         onChange={(e) => setForm((f) => ({ ...f, size: e.target.value }))}
-                        className="mt-1 w-full rounded-xl border border-[var(--color-line)] bg-white px-3 py-2 text-sm outline-none ring-[var(--color-sage)]/30 focus:ring-2"
+                        className="mt-1 w-full rounded-xl border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2 text-sm outline-none ring-[var(--color-sage)]/30 focus:ring-2"
                         placeholder="e.g. S, 6, 28, 8.5"
                       />
                     </label>
@@ -1324,7 +1324,7 @@ export function ClosetPage() {
                       <input
                         value={form.brand}
                         onChange={(e) => setForm((f) => ({ ...f, brand: e.target.value }))}
-                        className="mt-1 w-full rounded-xl border border-[var(--color-line)] bg-white px-3 py-2 text-sm outline-none ring-[var(--color-sage)]/30 focus:ring-2"
+                        className="mt-1 w-full rounded-xl border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2 text-sm outline-none ring-[var(--color-sage)]/30 focus:ring-2"
                         placeholder="Optional"
                       />
                     </label>
@@ -1336,7 +1336,7 @@ export function ClosetPage() {
                       <select
                         value={form.condition}
                         onChange={(e) => setForm((f) => ({ ...f, condition: e.target.value }))}
-                        className="mt-1 w-full rounded-xl border border-[var(--color-line)] bg-white px-3 py-2 text-sm outline-none ring-[var(--color-sage)]/30 focus:ring-2"
+                        className="mt-1 w-full rounded-xl border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2 text-sm outline-none ring-[var(--color-sage)]/30 focus:ring-2"
                       >
                         <option value="">Select…</option>
                         {CONDITIONS.map((c) => (
@@ -1351,7 +1351,7 @@ export function ClosetPage() {
                       <input
                         value={form.locationPurchased}
                         onChange={(e) => setForm((f) => ({ ...f, locationPurchased: e.target.value }))}
-                        className="mt-1 w-full rounded-xl border border-[var(--color-line)] bg-white px-3 py-2 text-sm outline-none ring-[var(--color-sage)]/30 focus:ring-2"
+                        className="mt-1 w-full rounded-xl border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2 text-sm outline-none ring-[var(--color-sage)]/30 focus:ring-2"
                         placeholder="Optional"
                       />
                     </label>
@@ -1363,7 +1363,7 @@ export function ClosetPage() {
                       value={form.notes}
                       onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
                       rows={4}
-                      className="mt-1 w-full resize-none rounded-xl border border-[var(--color-line)] bg-white px-3 py-2 text-sm outline-none ring-[var(--color-sage)]/30 focus:ring-2"
+                      className="mt-1 w-full resize-none rounded-xl border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2 text-sm outline-none ring-[var(--color-sage)]/30 focus:ring-2"
                       placeholder="Fit, care instructions, where it’s from, or anything you want to remember."
                     />
                   </label>
@@ -1388,7 +1388,7 @@ export function ClosetPage() {
                         setSaving(false)
                       }
                     }}
-                    className="rounded-full border border-red-200 bg-white py-2.5 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-60"
+                    className="rounded-full border border-red-300/40 bg-[var(--color-paper)] py-2.5 text-sm font-semibold text-red-300 hover:bg-red-900/30 disabled:opacity-60"
                   >
                     Delete
                   </button>
@@ -1411,7 +1411,7 @@ export function ClosetPage() {
                         setSaving(false)
                       }
                     }}
-                    className="rounded-full border border-[var(--color-line)] bg-white py-2.5 text-sm font-semibold text-[var(--color-sage)] hover:bg-[var(--color-hover)] disabled:opacity-60"
+                    className="rounded-full border border-[var(--color-line)] bg-[var(--color-paper)] py-2.5 text-sm font-semibold text-[var(--color-sage)] hover:bg-[var(--color-hover)] disabled:opacity-60"
                   >
                     {form.archived ? 'Unarchive' : 'Archive'}
                   </button>
