@@ -190,7 +190,16 @@ jobs:
           # Phase 2: platform (ACM, controllers) + app_bluegreen and the rest.
           terraform apply -auto-approve
           DOMAIN_ROOT=claiset.xyz FRONTEND_SUBDOMAIN= K8S_APP_NAMESPACE=dev bash ../../scripts/route53-ingress-records-guard.sh
-          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=dev FRONTEND_HOST=claiset.xyz bash ../../scripts/smoke-test-env.sh
+
+      - name: Wait for readiness (dev)
+        working-directory: infra/envs/dev
+        run: |
+          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=dev FRONTEND_HOST=claiset.xyz bash ../../scripts/smoke-test-env.sh --wait-only
+
+      - name: Smoke tests (dev)
+        working-directory: infra/envs/dev
+        run: |
+          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=dev FRONTEND_HOST=claiset.xyz bash ../../scripts/smoke-test-env.sh --skip-wait
 
   qa:
     name: Promote to QA (nightly)
@@ -306,7 +315,16 @@ jobs:
           K8S_APP_NAMESPACE=qa bash ../../scripts/terraform-k8s-import-guard.sh
           terraform apply -auto-approve
           DOMAIN_ROOT=claiset.xyz K8S_APP_NAMESPACE=qa FRONTEND_SUBDOMAIN=app-qa bash ../../scripts/route53-ingress-records-guard.sh
-          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=qa FRONTEND_HOST=app-qa.claiset.xyz bash ../../scripts/smoke-test-env.sh
+
+      - name: Wait for readiness (qa)
+        working-directory: infra/envs/qa
+        run: |
+          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=qa FRONTEND_HOST=app-qa.claiset.xyz bash ../../scripts/smoke-test-env.sh --wait-only
+
+      - name: Smoke checks (qa)
+        working-directory: infra/envs/qa
+        run: |
+          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=qa FRONTEND_HOST=app-qa.claiset.xyz bash ../../scripts/smoke-test-env.sh --skip-wait
 
   uat:
     name: Promote to UAT (RC commits)
@@ -423,7 +441,16 @@ jobs:
           K8S_APP_NAMESPACE=uat bash ../../scripts/terraform-k8s-import-guard.sh
           terraform apply -auto-approve
           DOMAIN_ROOT=claiset.xyz K8S_APP_NAMESPACE=uat FRONTEND_SUBDOMAIN=app-uat bash ../../scripts/route53-ingress-records-guard.sh
-          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=uat FRONTEND_HOST=app-uat.claiset.xyz bash ../../scripts/smoke-test-env.sh
+
+      - name: Wait for readiness (uat)
+        working-directory: infra/envs/uat
+        run: |
+          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=uat FRONTEND_HOST=app-uat.claiset.xyz bash ../../scripts/smoke-test-env.sh --wait-only
+
+      - name: Smoke checks (uat)
+        working-directory: infra/envs/uat
+        run: |
+          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=uat FRONTEND_HOST=app-uat.claiset.xyz bash ../../scripts/smoke-test-env.sh --skip-wait
 
   prod:
     name: Promote to production (tags)

@@ -13,6 +13,24 @@
 
 set -euo pipefail
 
+MODE="${1:-full}"
+
+case "${MODE}" in
+  full|--full)
+    MODE="full"
+    ;;
+  wait-only|--wait-only)
+    MODE="wait-only"
+    ;;
+  skip-wait|--skip-wait)
+    MODE="skip-wait"
+    ;;
+  *)
+    echo "Unknown mode: ${MODE}. Use: full | --wait-only | --skip-wait" >&2
+    exit 1
+    ;;
+esac
+
 REGION="${AWS_REGION:-us-east-1}"
 CLUSTER="${EXPECTED_CLUSTER_NAME:-}"
 NAMESPACE="${K8S_APP_NAMESPACE:-${TF_VAR_env:-dev}}"
@@ -34,11 +52,6 @@ echo "Smoke test: cluster=${CLUSTER} namespace=${NAMESPACE} frontend=${FRONTEND_
 
 aws eks update-kubeconfig --region "${REGION}" --name "${CLUSTER}" >/dev/null
 
-for d in web items outfits schedule; do
-  echo "Checking rollout: deployment/${d} in ${NAMESPACE}"
-  kubectl -n "${NAMESPACE}" rollout status "deployment/${d}" --timeout=8m
-done
-
 wait_for_no_pending_app_pods() {
   local attempts=36
   local sleep_s=5
@@ -58,7 +71,18 @@ wait_for_no_pending_app_pods() {
   return 1
 }
 
-wait_for_no_pending_app_pods
+if [[ "${MODE}" != "skip-wait" ]]; then
+  for d in web items outfits schedule; do
+    echo "Checking rollout: deployment/${d} in ${NAMESPACE}"
+    kubectl -n "${NAMESPACE}" rollout status "deployment/${d}" --timeout=8m
+  done
+  wait_for_no_pending_app_pods
+fi
+
+if [[ "${MODE}" == "wait-only" ]]; then
+  echo "Wait-only checks passed for ${NAMESPACE}."
+  exit 0
+fi
 
 check_internal_health() {
   local svc="$1"
@@ -141,15 +165,33 @@ curl_code() {
   curl -sS "${SMOKE_CONNECT_TO[@]}" -o /dev/null -w '%{http_code}' "${url}" || true
 }
 
-front_code="$(curl_code "https://${SMOKE_BASE_HOST}")"
-if [[ ! "${front_code}" =~ ^2|3 ]]; then
+check_frontend() {
+  local attempts="${1:-12}"
+  local sleep_s="${2:-5}"
+  local code="000"
+  local i
+  for ((i=1; i<=attempts; i++)); do
+    code="$(curl_code "https://${SMOKE_BASE_HOST}")"
+    if [[ "${code}" =~ ^2|3 ]]; then
+      front_code="${code}"
+      return 0
+    fi
+    echo "Frontend not ready yet: https://${SMOKE_BASE_HOST} -> ${code} (attempt ${i}/${attempts})"
+    sleep "${sleep_s}"
+  done
+  front_code="${code}"
+  return 1
+}
+
+front_code="000"
+if ! check_frontend 12 5; then
   echo "Primary frontend host check failed: https://${SMOKE_BASE_HOST} returned ${front_code}" >&2
   echo "Retrying via ALB using SNI host ${FRONTEND_HOST} -> ${LB_HOST}"
   # Keep URL/SNI/Host as FRONTEND_HOST so ACM cert validation passes,
   # but connect network path directly to the ALB hostname.
   SMOKE_BASE_HOST="${FRONTEND_HOST}"
   SMOKE_CONNECT_TO=(--connect-to "${FRONTEND_HOST}:443:${LB_HOST}:443")
-  front_code="$(curl_code "https://${SMOKE_BASE_HOST}")"
+  check_frontend 12 5 || true
 fi
 if [[ ! "${front_code}" =~ ^2|3 ]]; then
   echo "Frontend smoke failed: https://${SMOKE_BASE_HOST} returned ${front_code}" >&2
