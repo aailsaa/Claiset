@@ -151,6 +151,14 @@ resource "helm_release" "aws_load_balancer_controller" {
     name  = "serviceAccount.name"
     value = "aws-load-balancer-controller"
   }
+  # In constrained/student accounts, webhook CA rotation can drift and break
+  # Service creates cluster-wide with x509 unknown authority.
+  # We only need Ingress reconciliation for this project, so disable the optional
+  # service mutator webhook to prevent external-dns/chart installs from failing.
+  set {
+    name  = "enableServiceMutatorWebhook"
+    value = "false"
+  }
 }
 
 # ExternalDNS to create Route53 records from Ingress/Service annotations.
