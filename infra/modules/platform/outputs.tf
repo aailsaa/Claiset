@@ -15,7 +15,7 @@ output "route53_nameservers" {
 }
 
 output "frontend_hostname" {
-  value       = var.domain_root != "" ? "${var.frontend_subdomain}.${var.domain_root}" : ""
+  value       = local.frontend_host
   description = "Public hostname for the frontend."
 }
 

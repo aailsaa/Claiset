@@ -46,23 +46,30 @@ if [[ -z "${LB_HOST}" ]]; then
 fi
 echo "Ingress LB: ${LB_HOST}"
 
-front_code="$(curl -sS -o /dev/null -w '%{http_code}' "https://${FRONTEND_HOST}" || true)"
+SMOKE_BASE_HOST="${FRONTEND_HOST}"
+front_code="$(curl -sS -o /dev/null -w '%{http_code}' "https://${SMOKE_BASE_HOST}" || true)"
 if [[ ! "${front_code}" =~ ^2|3 ]]; then
-  echo "Frontend smoke failed: https://${FRONTEND_HOST} returned ${front_code}" >&2
+  echo "Primary frontend host check failed: https://${SMOKE_BASE_HOST} returned ${front_code}" >&2
+  echo "Retrying smoke checks via ingress load balancer host: ${LB_HOST}"
+  SMOKE_BASE_HOST="${LB_HOST}"
+  front_code="$(curl -sS -o /dev/null -w '%{http_code}' "https://${SMOKE_BASE_HOST}" || true)"
+fi
+if [[ ! "${front_code}" =~ ^2|3 ]]; then
+  echo "Frontend smoke failed: https://${SMOKE_BASE_HOST} returned ${front_code}" >&2
   exit 1
 fi
-echo "Frontend smoke OK (${front_code})"
+echo "Frontend smoke OK (${front_code}) via ${SMOKE_BASE_HOST}"
 
 check_api() {
   local path="$1"
   local code
-  code="$(curl -sS -o /dev/null -w '%{http_code}' "https://${FRONTEND_HOST}${path}" || true)"
+  code="$(curl -sS -o /dev/null -w '%{http_code}' "https://${SMOKE_BASE_HOST}${path}" || true)"
   # Accepts 2xx/3xx/4xx for smoke; rejects transport failures/5xx.
   if [[ "${code}" == "000" || "${code}" =~ ^5 ]]; then
-    echo "Backend smoke failed: ${path} returned ${code}" >&2
+    echo "Backend smoke failed: https://${SMOKE_BASE_HOST}${path} returned ${code}" >&2
     exit 1
   fi
-  echo "Backend route ${path} OK (${code})"
+  echo "Backend route ${path} OK (${code}) via ${SMOKE_BASE_HOST}"
 }
 
 check_api "/api/v1/items"
