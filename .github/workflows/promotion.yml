@@ -133,6 +133,24 @@ jobs:
         working-directory: infra/envs/dev
         run: bash ../../scripts/terraform-ecr-import-guard.sh
 
+      - name: ECR state reconcile (dev)
+        working-directory: infra/envs/dev
+        run: |
+          set -euo pipefail
+          repos=(items outfits schedule web migrate)
+          for suffix in "${repos[@]}"; do
+            repo="claiset-${suffix}"
+            addr="module.ecr.aws_ecr_repository.this[\"${suffix}\"]"
+            if aws ecr describe-repositories --region "${AWS_REGION}" --repository-names "${repo}" >/dev/null 2>&1; then
+              if terraform state show -no-color "${addr}" >/dev/null 2>&1; then
+                echo "${repo} already in terraform state"
+              else
+                echo "Importing ${repo} into terraform state"
+                terraform import "${addr}" "${repo}"
+              fi
+            fi
+          done
+
       # Switching to route53_hosted_zone_id drops aws_route53_zone from config; Terraform would
       # otherwise try DeleteHostedZone on the old duplicate — fails while ACM/other records exist.
       # Stop managing it in state; delete the duplicate zone in AWS console later if needed.
