@@ -6,13 +6,9 @@
 name: QA teardown (after nightly)
 
 on:
-  workflow_run:
-    workflows:
-      - "Promotion (dev → qa → uat → prod)"
-    types:
-      - completed
-    branches:
-      - main
+  schedule:
+    # Nightly teardown (UTC), 1 hour after Promotion's nightly run (0 6 * * *).
+    - cron: "0 7 * * *"
   workflow_dispatch:
 
 permissions:
@@ -36,18 +32,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       EXPECTED_CLUSTER_NAME: claiset-qa
-    if: |
-      github.event_name == 'workflow_dispatch'
-      || (
-        github.event_name == 'workflow_run'
-        && github.event.workflow_run.event == 'schedule'
-        && github.event.workflow_run.conclusion == 'success'
-      )
     steps:
-      - name: Checkout (match nightly commit when triggered by workflow_run)
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
