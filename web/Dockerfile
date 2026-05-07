@@ -17,7 +17,8 @@ RUN set -e; \
 # Vite does not overwrite env vars already set.
 ENV VITE_ITEMS_API="" \
     VITE_OUTFITS_API="" \
-    VITE_SCHEDULE_API=""
+    VITE_SCHEDULE_API="" \
+    VITE_GOOGLE_CLIENT_ID="551920137993-5re842ov91rtdbtil3o6vi8lglmvpool.apps.googleusercontent.com"
 
 RUN npm run build
 
