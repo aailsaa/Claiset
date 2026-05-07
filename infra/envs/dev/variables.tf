@@ -36,16 +36,15 @@ variable "node_instance_types" {
 
 variable "node_group_desired_size" {
   type        = number
-  description = "EKS managed node group desired capacity."
-  # Cost-efficient baseline: keep a small steady-state and let autoscaling burst when needed.
-  default     = 2
+  description = "EKS managed node group desired capacity. Keep enough steady-state pods so ingress targets stay healthy between deploys."
+  default     = 3
 }
 
 variable "node_group_min_size" {
   type        = number
   description = "EKS managed node group minimum capacity."
-  # Allow scale-down to 1 when idle to reduce cost.
-  default     = 1
+  # Keep at least 2 nodes so deploy scale-back does not strand app pods in Pending.
+  default     = 2
 }
 
 variable "node_group_max_size" {
