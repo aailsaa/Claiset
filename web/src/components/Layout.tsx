@@ -4,7 +4,7 @@ import { useAuth } from '../auth/AuthContext'
 
 const tabClass = ({ isActive }: { isActive: boolean }) =>
   [
-    'relative flex-1 px-4 py-3 text-center text-sm font-semibold transition-colors sm:text-base',
+    'relative flex-1 px-4 py-3 text-center text-sm font-semibold transition-colors sm:text-base [font-family:var(--font-heading)]',
     isActive
       ? 'text-[var(--color-sage)] after:absolute after:bottom-0 after:left-4 after:right-4 after:h-0.5 after:rounded-full after:bg-[var(--color-sage)]'
       : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]',

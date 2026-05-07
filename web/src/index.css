@@ -1,7 +1,9 @@
+@import url('https://fonts.googleapis.com/css2?family=Prata&display=swap');
 @import 'tailwindcss';
 
 @theme {
-  --font-sans: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Prata', Georgia, serif;
+  --font-heading: 'Prata', Georgia, serif;
   --color-paper: #ffffff;
   --color-surface: #fafafa;
   --color-ink: #121212;
@@ -45,6 +47,6 @@
   h4,
   h5,
   h6 {
-    font-family: var(--font-sans);
+    font-family: var(--font-heading);
   }
 }
