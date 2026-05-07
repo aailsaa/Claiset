@@ -37,15 +37,15 @@ variable "node_instance_types" {
 variable "node_group_desired_size" {
   type        = number
   description = "EKS managed node group desired capacity."
-  # Middle-ground baseline: keep cost lower than 3-node steady state while retaining better pod capacity than t3.micro.
-  default     = 2
+  # Raise baseline for reliability during normal dev access; manual scale-down can be used to save cost.
+  default     = 3
 }
 
 variable "node_group_min_size" {
   type        = number
   description = "EKS managed node group minimum capacity."
-  # Allow scale-down to 1 for cost when idle; CI bursts capacity during deploy.
-  default     = 1
+  # Keep at least 2 nodes so core platform + app pods avoid frequent Pending states.
+  default     = 2
 }
 
 variable "node_group_max_size" {

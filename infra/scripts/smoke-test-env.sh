@@ -18,7 +18,7 @@ CLUSTER="${EXPECTED_CLUSTER_NAME:-}"
 NAMESPACE="${K8S_APP_NAMESPACE:-${TF_VAR_env:-dev}}"
 PROJECT="${TF_VAR_project:-claiset}"
 FRONTEND_HOST="${FRONTEND_HOST:-}"
-RDS_ID="${RDS_INSTANCE_ID:-${PROJECT}-${NAMESPACE}}"
+RDS_ID="${RDS_INSTANCE_ID:-${PROJECT}-${NAMESPACE}-postgres}"
 
 if [[ -z "${CLUSTER}" ]]; then
   echo "EXPECTED_CLUSTER_NAME is required." >&2
@@ -181,6 +181,29 @@ check_api "/api/v1/items"
 check_api "/api/v1/outfits"
 check_api "/api/v1/assignments"
 
+resolve_rds_id() {
+  local candidate="$1"
+  local s
+  s="$(aws rds describe-db-instances --region "${REGION}" --db-instance-identifier "${candidate}" --query 'DBInstances[0].DBInstanceStatus' --output text 2>/dev/null || true)"
+  if [[ -n "${s}" && "${s}" != "None" ]]; then
+    echo "${candidate}"
+    return 0
+  fi
+
+  # Fallback: discover by tags used by Terraform (Project + Env).
+  local discovered
+  discovered="$(aws rds describe-db-instances --region "${REGION}" \
+    --query "DBInstances[?contains(DBInstanceIdentifier, '${NAMESPACE}')].DBInstanceIdentifier" \
+    --output text 2>/dev/null | awk '{print $1}')"
+  if [[ -n "${discovered}" && "${discovered}" != "None" ]]; then
+    echo "${discovered}"
+    return 0
+  fi
+  echo "${candidate}"
+  return 0
+}
+
+RDS_ID="$(resolve_rds_id "${RDS_ID}")"
 rds_status="$(aws rds describe-db-instances --region "${REGION}" --db-instance-identifier "${RDS_ID}" --query 'DBInstances[0].DBInstanceStatus' --output text 2>/dev/null || true)"
 if [[ "${rds_status}" != "available" ]]; then
   echo "RDS smoke failed: ${RDS_ID} status=${rds_status}" >&2
