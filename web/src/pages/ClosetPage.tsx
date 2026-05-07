@@ -97,6 +97,25 @@ type SortKey =
 
 type NametagKey = 'name' | 'price' | 'costPerWear' | 'wears' | 'brand' | 'datePurchased' | 'itemNumber'
 
+const RAINBOW_COLOR_ORDER = [
+  'RED',
+  'ORANGE',
+  'YELLOW',
+  'GREEN',
+  'BLUE',
+  'PURPLE',
+  'PINK',
+  'BROWN',
+  'BLACK',
+  'GREY',
+  'SILVER',
+  'GOLD',
+  'WHITE',
+  'MULTICOLOR',
+  'UNSPECIFIED',
+] as const
+const RAINBOW_COLOR_RANK = new Map<string, number>(RAINBOW_COLOR_ORDER.map((c, idx) => [c, idx]))
+
 function parseItemDate(itemDate?: string | null): number {
   if (!itemDate) return 0
   const t = Date.parse(itemDate)
@@ -125,7 +144,7 @@ export function ClosetPage() {
   const [photoEditOriginalSrc, setPhotoEditOriginalSrc] = useState<string | null>(null)
   const [photoOriginalFile, setPhotoOriginalFile] = useState<File | null>(null)
   const [bgModelUsed, setBgModelUsed] = useState<BgModel>('isnet')
-  const [bgTuning, setBgTuning] = useState<BgPostprocessTuning>('balanced')
+  const [bgTuning, setBgTuning] = useState<BgPostprocessTuning>('cleaner')
   const [viewOpen, setViewOpen] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [sortOpen, setSortOpen] = useState(false)
@@ -349,10 +368,13 @@ export function ClosetPage() {
           return sub * dir || (a.id - b.id) * -1
         }
         case 'color': {
-          const ac = closetLabel((a.colors?.[0] ?? '') as string)
-          const bc = closetLabel((b.colors?.[0] ?? '') as string)
-          const c = cmpStr(ac, bc)
-          return c * dir || (a.id - b.id) * -1
+          const ac = String(a.colors?.[0] ?? 'UNSPECIFIED').toUpperCase()
+          const bc = String(b.colors?.[0] ?? 'UNSPECIFIED').toUpperCase()
+          const ar = RAINBOW_COLOR_RANK.get(ac) ?? 999
+          const br = RAINBOW_COLOR_RANK.get(bc) ?? 999
+          if (ar !== br) return (ar - br) * dir
+          const byLabel = cmpStr(closetLabel(ac), closetLabel(bc))
+          return byLabel * dir || (a.id - b.id) * -1
         }
         case 'costPerWear': {
           const av = costPerWear(Number(a.price) || 0, Number(a.wears) || 0)
@@ -374,7 +396,7 @@ export function ClosetPage() {
   function resetPhotoSession() {
     setPhotoOriginalFile(null)
     setBgModelUsed('isnet')
-    setBgTuning('balanced')
+    setBgTuning('cleaner')
     setPhotoMessage(null)
     setRemovingBg(false)
     setPhotoEditOpen(false)
@@ -476,11 +498,13 @@ export function ClosetPage() {
     // Cycle models: quint8 -> fp16 -> isnet (best). We default to isnet, but retry lets people try alternates.
     const next: BgModel =
       bgModelUsed === 'isnet_quint8' ? 'isnet_fp16' : bgModelUsed === 'isnet_fp16' ? 'isnet' : 'isnet_fp16'
+    const retryTuning: BgPostprocessTuning =
+      bgTuning === 'preserveEdges' ? 'cleaner' : 'aggressive'
     try {
       const { dataUrl, removed, modelUsed } = await removeBackgroundToDataUrl(photoOriginalFile, {
         model: next,
         device: 'gpu',
-        tuning: bgTuning,
+        tuning: retryTuning,
       })
       setBgModelUsed(modelUsed)
       setPhotoEditSrc(dataUrl)
@@ -908,7 +932,6 @@ export function ClosetPage() {
                   onClick={() => {
                     setSortKey(k)
                     setSortReversed(false)
-                    setSortOpen(false)
                   }}
                   className={`flex w-full items-center justify-between rounded-2xl border px-4 py-3 text-left text-sm font-semibold transition ${
                     sortKey === k

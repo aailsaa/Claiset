@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { fetchItems, fetchOutfits } from '../api'
 import { computeClosetStats } from '../closetStats'
-import { closetLabel } from '../closetCatalog'
+import { closetColorSwatch, closetLabel } from '../closetCatalog'
 import type { ClosetStats, Item } from '../types'
 
 function usd(n: number) {
@@ -23,11 +23,13 @@ function BarRow({
   sub,
   pct,
   valueRight,
+  barColor,
 }: {
   label: string
   sub?: string
   pct: number
   valueRight: string
+  barColor?: string
 }) {
   const w = Math.min(100, Math.max(0, pct))
   return (
@@ -41,9 +43,85 @@ function BarRow({
       </div>
       <div className="h-2 overflow-hidden rounded-full bg-[var(--color-surface)] ring-1 ring-[var(--color-line)]">
         <div
-          className="h-full rounded-full bg-[var(--color-sage)] transition-[width] duration-300"
-          style={{ width: `${w}%` }}
+          className="h-full rounded-full transition-[width] duration-300"
+          style={{ width: `${w}%`, background: barColor ?? 'var(--color-sage)' }}
         />
+      </div>
+    </div>
+  )
+}
+
+type ChartDatum = {
+  label: string
+  value: number
+  valueRight: string
+  sub?: string
+  color?: string
+}
+
+function solidChartColor(label: string): string {
+  const key = String(label).trim().toUpperCase()
+  const map: Record<string, string> = {
+    RED: '#c62828',
+    ORANGE: '#ef6c00',
+    YELLOW: '#f9a825',
+    GREEN: '#2e7d32',
+    BLUE: '#1565c0',
+    PURPLE: '#6a1b9a',
+    PINK: '#c2185b',
+    BROWN: '#5d4037',
+    BLACK: '#1a1a1a',
+    WHITE: '#d9d9d9',
+    GREY: '#78909c',
+    SILVER: '#b0bec5',
+    GOLD: '#ffb300',
+    MULTICOLOR: '#9a1530',
+    UNSPECIFIED: '#9e9e9e',
+  }
+  return map[key] ?? '#9a1530'
+}
+
+function PieChart({
+  rows,
+}: {
+  rows: ChartDatum[]
+}) {
+  const positive = rows.filter((r) => r.value > 0)
+  const total = positive.reduce((sum, r) => sum + r.value, 0)
+  const palette = ['#f6b3c1', '#f08aa5', '#d9688d', '#ba4e79', '#9a1530', '#fbd1db', '#f39ab1', '#cf5b84']
+  if (!total) return <p className="text-sm text-[var(--color-muted)]">No data yet.</p>
+
+  let cursor = 0
+  const slices = positive.map((row, idx) => {
+    const size = (row.value / total) * 100
+    const start = cursor
+    cursor += size
+    return {
+      ...row,
+      color: row.color ?? palette[idx % palette.length],
+      start,
+      end: cursor,
+    }
+  })
+
+  const gradient = slices
+    .map((s) => `${s.color} ${s.start.toFixed(2)}% ${s.end.toFixed(2)}%`)
+    .join(', ')
+
+  return (
+    <div className="space-y-3">
+      <div className="mx-auto h-44 w-44 rounded-full ring-1 ring-[var(--color-line)]" style={{ background: `conic-gradient(${gradient})` }} />
+      <div className="space-y-2">
+        {slices.map((s) => (
+          <div key={s.label} className="flex items-center justify-between gap-2 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2 text-sm">
+            <div className="flex items-center gap-2">
+              <span className="h-3 w-3 rounded-full" style={{ background: s.color }} />
+              <span className="font-medium text-[var(--color-ink)]">{s.label}</span>
+              {s.sub ? <span className="text-xs text-[var(--color-muted)]">{s.sub}</span> : null}
+            </div>
+            <span className="text-[var(--color-muted)]">{s.valueRight}</span>
+          </div>
+        ))}
       </div>
     </div>
   )
@@ -54,6 +132,22 @@ export function StatsPage() {
   const [items, setItems] = useState<Item[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [chartMode, setChartMode] = useState<'bar' | 'pie'>(() => {
+    try {
+      const raw = window.localStorage.getItem('stats:view:chartMode')
+      return raw === 'pie' ? 'pie' : 'bar'
+    } catch {
+      return 'bar'
+    }
+  })
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem('stats:view:chartMode', chartMode)
+    } catch {
+      // ignore
+    }
+  }, [chartMode])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -172,10 +266,55 @@ export function StatsPage() {
     return { topTypes, topColors, mostWorn, leastWorn, totalWears, avgPerItem, unwornCount }
   }, [activeItems])
 
+  const avgCostPerWearPerItem = useMemo(() => {
+    const perItem = activeItems
+      .map((it) => {
+        const wears = Math.max(0, Number(it.wears) || 0)
+        const price = Math.max(0, Number(it.price) || 0)
+        if (wears <= 0) return null
+        return price / wears
+      })
+      .filter((v): v is number => v != null)
+    if (perItem.length === 0) return null
+    return perItem.reduce((sum, v) => sum + v, 0) / perItem.length
+  }, [activeItems])
+
   return (
     <div className="space-y-8">
-      <div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold tracking-tight text-[var(--color-ink)] sm:text-3xl">Statistics</h1>
+        <div className="inline-flex items-center gap-1 rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface)] p-1">
+          <button
+            type="button"
+            onClick={() => setChartMode('bar')}
+            className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition ${
+              chartMode === 'bar' ? 'bg-[var(--color-paper)] text-[var(--color-ink)] shadow-sm' : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]'
+            }`}
+            title="Bar charts"
+            aria-label="Show bar charts"
+          >
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M4 20V10" />
+              <path d="M10 20V4" />
+              <path d="M16 20v-7" />
+              <path d="M22 20v-3" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            onClick={() => setChartMode('pie')}
+            className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition ${
+              chartMode === 'pie' ? 'bg-[var(--color-paper)] text-[var(--color-ink)] shadow-sm' : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]'
+            }`}
+            title="Pie charts"
+            aria-label="Show pie charts"
+          >
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 3v9h9" />
+              <path d="M20.49 13A9 9 0 1 1 11 3.06" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {error ? (
@@ -218,15 +357,26 @@ export function StatsPage() {
                   {stats.byCategory.length === 0 ? (
                     <p className="text-sm text-[var(--color-muted)]">No items yet.</p>
                   ) : (
-                    stats.byCategory.map((row) => (
-                      <BarRow
-                        key={row.category}
-                        label={closetLabel(row.category)}
-                        sub={`${row.count} items`}
-                        pct={row.pct}
-                        valueRight={`${row.pct.toFixed(0)}%`}
+                    chartMode === 'bar' ? (
+                      stats.byCategory.map((row) => (
+                        <BarRow
+                          key={row.category}
+                          label={closetLabel(row.category)}
+                          sub={`${row.count} items`}
+                          pct={row.pct}
+                          valueRight={`${row.pct.toFixed(0)}%`}
+                        />
+                      ))
+                    ) : (
+                      <PieChart
+                        rows={stats.byCategory.map((row) => ({
+                          label: closetLabel(row.category),
+                          sub: `${row.count} items`,
+                          value: row.pct,
+                          valueRight: `${row.pct.toFixed(0)}%`,
+                        }))}
                       />
-                    ))
+                    )
                   )}
                 </div>
               </div>
@@ -236,14 +386,26 @@ export function StatsPage() {
                   {stats.byColor.length === 0 ? (
                     <p className="text-sm text-[var(--color-muted)]">No items yet.</p>
                   ) : (
-                    stats.byColor.slice(0, 8).map((row) => (
-                      <BarRow
-                        key={row.color}
-                        label={closetLabel(row.color)}
-                        pct={row.pct}
-                        valueRight={`${row.pct.toFixed(0)}%`}
+                    chartMode === 'bar' ? (
+                      stats.byColor.slice(0, 8).map((row) => (
+                        <BarRow
+                          key={row.color}
+                          label={closetLabel(row.color)}
+                          pct={row.pct}
+                          valueRight={`${row.pct.toFixed(0)}%`}
+                          barColor={solidChartColor(row.color)}
+                        />
+                      ))
+                    ) : (
+                      <PieChart
+                        rows={stats.byColor.slice(0, 8).map((row) => ({
+                          label: closetLabel(row.color),
+                          value: row.pct,
+                          valueRight: `${row.pct.toFixed(0)}%`,
+                          color: solidChartColor(row.color),
+                        }))}
                       />
-                    ))
+                    )
                   )}
                 </div>
               </div>
@@ -253,15 +415,26 @@ export function StatsPage() {
                   {stats.byPurchaseYear.length === 0 ? (
                     <p className="text-sm text-[var(--color-muted)]">No items yet.</p>
                   ) : (
-                    stats.byPurchaseYear.map((row) => (
-                      <BarRow
-                        key={row.year === null ? 'undated' : row.year}
-                        label={row.year === null ? 'No purchase date' : String(row.year)}
-                        sub={`${row.count} items`}
-                        pct={(row.count / maxLongevityCount) * 100}
-                        valueRight={`${row.pct.toFixed(0)}%`}
+                    chartMode === 'bar' ? (
+                      stats.byPurchaseYear.map((row) => (
+                        <BarRow
+                          key={row.year === null ? 'undated' : row.year}
+                          label={row.year === null ? 'Unspecified' : String(row.year)}
+                          sub={`${row.count} items`}
+                          pct={(row.count / maxLongevityCount) * 100}
+                          valueRight={`${row.pct.toFixed(0)}%`}
+                        />
+                      ))
+                    ) : (
+                      <PieChart
+                        rows={stats.byPurchaseYear.map((row) => ({
+                          label: row.year === null ? 'Unspecified' : String(row.year),
+                          sub: `${row.count} items`,
+                          value: row.count,
+                          valueRight: `${row.pct.toFixed(0)}%`,
+                        }))}
                       />
-                    ))
+                    )
                   )}
                 </div>
               </div>
@@ -296,15 +469,26 @@ export function StatsPage() {
                   {stats.byCategory.length === 0 ? (
                     <p className="text-sm text-[var(--color-muted)]">No items yet.</p>
                   ) : (
-                    stats.byCategory.map((row) => (
-                      <BarRow
-                        key={`spend-${row.category}`}
-                        label={closetLabel(row.category)}
-                        sub={`${row.count} items`}
-                        pct={(row.spend / maxCatSpend) * 100}
-                        valueRight={usd(row.spend)}
+                    chartMode === 'bar' ? (
+                      stats.byCategory.map((row) => (
+                        <BarRow
+                          key={`spend-${row.category}`}
+                          label={closetLabel(row.category)}
+                          sub={`${row.count} items`}
+                          pct={(row.spend / maxCatSpend) * 100}
+                          valueRight={usd(row.spend)}
+                        />
+                      ))
+                    ) : (
+                      <PieChart
+                        rows={stats.byCategory.map((row) => ({
+                          label: closetLabel(row.category),
+                          sub: `${row.count} items`,
+                          value: row.spend,
+                          valueRight: usd(row.spend),
+                        }))}
                       />
-                    ))
+                    )
                   )}
                 </div>
               </div>
@@ -314,15 +498,26 @@ export function StatsPage() {
                   {stats.byCategory.length === 0 ? (
                     <p className="text-sm text-[var(--color-muted)]">No items yet.</p>
                   ) : (
-                    stats.byCategory.map((row) => (
-                      <BarRow
-                        key={`avg-${row.category}`}
-                        label={closetLabel(row.category)}
-                        sub={`${row.count} items`}
-                        pct={(row.avgPrice / maxAvgByType) * 100}
-                        valueRight={usdCents(row.avgPrice)}
+                    chartMode === 'bar' ? (
+                      stats.byCategory.map((row) => (
+                        <BarRow
+                          key={`avg-${row.category}`}
+                          label={closetLabel(row.category)}
+                          sub={`${row.count} items`}
+                          pct={(row.avgPrice / maxAvgByType) * 100}
+                          valueRight={usdCents(row.avgPrice)}
+                        />
+                      ))
+                    ) : (
+                      <PieChart
+                        rows={stats.byCategory.map((row) => ({
+                          label: closetLabel(row.category),
+                          sub: `${row.count} items`,
+                          value: row.avgPrice,
+                          valueRight: usdCents(row.avgPrice),
+                        }))}
                       />
-                    ))
+                    )
                   )}
                 </div>
               </div>
@@ -375,8 +570,10 @@ export function StatsPage() {
                 <p className="mt-1 text-xl font-semibold tabular-nums text-[var(--color-ink)]">{wearBreakdown.totalWears}</p>
               </div>
               <div className="rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface)] p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">Tracked items</p>
-                <p className="mt-1 text-xl font-semibold tabular-nums text-[var(--color-ink)]">{activeItems.length}</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">Avg cost / wear</p>
+                <p className="mt-1 text-xl font-semibold tabular-nums text-[var(--color-ink)]">
+                  {avgCostPerWearPerItem == null ? '—' : usdCents(avgCostPerWearPerItem)}
+                </p>
               </div>
               <div className="rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface)] p-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">Avg wears / item</p>
@@ -395,15 +592,26 @@ export function StatsPage() {
                   {wearBreakdown.topTypes.length === 0 ? (
                     <p className="text-sm text-[var(--color-muted)]">No items in this time frame.</p>
                   ) : (
-                    wearBreakdown.topTypes.map((row, i) => (
-                      <BarRow
-                        key={`wtype-${row.label}`}
-                        label={closetLabel(row.label)}
-                        sub={`#${i + 1}`}
-                        pct={wearBreakdown.topTypes[0].wears > 0 ? (row.wears / wearBreakdown.topTypes[0].wears) * 100 : 0}
-                        valueRight={`${row.wears.toFixed(0)} wears`}
+                    chartMode === 'bar' ? (
+                      wearBreakdown.topTypes.map((row, i) => (
+                        <BarRow
+                          key={`wtype-${row.label}`}
+                          label={closetLabel(row.label)}
+                          sub={`#${i + 1}`}
+                          pct={wearBreakdown.topTypes[0].wears > 0 ? (row.wears / wearBreakdown.topTypes[0].wears) * 100 : 0}
+                          valueRight={`${row.wears.toFixed(0)} wears`}
+                        />
+                      ))
+                    ) : (
+                      <PieChart
+                        rows={wearBreakdown.topTypes.map((row, i) => ({
+                          label: closetLabel(row.label),
+                          sub: `#${i + 1}`,
+                          value: row.wears,
+                          valueRight: `${row.wears.toFixed(0)} wears`,
+                        }))}
                       />
-                    ))
+                    )
                   )}
                 </div>
               </div>
@@ -413,15 +621,28 @@ export function StatsPage() {
                   {wearBreakdown.topColors.length === 0 ? (
                     <p className="text-sm text-[var(--color-muted)]">No items in this time frame.</p>
                   ) : (
-                    wearBreakdown.topColors.map((row, i) => (
-                      <BarRow
-                        key={`wcolor-${row.label}`}
-                        label={closetLabel(row.label)}
-                        sub={`#${i + 1}`}
-                        pct={wearBreakdown.topColors[0].wears > 0 ? (row.wears / wearBreakdown.topColors[0].wears) * 100 : 0}
-                        valueRight={`${row.wears.toFixed(1)} wears`}
+                    chartMode === 'bar' ? (
+                      wearBreakdown.topColors.map((row, i) => (
+                        <BarRow
+                          key={`wcolor-${row.label}`}
+                          label={closetLabel(row.label)}
+                          sub={`#${i + 1}`}
+                          pct={wearBreakdown.topColors[0].wears > 0 ? (row.wears / wearBreakdown.topColors[0].wears) * 100 : 0}
+                          valueRight={`${row.wears.toFixed(1)} wears`}
+                          barColor={solidChartColor(row.label)}
+                        />
+                      ))
+                    ) : (
+                      <PieChart
+                        rows={wearBreakdown.topColors.map((row, i) => ({
+                          label: closetLabel(row.label),
+                          sub: `#${i + 1}`,
+                          value: row.wears,
+                          valueRight: `${row.wears.toFixed(1)} wears`,
+                          color: solidChartColor(row.label),
+                        }))}
                       />
-                    ))
+                    )
                   )}
                 </div>
               </div>

@@ -83,13 +83,14 @@ export function computeClosetStats(items: Item[], outfits: Outfit[]): ClosetStat
     c.spend += price
     catMap.set(label, c)
 
-    const cols = (it.colors ?? []).map((x) => String(x).trim()).filter(Boolean)
+    const cols = [...new Set((it.colors ?? []).map((x) => String(x).trim()).filter(Boolean))]
     if (cols.length === 0) {
       colorWeights.set('Unspecified', (colorWeights.get('Unspecified') || 0) + 1)
     } else {
       const w = 1 / cols.length
       for (const col of cols) {
         const key = col.toUpperCase()
+        // Split each item's contribution across its selected colors so totals sum to 100%.
         colorWeights.set(key, (colorWeights.get(key) || 0) + w)
       }
     }
