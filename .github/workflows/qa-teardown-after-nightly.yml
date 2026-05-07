@@ -34,6 +34,8 @@ jobs:
   destroy-qa:
     name: Terraform destroy (qa only)
     runs-on: ubuntu-latest
+    env:
+      EXPECTED_CLUSTER_NAME: claiset-qa
     if: |
       github.event_name == 'workflow_dispatch'
       || (
