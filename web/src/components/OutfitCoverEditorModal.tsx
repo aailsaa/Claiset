@@ -27,15 +27,16 @@ function sortByZ(layers: OutfitLayoutLayer[]) {
   return [...layers].sort((a, b) => (a.z ?? 0) - (b.z ?? 0))
 }
 
-const DEFAULT_LAYER_SCALE = 1.7
-// Approximate on-screen size of an item tile (image 144px + padding).
-const ITEM_TILE_PX = 168
+const DEFAULT_LAYER_SCALE = 0.8
+// Keep preview and export in lockstep so "what you see is what gets saved".
+const COVER_ITEM_BASE_RATIO = 0.52
 
 export function OutfitCoverEditorModal({ open, items, layers, onCancel, onSave }: Props) {
   const hostRef = useRef<HTMLDivElement | null>(null)
   const [working, setWorking] = useState<OutfitLayoutLayer[]>([])
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null)
   const [drag, setDrag] = useState<null | { itemId: number; dx: number; dy: number; pointerId: number }>(null)
+  const [hostSize, setHostSize] = useState({ width: 0, height: 0 })
 
   const itemById = useMemo(() => new Map(items.map((it) => [it.id, it])), [items])
 
@@ -49,6 +50,19 @@ export function OutfitCoverEditorModal({ open, items, layers, onCancel, onSave }
 
   const selected = useMemo(() => working.find((l) => l.itemId === selectedItemId) ?? null, [working, selectedItemId])
 
+  useEffect(() => {
+    const host = hostRef.current
+    if (!host) return
+    const update = () => {
+      const rect = host.getBoundingClientRect()
+      setHostSize({ width: rect.width, height: rect.height })
+    }
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(host)
+    return () => ro.disconnect()
+  }, [open])
+
   function updateLayer(itemId: number, patch: Partial<OutfitLayoutLayer>) {
     setWorking((w) =>
       w.map((l) =>
@@ -56,7 +70,7 @@ export function OutfitCoverEditorModal({ open, items, layers, onCancel, onSave }
           ? {
               ...l,
               ...patch,
-              scale: patch.scale ?? l.scale ?? 1,
+              scale: patch.scale ?? l.scale ?? DEFAULT_LAYER_SCALE,
               rotationDeg: patch.rotationDeg ?? l.rotationDeg ?? 0,
             }
           : l,
@@ -94,10 +108,8 @@ export function OutfitCoverEditorModal({ open, items, layers, onCancel, onSave }
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    // background
+    // Keep cover background transparent so card/theme background shows through.
     ctx.clearRect(0, 0, w, h)
-    ctx.fillStyle = '#ffffff'
-    ctx.fillRect(0, 0, w, h)
 
     const sorted = sortByZ(working)
     const images: Record<number, HTMLImageElement> = {}
@@ -113,12 +125,12 @@ export function OutfitCoverEditorModal({ open, items, layers, onCancel, onSave }
       // Allow items to go partially off-canvas in the export.
       const x = (l.x ?? 0.5) * w
       const y = (l.y ?? 0.5) * h
-      const s = clamp(l.scale ?? 1, 0.2, 4)
+      const s = clamp(l.scale ?? DEFAULT_LAYER_SCALE, 0.2, 4)
       const r = ((l.rotationDeg ?? 0) * Math.PI) / 180
 
       // Base visual size for each item in the cover.
       // Scale slider applies on top of this.
-      const base = Math.min(w, h) * 0.52
+      const base = Math.min(w, h) * COVER_ITEM_BASE_RATIO
       const iw = img.naturalWidth || img.width
       const ih = img.naturalHeight || img.height
       const fit = base / Math.max(iw, ih)
@@ -152,9 +164,7 @@ export function OutfitCoverEditorModal({ open, items, layers, onCancel, onSave }
           <div className="relative z-10">
             <div
               ref={hostRef}
-              className={`relative aspect-[3/4] touch-none rounded-3xl bg-[var(--color-surface)] ring-1 ring-[var(--color-line)] ${
-                drag ? 'overflow-visible' : 'overflow-hidden'
-              }`}
+              className="relative aspect-[3/4] touch-none overflow-visible rounded-3xl bg-[var(--color-surface)] ring-1 ring-[var(--color-line)]"
               // TODO(outfit-cover): Fix boundary/clipping model so items can go off-frame and be cropped
               // at the frame edge without any perceived "resizing" on left/right while dragging.
               onPointerMove={(e) => {
@@ -164,32 +174,9 @@ export function OutfitCoverEditorModal({ open, items, layers, onCancel, onSave }
                 const rect = host.getBoundingClientRect()
                 const px = e.clientX - rect.left - drag.dx
                 const py = e.clientY - rect.top - drag.dy
-                // Allow items up to ~half off-screen in any direction,
-                // based on the item tile size + current scale.
-                const layer = working.find((l) => l.itemId === drag.itemId)
-                const s = clamp(layer?.scale ?? DEFAULT_LAYER_SCALE, 0.2, 5)
-                const theta = (((layer?.rotationDeg ?? 0) % 360) * Math.PI) / 180
-                const c = Math.abs(Math.cos(theta))
-                const sn = Math.abs(Math.sin(theta))
-                const base = ITEM_TILE_PX * s
-                // Rotated axis-aligned bounding box for a square of side `base`.
-                const bboxW = base * (c + sn)
-                const bboxH = base * (c + sn)
-                const halfW = bboxW / 2
-                const halfH = bboxH / 2
-                // Allow items to go fully off-canvas while editing (no edge clipping).
-                // Keep a very wide clamp to avoid runaway values.
-                const minX = -3 - halfW / rect.width
-                const maxX = 4 + halfW / rect.width
-                const minY = -3 - halfH / rect.height
-                const maxY = 4 + halfH / rect.height
-                // TODO(outfit-cover): Revisit drag clamping. Desired behavior:
-                // - Items can move off the cover frame
-                // - Off-frame parts are cropped at the cover edge
-                // - Scale/shape should NEVER appear to change near edges (only crop changes)
                 updateLayer(drag.itemId, {
-                  x: clamp(px / rect.width, minX, maxX),
-                  y: clamp(py / rect.height, minY, maxY),
+                  x: px / rect.width,
+                  y: py / rect.height,
                 })
               }}
               onPointerUp={() => setDrag(null)}
@@ -204,6 +191,8 @@ export function OutfitCoverEditorModal({ open, items, layers, onCancel, onSave }
                 const s = clamp(l.scale ?? DEFAULT_LAYER_SCALE, 0.2, 5)
                 const r = l.rotationDeg ?? 0
                 const on = l.itemId === selectedItemId
+                const base = Math.min(hostSize.width || 0, hostSize.height || 0) * COVER_ITEM_BASE_RATIO
+                const maxDim = Math.max(24, base * s)
                 return (
                   <button
                     key={l.itemId}
@@ -214,7 +203,9 @@ export function OutfitCoverEditorModal({ open, items, layers, onCancel, onSave }
                     style={{
                       left: `${xPct}%`,
                       top: `${yPct}%`,
-                      transform: `translate(-50%, -50%) rotate(${r}deg) scale(${s})`,
+                      width: `${maxDim}px`,
+                      height: `${maxDim}px`,
+                      transform: `translate(-50%, -50%) rotate(${r}deg)`,
                       transformOrigin: 'center',
                       willChange: 'transform',
                     }}
@@ -238,7 +229,7 @@ export function OutfitCoverEditorModal({ open, items, layers, onCancel, onSave }
                     <img
                       src={it.photoDataUrl}
                       alt={it.name}
-                      className="block h-36 w-36 object-contain object-center pointer-events-none"
+                      className="block h-full w-full object-contain object-center pointer-events-none"
                     />
                   </button>
                 )
@@ -258,10 +249,10 @@ export function OutfitCoverEditorModal({ open, items, layers, onCancel, onSave }
                 Size
                 <input
                   type="range"
-                  min={0.8}
-                  max={5}
+                  min={0}
+                  max={1.6}
                   step={0.01}
-                  value={selected?.scale ?? 1}
+                  value={selected?.scale ?? DEFAULT_LAYER_SCALE}
                   onChange={(e) => selected && updateLayer(selected.itemId, { scale: Number(e.target.value) })}
                   className="mt-2 w-full"
                   disabled={!selected}
