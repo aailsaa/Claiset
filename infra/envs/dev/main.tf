@@ -5,6 +5,16 @@ locals {
   }
 }
 
+data "aws_caller_identity" "current" {}
+
+locals {
+  ecr_suffixes = ["items", "outfits", "schedule", "web", "migrate"]
+  ecr_repository_urls = {
+    for s in local.ecr_suffixes :
+    s => "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/${var.ecr_repository_prefix}-${s}"
+  }
+}
+
 module "network" {
   source  = "../../modules/network"
   project = var.project
@@ -95,11 +105,11 @@ module "app_bluegreen" {
   database_url = "postgres://${module.rds.username}:${module.rds.password}@${module.rds.address}:${module.rds.port}/${module.rds.db_name}?sslmode=require"
 
   images = {
-    items    = "${module.ecr.repository_urls.items}:dev"
-    outfits  = "${module.ecr.repository_urls.outfits}:dev"
-    schedule = "${module.ecr.repository_urls.schedule}:dev"
-    web      = "${module.ecr.repository_urls.web}:dev"
-    migrate  = "${module.ecr.repository_urls.migrate}:dev"
+    items    = "${local.ecr_repository_urls.items}:dev"
+    outfits  = "${local.ecr_repository_urls.outfits}:dev"
+    schedule = "${local.ecr_repository_urls.schedule}:dev"
+    web      = "${local.ecr_repository_urls.web}:dev"
+    migrate  = "${local.ecr_repository_urls.migrate}:dev"
   }
 }
 
