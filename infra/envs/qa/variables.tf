@@ -30,14 +30,14 @@ variable "eks_cluster_version" {
 
 variable "node_instance_types" {
   type        = list(string)
-  description = "EKS node instance types (passed to infra/modules/eks)."
-  default     = ["t3.micro"]
+  description = "EKS node instance types (passed to infra/modules/eks). t3.small avoids ~4-pod/node cap on t3.micro (VPC CNI)."
+  default     = ["t3.small"]
 }
 
 variable "node_group_desired_size" {
   type        = number
   description = "EKS managed node group desired capacity."
-  default     = 1
+  default     = 2
 }
 
 variable "node_group_min_size" {
@@ -48,9 +48,8 @@ variable "node_group_min_size" {
 
 variable "node_group_max_size" {
   type        = number
-  description = "EKS managed node group maximum capacity."
-  # Allow a small burst during rollouts to avoid pod/IP scheduling limits on tiny nodes.
-  default     = 3
+  description = "EKS managed node group maximum capacity. CA + CI burst use this ceiling."
+  default     = 6
 }
 
 variable "google_client_id" {

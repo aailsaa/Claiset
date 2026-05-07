@@ -30,8 +30,8 @@ variable "eks_cluster_version" {
 
 variable "node_instance_types" {
   type        = list(string)
-  description = "EKS node instance types (passed to infra/modules/eks)."
-  default     = ["t3.micro"]
+  description = "EKS node instance types (passed to infra/modules/eks). t3.small matches UAT/QA prod-like pod limits; override with t3.micro for lowest $ (risk: Too many pods)."
+  default     = ["t3.small"]
 }
 
 variable "node_group_desired_size" {
