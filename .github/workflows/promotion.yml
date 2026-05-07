@@ -242,11 +242,11 @@ jobs:
             -target=module.rds
 
           # Burst node capacity for Phase 2 rollout, then scale down again for cost.
-          # QA is cheap-by-default (desired=1) but needs headroom to avoid "Too many pods".
+          # Align with env defaults (desired=2, max=6): burst so Helm/controllers always have slots on t3.small.
           BASE_MIN=1
-          BASE_DESIRED=1
-          BASE_MAX=3
-          BURST_DESIRED=2
+          BASE_DESIRED=2
+          BASE_MAX=6
+          BURST_DESIRED=4
           CLUSTER="${EXPECTED_CLUSTER_NAME}"
           NODEGROUP="${EXPECTED_CLUSTER_NAME}-default"
           trap 'echo "Scaling nodegroup back down"; AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" "${BASE_MIN}" "${BASE_DESIRED}" "${BASE_MAX}" || true' EXIT
@@ -356,6 +356,17 @@ jobs:
             -target=module.network \
             -target=module.eks \
             -target=module.rds
+
+          # Same as dev: UAT had no burst and hit "Too many pods" on platform Helm (external-dns Pending).
+          BASE_MIN=1
+          BASE_DESIRED=2
+          BASE_MAX=6
+          BURST_DESIRED=4
+          CLUSTER="${EXPECTED_CLUSTER_NAME}"
+          NODEGROUP="${EXPECTED_CLUSTER_NAME}-default"
+          trap 'echo "Scaling nodegroup back down"; AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" "${BASE_MIN}" "${BASE_DESIRED}" "${BASE_MAX}" || true' EXIT
+          AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" "${BASE_MIN}" "${BURST_DESIRED}" "${BASE_MAX}"
+
           K8S_APP_NAMESPACE=uat bash ../../scripts/terraform-k8s-import-guard.sh
           terraform apply -auto-approve
 
@@ -451,6 +462,16 @@ jobs:
             -target=module.network \
             -target=module.eks \
             -target=module.rds
+
+          BASE_MIN=1
+          BASE_DESIRED=2
+          BASE_MAX=6
+          BURST_DESIRED=4
+          CLUSTER="${EXPECTED_CLUSTER_NAME}"
+          NODEGROUP="${EXPECTED_CLUSTER_NAME}-default"
+          trap 'echo "Scaling nodegroup back down"; AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" "${BASE_MIN}" "${BASE_DESIRED}" "${BASE_MAX}" || true' EXIT
+          AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" "${BASE_MIN}" "${BURST_DESIRED}" "${BASE_MAX}"
+
           K8S_APP_NAMESPACE=prod bash ../../scripts/terraform-k8s-import-guard.sh
           terraform apply -auto-approve
 
