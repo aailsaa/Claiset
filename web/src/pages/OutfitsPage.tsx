@@ -9,7 +9,23 @@ import type { Item, Outfit, OutfitExtra, OutfitLayoutLayer, OutfitPicture } from
 
 const WEATHER_TAGS = ['Hot', 'Warm', 'Mild', 'Cold', 'Freezing', 'Rain', 'Snow'] as const
 const SEASONS = ['Summer', 'Autumn', 'Winter', 'Spring'] as const
-const DEFAULT_COVER_ITEM_SCALE = 1.7
+const DEFAULT_COVER_ITEM_SCALE = 0.8
+type OutfitNametagKey = 'name' | 'outfitNumber' | 'wears' | 'totalCost'
+type OutfitSortKey = 'recentlyAdded' | 'name' | 'wears' | 'totalCost'
+type OutfitGridFilters = {
+  colors: string[]
+  categories: string[]
+  subcategories: string[]
+  weather: string[]
+  seasons: string[]
+}
+const EMPTY_OUTFIT_FILTERS: OutfitGridFilters = {
+  colors: [],
+  categories: [],
+  subcategories: [],
+  weather: [],
+  seasons: [],
+}
 
 export function OutfitsPage() {
   const [items, setItems] = useState<Item[]>([])
@@ -35,7 +51,34 @@ export function OutfitsPage() {
   const [coverEditorOpen, setCoverEditorOpen] = useState(false)
 
   const [itemSearch, setItemSearch] = useState('')
+  const [viewOpen, setViewOpen] = useState(false)
+  const [outfitFiltersOpen, setOutfitFiltersOpen] = useState(false)
+  const [outfitSortOpen, setOutfitSortOpen] = useState(false)
   const [filterOpen, setFilterOpen] = useState(false)
+  const [outfitsPerRow, setOutfitsPerRow] = useState<number>(() => {
+    try {
+      if (typeof window === 'undefined') return 4
+      const raw = window.localStorage.getItem('outfits:view:outfitsPerRow')
+      const n = raw ? Number(raw) : 4
+      return Number.isFinite(n) ? Math.min(6, Math.max(2, Math.round(n))) : 4
+    } catch {
+      return 4
+    }
+  })
+  const [nametagKey, setNametagKey] = useState<OutfitNametagKey>(() => {
+    try {
+      if (typeof window === 'undefined') return 'outfitNumber'
+      const raw = window.localStorage.getItem('outfits:view:nametagKey') as OutfitNametagKey | null
+      const allowed: OutfitNametagKey[] = ['name', 'outfitNumber', 'wears', 'totalCost']
+      return raw && allowed.includes(raw) ? raw : 'outfitNumber'
+    } catch {
+      return 'outfitNumber'
+    }
+  })
+  const [outfitSortKey, setOutfitSortKey] = useState<OutfitSortKey>('recentlyAdded')
+  const [outfitSortReversed, setOutfitSortReversed] = useState(false)
+  const [appliedOutfitFilters, setAppliedOutfitFilters] = useState<OutfitGridFilters>(EMPTY_OUTFIT_FILTERS)
+  const [draftOutfitFilters, setDraftOutfitFilters] = useState<OutfitGridFilters>(EMPTY_OUTFIT_FILTERS)
   const [draftFilters, setDraftFilters] = useState<{
     colors: string[]
     categories: string[]
@@ -65,6 +108,22 @@ export function OutfitsPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem('outfits:view:outfitsPerRow', String(outfitsPerRow))
+    } catch {
+      // ignore
+    }
+  }, [outfitsPerRow])
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem('outfits:view:nametagKey', nametagKey)
+    } catch {
+      // ignore
+    }
+  }, [nametagKey])
 
   function resetForm() {
     setName('')
@@ -202,6 +261,125 @@ export function OutfitsPage() {
     return sum
   }, [selectedItemIds, itemById])
 
+  const outfitNametagText = useCallback(
+    (o: Outfit) => {
+      switch (nametagKey) {
+        case 'name':
+          return o.name?.trim() ? o.name : `Outfit #${o.id}`
+        case 'wears':
+          return `${o.wears ?? 0} wears`
+        case 'totalCost':
+          return `Total $${totalCostFor(o, itemById).toFixed(0)}`
+        case 'outfitNumber':
+        default:
+          return `#${o.id}`
+      }
+    },
+    [nametagKey, itemById],
+  )
+
+  const visibleOutfits = useMemo(() => {
+    const f = appliedOutfitFilters
+    const selectedColors = new Set(f.colors)
+    const selectedCategories = new Set(f.categories.map((x) => String(x).toUpperCase()))
+    const selectedSubcategories = new Set(f.subcategories.map((x) => String(x).toUpperCase()))
+    const selectedWeather = new Set(f.weather)
+    const selectedSeasons = new Set(f.seasons)
+
+    function outfitItems(o: Outfit) {
+      return (o.itemIds ?? []).map((id) => itemById.get(id)).filter((it): it is Item => Boolean(it))
+    }
+
+    function matches(o: Outfit) {
+      const included = outfitItems(o)
+      if (f.colors.length) {
+        const colors = new Set(included.flatMap((it) => (it.colors ?? []).map((c) => String(c))))
+        let ok = false
+        for (const c of selectedColors) {
+          if (colors.has(c)) {
+            ok = true
+            break
+          }
+        }
+        if (!ok) return false
+      }
+      if (f.categories.length) {
+        const cats = new Set(included.map((it) => String(it.category ?? '').toUpperCase()))
+        let ok = false
+        for (const c of selectedCategories) {
+          if (cats.has(c)) {
+            ok = true
+            break
+          }
+        }
+        if (!ok) return false
+      }
+      if (f.subcategories.length) {
+        const subs = new Set(included.map((it) => String(it.subcategory ?? '').toUpperCase()))
+        let ok = false
+        for (const s of selectedSubcategories) {
+          if (subs.has(s)) {
+            ok = true
+            break
+          }
+        }
+        if (!ok) return false
+      }
+      if (f.weather.length) {
+        const w = Array.isArray(o.extra?.weather) ? o.extra.weather.map(String) : []
+        const wSet = new Set(w)
+        let ok = false
+        for (const tag of selectedWeather) {
+          if (wSet.has(tag)) {
+            ok = true
+            break
+          }
+        }
+        if (!ok) return false
+      }
+      if (f.seasons.length) {
+        const s = Array.isArray(o.extra?.seasons) ? o.extra.seasons.map(String) : []
+        const sSet = new Set(s)
+        let ok = false
+        for (const tag of selectedSeasons) {
+          if (sSet.has(tag)) {
+            ok = true
+            break
+          }
+        }
+        if (!ok) return false
+      }
+      return true
+    }
+
+    const filtered = outfits.filter(matches)
+    const defaultDir: Record<OutfitSortKey, 1 | -1> = {
+      recentlyAdded: -1,
+      name: 1,
+      wears: -1,
+      totalCost: -1,
+    }
+    const base = defaultDir[outfitSortKey] ?? -1
+    const dir = outfitSortReversed ? (base * -1 as 1 | -1) : base
+    filtered.sort((a, b) => {
+      switch (outfitSortKey) {
+        case 'name':
+          return (a.name ?? '').localeCompare(b.name ?? '', undefined, { sensitivity: 'base' }) * dir || (a.id - b.id) * -1
+        case 'wears':
+          return ((Number(a.wears) || 0) - (Number(b.wears) || 0)) * dir || (a.id - b.id) * -1
+        case 'totalCost': {
+          const av = totalCostFor(a, itemById)
+          const bv = totalCostFor(b, itemById)
+          return (av - bv) * dir || (a.id - b.id) * -1
+        }
+        case 'recentlyAdded':
+        default:
+          return (a.id - b.id) * dir
+      }
+    })
+    return filtered
+  }, [appliedOutfitFilters, outfits, outfitSortKey, outfitSortReversed, itemById])
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!name.trim()) return
@@ -260,6 +438,32 @@ export function OutfitsPage() {
         <h1 className="text-2xl font-semibold tracking-tight text-[var(--color-ink)] sm:text-3xl">
           Outfits
         </h1>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setViewOpen(true)}
+            className="rounded-full border border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-2 text-sm font-medium text-[var(--color-sage)] shadow-sm hover:bg-[var(--color-hover)]"
+          >
+            View
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setDraftOutfitFilters(appliedOutfitFilters)
+              setOutfitFiltersOpen(true)
+            }}
+            className="rounded-full border border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-2 text-sm font-medium text-[var(--color-sage)] shadow-sm hover:bg-[var(--color-hover)]"
+          >
+            Filter
+          </button>
+          <button
+            type="button"
+            onClick={() => setOutfitSortOpen(true)}
+            className="rounded-full border border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-2 text-sm font-medium text-[var(--color-sage)] shadow-sm hover:bg-[var(--color-hover)]"
+          >
+            Sort
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -270,20 +474,23 @@ export function OutfitsPage() {
 
       {loading ? <p className="text-sm text-[var(--color-muted)]">Loading…</p> : null}
 
-      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
+      <ul
+        className="grid gap-3 sm:gap-4"
+        style={{ gridTemplateColumns: `repeat(${outfitsPerRow}, minmax(0, 1fr))` }}
+      >
         <li>
           <button
             type="button"
             onClick={openAddModal}
-            className="flex aspect-[3/4] w-full flex-col items-center justify-center rounded-3xl border-2 border-dashed border-[var(--color-sage)]/40 bg-[var(--color-surface)] text-[var(--color-sage)] shadow-sm transition hover:border-[var(--color-sage)] hover:bg-[var(--color-accent-soft)]"
+            className="flex aspect-[3/4] w-full flex-col items-center justify-center rounded-3xl border-2 border-dashed border-[var(--color-sage)]/40 bg-[var(--color-outfit-bg)] text-[var(--color-sage)] shadow-sm transition hover:border-[var(--color-sage)] hover:bg-[var(--color-accent-soft)]"
           >
             <span className="text-4xl font-light leading-none">+</span>
             <span className="mt-2 text-xs font-semibold uppercase tracking-wide">Add outfit</span>
           </button>
         </li>
-        {outfits.map((o) => (
+        {visibleOutfits.map((o) => (
           <li key={o.id}>
-            <div className="group relative flex aspect-[3/4] h-full flex-col overflow-hidden rounded-3xl border border-[var(--color-line)] bg-[var(--color-surface)] p-4 shadow-sm ring-1 ring-transparent transition hover:-translate-y-0.5 hover:shadow-md hover:ring-[var(--color-sage)]/25">
+            <div className="group relative flex aspect-[3/4] h-full flex-col overflow-hidden rounded-3xl border border-[var(--color-line)] bg-[var(--color-outfit-bg)] p-4 shadow-sm ring-1 ring-transparent transition hover:-translate-y-0.5 hover:shadow-md hover:ring-[var(--color-sage)]/25">
               <button
                 type="button"
                 onClick={() => openEditModal(o)}
@@ -295,13 +502,13 @@ export function OutfitsPage() {
                   <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4 11.5-11.5z" />
                 </svg>
               </button>
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-sage)]">#{o.id}</p>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-sage)]">{outfitNametagText(o)}</p>
               {o.coverDataUrl ? (
-                <div className="mt-2 flex flex-1 items-center justify-center rounded-2xl bg-[var(--color-surface)] p-2">
+                <div className="mt-2 flex flex-1 items-center justify-center rounded-2xl bg-[var(--color-outfit-bg)] p-2">
                   <img src={o.coverDataUrl} alt={o.name} className="block max-h-full max-w-full rounded-xl object-contain object-center" loading="lazy" />
                 </div>
               ) : (
-                <div className="mt-2 flex flex-1 items-center justify-center rounded-2xl bg-[var(--color-surface)] p-2 text-xs text-[var(--color-muted)]">
+                <div className="mt-2 flex flex-1 items-center justify-center rounded-2xl bg-[var(--color-outfit-bg)] p-2 text-xs text-[var(--color-muted)]">
                   No cover yet
                 </div>
               )}
@@ -316,6 +523,215 @@ export function OutfitsPage() {
           </li>
         ))}
       </ul>
+
+      {viewOpen ? (
+        <div
+          className="fixed inset-0 z-40 flex items-end justify-center bg-black/40 p-4 sm:items-center"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Outfit view options"
+          onClick={() => setViewOpen(false)}
+        >
+          <div
+            className="w-full max-w-md overflow-hidden rounded-3xl border border-[var(--color-line)] bg-[var(--color-surface)] shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-[var(--color-line)] px-5 py-4">
+              <h2 className="text-lg font-semibold text-[var(--color-sage)]">View</h2>
+              <button
+                type="button"
+                onClick={() => setViewOpen(false)}
+                className="rounded-full px-2 py-1 text-sm text-[var(--color-muted)] hover:bg-[var(--color-hover)]"
+              >
+                Close
+              </button>
+            </div>
+            <div className="space-y-5 p-5">
+              <label className="block text-xs font-medium text-[var(--color-muted)]">
+                Outfits per row
+                <div className="mt-2 flex items-center gap-3">
+                  <input
+                    type="range"
+                    min={2}
+                    max={6}
+                    step={1}
+                    value={outfitsPerRow}
+                    onChange={(e) => setOutfitsPerRow(Number(e.target.value))}
+                    className="w-full"
+                  />
+                  <span className="w-8 text-right text-sm font-semibold text-[var(--color-ink)]">{outfitsPerRow}</span>
+                </div>
+              </label>
+
+              <label className="block text-xs font-medium text-[var(--color-muted)]">
+                Outfit nametag
+                <select
+                  value={nametagKey}
+                  onChange={(e) => setNametagKey(e.target.value as OutfitNametagKey)}
+                  className="mt-2 w-full rounded-xl border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2 text-sm outline-none ring-[var(--color-sage)]/30 focus:ring-2"
+                >
+                  <option value="name">Name</option>
+                  <option value="outfitNumber">Outfit number</option>
+                  <option value="wears">Wears</option>
+                  <option value="totalCost">Total cost</option>
+                </select>
+              </label>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {outfitFiltersOpen ? (
+        <div
+          className="fixed inset-0 z-40 flex items-end justify-center bg-black/40 p-4 sm:items-center"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Filter outfits"
+          onClick={() => setOutfitFiltersOpen(false)}
+        >
+          <div
+            className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl border border-[var(--color-line)] bg-[var(--color-surface)] p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <h2 className="text-lg font-semibold text-[var(--color-sage)]">Filter outfits</h2>
+              <button
+                type="button"
+                onClick={() => setOutfitFiltersOpen(false)}
+                className="rounded-full px-2 py-1 text-sm text-[var(--color-muted)] hover:bg-[var(--color-hover)]"
+              >
+                Close
+              </button>
+            </div>
+            <div className="mt-5 space-y-6">
+              <div className="grid gap-5 sm:grid-cols-2">
+                <MultiSelectDropdown
+                  label="Colors (from included items)"
+                  options={CLOSET_COLORS.map((c) => ({ id: c.id, label: closetLabel(c.id), swatch: closetColorSwatch(c.id) }))}
+                  selected={draftOutfitFilters.colors}
+                  setSelected={(next) => setDraftOutfitFilters((f) => ({ ...f, colors: next }))}
+                />
+                <MultiSelectDropdown
+                  label="Type (from included items)"
+                  options={CLOSET_CATEGORIES.map((c) => ({ id: c, label: closetLabel(c) }))}
+                  selected={draftOutfitFilters.categories}
+                  setSelected={(next) => setDraftOutfitFilters((f) => ({ ...f, categories: next }))}
+                />
+                <MultiSelectDropdown
+                  label="Subtype (from included items)"
+                  options={Object.values(SUBCATEGORIES_BY_CATEGORY)
+                    .flat()
+                    .map((s) => ({ id: s, label: closetLabel(s) }))}
+                  selected={draftOutfitFilters.subcategories}
+                  setSelected={(next) => setDraftOutfitFilters((f) => ({ ...f, subcategories: next }))}
+                  placeholder="Any"
+                />
+                <MultiSelectDropdown
+                  label="Weather"
+                  options={WEATHER_TAGS.map((t) => ({ id: t, label: t }))}
+                  selected={draftOutfitFilters.weather}
+                  setSelected={(next) => setDraftOutfitFilters((f) => ({ ...f, weather: next }))}
+                />
+                <MultiSelectDropdown
+                  label="Seasons"
+                  options={SEASONS.map((s) => ({ id: s, label: s }))}
+                  selected={draftOutfitFilters.seasons}
+                  setSelected={(next) => setDraftOutfitFilters((f) => ({ ...f, seasons: next }))}
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setDraftOutfitFilters(EMPTY_OUTFIT_FILTERS)}
+                  className="flex-1 rounded-full border border-[var(--color-line)] py-2.5 text-sm font-semibold text-[var(--color-muted)] hover:bg-[var(--color-hover)]"
+                >
+                  Clear filters
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAppliedOutfitFilters(draftOutfitFilters)
+                    setOutfitFiltersOpen(false)
+                  }}
+                  className="flex-1 rounded-full bg-[var(--color-sage)] py-2.5 text-sm font-semibold text-white shadow-md"
+                >
+                  Save filters
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {outfitSortOpen ? (
+        <div
+          className="fixed inset-0 z-40 flex items-end justify-center bg-black/40 p-4 sm:items-center"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Sort outfits"
+          onClick={() => setOutfitSortOpen(false)}
+        >
+          <div
+            className="w-full max-w-md overflow-hidden rounded-3xl border border-[var(--color-line)] bg-[var(--color-surface)] shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-[var(--color-line)] px-5 py-4">
+              <h2 className="text-lg font-semibold text-[var(--color-sage)]">Sort</h2>
+              <button
+                type="button"
+                onClick={() => setOutfitSortOpen(false)}
+                className="rounded-full px-2 py-1 text-sm text-[var(--color-muted)] hover:bg-[var(--color-hover)]"
+              >
+                Close
+              </button>
+            </div>
+            <div className="space-y-3 p-5">
+              {(
+                [
+                  ['recentlyAdded', 'Recently added'],
+                  ['name', 'Name'],
+                  ['wears', 'Wears'],
+                  ['totalCost', 'Total cost'],
+                ] as const
+              ).map(([k, label]) => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => {
+                    setOutfitSortKey(k)
+                    setOutfitSortReversed(false)
+                  }}
+                  className={`flex w-full items-center justify-between rounded-2xl border px-4 py-3 text-left text-sm font-semibold transition ${
+                    outfitSortKey === k
+                      ? 'border-[var(--color-sage)] bg-[var(--color-surface)] text-[var(--color-ink)]'
+                      : 'border-[var(--color-line)] bg-[var(--color-paper)] text-[var(--color-ink)] hover:bg-[var(--color-hover)]'
+                  }`}
+                >
+                  <span>{label}</span>
+                  {outfitSortKey === k ? (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        setOutfitSortReversed((v) => !v)
+                      }}
+                      className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold text-[var(--color-muted)] hover:bg-[var(--color-paper)]"
+                      aria-label="Reverse sort direction"
+                      title="Reverse"
+                    >
+                      <span className="text-[10px]">{outfitSortReversed ? '↑' : '↓'}</span>
+                    </button>
+                  ) : (
+                    <span className="text-xs text-[var(--color-muted)]" />
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {modalOpen ? (
         <div
