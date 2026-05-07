@@ -40,8 +40,8 @@ For the **canonical checklist** (checkboxes + rubric mapping), open **[REQUIREME
 
 | Requirement | Status |
 | ----------- | ------ |
-| Dev → nightly QA → UAT → Prod | **Implemented** — [`.github/workflows/promotion.yml`](.github/workflows/promotion.yml) (dev on push to `main`; QA on schedule + manual; UAT on **`RC` token** in commit message; prod on `v*` tags + manual) |
-| Dev/QA → UAT (Conventional Commits / PR) | **Partial** — UAT triggers when the **tip commit message** contains **`RC` as its own word** (e.g. `chore: RC` or `… RC …`), not substrings like `resources`. PR-merge automation is not wired separately. |
+| Dev → nightly QA → UAT → Prod | **Implemented** — [`promotion.yml`](.github/workflows/promotion.yml) (dev on push to `main`; QA on schedule + manual; **UAT on PR merged to `main` (same repo) or `RC` in commit message**; prod on `v*` tags + manual) |
+| Dev/QA → UAT (Conventional Commits / PR merge) | **Implemented** — Merging an in-repo PR into `main` promotes to UAT. Optional **`RC` token** in the tip merge commit subject/body still works for direct pushes. Fork PR merges are skipped (deploy via `workflow_dispatch` → UAT instead). |
 | UAT → Prod via tags (no console deploy) | **Implemented (initial)** — `v*` tags + `workflow_dispatch` prod |
 | Documented choice: blue/green **or** canary | **Still to do** (doc + how it maps to your rollout) |
 | Zero downtime | **Partial** — rolling updates + probes; formal demo/narrative still expected |
@@ -84,7 +84,7 @@ See **unchecked** items in **[REQUIREMENTS.md](REQUIREMENTS.md)** for what is st
 1. **Observability (15%)** — Largest gap: self-hosted **Prometheus + Grafana** on EKS, **OAuth2-only** Grafana access, dashboards (CPU/memory/disk), **alerts** (email/Slack), and **centralized logging** (e.g. **Loki** or ELK) with queries across all three Go services.
 2. **Day 2 OS patching (10%)** — Document and **demo** rolling EKS node updates (AMI / nodegroup version) **without** killing traffic (drain, surge, verification).
 3. **Day 2 schema change (10%)** — You have migrate; prepare a **graded narrative**: show a schema change, how it ships, and how rollback / safety works.
-4. **CI/CD narrative (15%)** — Align wording with the brief: optional **PR-based** UAT trigger if graders expect it; document the exact promotion path (dev → QA nightly → UAT `RC` → prod tag).
+4. **CI/CD narrative (15%)** — Promotion path documented: PR merge → UAT, optional `RC` on direct pushes to `main`, prod via `v*` tags; QA nightly teardown if applicable.
 5. **Blue/green or canary (written)** — Pick one, justify it, and relate it to how you deploy (even if implementation stays rolling for now).
 6. **Presentation & chaos defense** — Silent video allowed for long runs; **live narration**; practice using metrics/logs to find a failure in 1–2 minutes.
 
