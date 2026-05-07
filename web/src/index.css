@@ -17,6 +17,7 @@
   --color-night: #121212;
   --color-hover: #f0f0f0;
   --color-accent-soft: #fdf2f4;
+  --color-outfit-bg: #f3f3f3;
 }
 
 @layer base {
@@ -32,6 +33,7 @@
     --color-clay: #f6b3c1;
     --color-clay-soft: #5a3c45;
     --color-accent-soft: #5a3c45;
+    --color-outfit-bg: #262626;
   }
 
   html {

@@ -10,7 +10,7 @@ function blobToDataUrl(blob: Blob): Promise<string> {
 }
 
 export type BgModel = 'isnet' | 'isnet_fp16' | 'isnet_quint8'
-export type BgPostprocessTuning = 'balanced' | 'cleaner' | 'preserveEdges'
+export type BgPostprocessTuning = 'balanced' | 'cleaner' | 'preserveEdges' | 'aggressive'
 
 export async function fileToDataUrl(file: Blob): Promise<string> {
   return blobToDataUrl(file)
@@ -320,13 +320,16 @@ export async function removeBackgroundToDataUrl(
         const alpha = new Uint8ClampedArray(w * h)
         for (let i = 0; i < w * h; i++) alpha[i] = rem.data.data[i * 4 + 3]
 
-        const tuning: BgPostprocessTuning = opts?.tuning ?? 'balanced'
+        // Default to a stronger cleanup profile so initial results remove more background.
+        const tuning: BgPostprocessTuning = opts?.tuning ?? 'cleaner'
         const params =
-          tuning === 'cleaner'
-            ? { keepThreshold: 18, closeRadius: 2, expand: 0, erodeAfter: 1, blur: 1 }
-            : tuning === 'preserveEdges'
-              ? { keepThreshold: 6, closeRadius: 3, expand: 2, erodeAfter: 0, blur: 1 }
-              : { keepThreshold: 10, closeRadius: 3, expand: 1, erodeAfter: 0, blur: 1 }
+          tuning === 'aggressive'
+            ? { keepThreshold: 36, closeRadius: 2, expand: 0, erodeAfter: 3, blur: 1 }
+            : tuning === 'cleaner'
+              ? { keepThreshold: 28, closeRadius: 2, expand: 0, erodeAfter: 2, blur: 1 }
+              : tuning === 'preserveEdges'
+                ? { keepThreshold: 6, closeRadius: 3, expand: 2, erodeAfter: 0, blur: 1 }
+                : { keepThreshold: 10, closeRadius: 3, expand: 1, erodeAfter: 0, blur: 1 }
 
         // Keep the garment and discard stray background islands.
         maskKeepLargestComponent(alpha, w, h, params.keepThreshold)
