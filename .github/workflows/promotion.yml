@@ -150,6 +150,7 @@ jobs:
           bash ../../scripts/terraform-k8s-import-guard.sh
           # Phase 2: platform (ACM, controllers) + app_bluegreen and the rest.
           terraform apply -auto-approve
+          K8S_APP_NAMESPACE=dev bash ../../scripts/route53-ingress-records-guard.sh
 
   qa:
     name: Promote to QA (nightly)
@@ -264,6 +265,7 @@ jobs:
 
           K8S_APP_NAMESPACE=qa bash ../../scripts/terraform-k8s-import-guard.sh
           terraform apply -auto-approve
+          K8S_APP_NAMESPACE=qa FRONTEND_SUBDOMAIN=app-qa bash ../../scripts/route53-ingress-records-guard.sh
 
   uat:
     name: Promote to UAT (RC commits)
@@ -379,6 +381,7 @@ jobs:
 
           K8S_APP_NAMESPACE=uat bash ../../scripts/terraform-k8s-import-guard.sh
           terraform apply -auto-approve
+          K8S_APP_NAMESPACE=uat FRONTEND_SUBDOMAIN=app-uat bash ../../scripts/route53-ingress-records-guard.sh
 
   prod:
     name: Promote to production (tags)
@@ -484,4 +487,5 @@ jobs:
 
           K8S_APP_NAMESPACE=prod bash ../../scripts/terraform-k8s-import-guard.sh
           terraform apply -auto-approve
+          K8S_APP_NAMESPACE=prod FRONTEND_SUBDOMAIN=app-prod bash ../../scripts/route53-ingress-records-guard.sh
 
