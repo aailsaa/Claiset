@@ -66,7 +66,20 @@ for ENV in "${ENVS[@]}"; do
       -backend-config="dynamodb_table=${LOCK_TABLE}" \
       -backend-config="encrypt=true"
 
-    terraform destroy "${DESTROY_OPTS[@]}"
+    # Phase 1: tear down Kubernetes/platform resources first to release ALB/ENI/EIP dependencies.
+    # If these modules are already gone, continue to full destroy.
+    echo "Phase 1 destroy (${ENV}): app/platform resources"
+    terraform destroy "${DESTROY_OPTS[@]}" \
+      -target=module.app_bluegreen \
+      -target=module.platform || true
+
+    # Phase 2: full environment destroy.
+    echo "Phase 2 destroy (${ENV}): full environment"
+    if ! terraform destroy "${DESTROY_OPTS[@]}"; then
+      echo "Full destroy failed for ${ENV}; waiting and retrying once for eventual-consistency dependencies..."
+      sleep 20
+      terraform destroy "${DESTROY_OPTS[@]}"
+    fi
   )
 done
 
