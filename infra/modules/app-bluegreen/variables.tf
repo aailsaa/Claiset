@@ -19,6 +19,7 @@ variable "domain_root" {
 variable "frontend_subdomain" {
   type    = string
   default = "app"
+  # Set to "" to use apex as canonical host (domain_root directly).
 }
 
 variable "frontend_certificate_arn" {

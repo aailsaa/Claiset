@@ -58,6 +58,7 @@ variable "create_hosted_zone" {
 variable "frontend_subdomain" {
   type    = string
   default = "app"
+  # Set to "" to issue ACM cert for apex (domain_root) instead of app.domain_root.
 }
 
 variable "wait_for_acm_validation" {

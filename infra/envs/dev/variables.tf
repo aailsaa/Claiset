@@ -81,7 +81,7 @@ variable "create_hosted_zone" {
 variable "frontend_subdomain" {
   type        = string
   description = "Subdomain for the frontend (e.g. app). Full name becomes app.<domain_root>."
-  default     = "app"
+  default     = ""
 }
 
 variable "wait_for_acm_validation" {

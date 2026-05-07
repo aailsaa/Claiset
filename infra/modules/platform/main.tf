@@ -1,5 +1,10 @@
 locals {
   name = "${var.project}-${var.env}"
+  frontend_host = (
+    var.domain_root == "" ? "" :
+    trimspace(var.frontend_subdomain) == "" ? var.domain_root :
+    "${var.frontend_subdomain}.${var.domain_root}"
+  )
   # Prefer explicit ID (avoids ambiguity when duplicate zones exist for the same domain).
   create_new_zone     = var.domain_root != "" && var.hosted_zone_id == "" && var.create_hosted_zone
   lookup_zone_by_name = var.domain_root != "" && var.hosted_zone_id == "" && !var.create_hosted_zone
@@ -42,7 +47,7 @@ locals {
 # than the hosted zone in `route53_hosted_zone_id`. Fix public NS/DNS, then re-apply.
 resource "aws_acm_certificate" "frontend" {
   count             = var.domain_root != "" ? 1 : 0
-  domain_name       = "${var.frontend_subdomain}.${var.domain_root}"
+  domain_name       = local.frontend_host
   validation_method = "DNS"
   tags              = var.tags
 }
@@ -158,6 +163,12 @@ resource "helm_release" "aws_load_balancer_controller" {
   set {
     name  = "enableServiceMutatorWebhook"
     value = "false"
+  }
+  # Same CA issue can also break ingress validation webhook (vingress.elbv2.k8s.aws).
+  # Disable chart-level ingress validation to avoid hard-failing Ingress creates.
+  set {
+    name  = "webhookConfig.disableIngressValidation"
+    value = "true"
   }
 }
 

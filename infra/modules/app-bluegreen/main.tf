@@ -1,8 +1,12 @@
 locals {
-  name          = "${var.project}-${var.env}"
-  frontend_host = var.domain_root != "" ? "${var.frontend_subdomain}.${var.domain_root}" : ""
-  apex_host     = var.domain_root
-  www_host      = var.domain_root != "" ? "www.${var.domain_root}" : ""
+  name = "${var.project}-${var.env}"
+  frontend_host = (
+    var.domain_root == "" ? "" :
+    trimspace(var.frontend_subdomain) == "" ? var.domain_root :
+    "${var.frontend_subdomain}.${var.domain_root}"
+  )
+  apex_host = var.domain_root
+  www_host  = var.domain_root != "" ? "www.${var.domain_root}" : ""
   # Keep count decisions based only on root input variables, not on values computed from
   # other modules during the same plan (e.g. RDS address/password, ACM ARN). Those can be
   # unknown at plan time and would make count invalid.
