@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { fetchItems, fetchOutfits } from '../api'
 import { computeClosetStats } from '../closetStats'
-import { closetColorSwatch, closetLabel } from '../closetCatalog'
+import { closetLabel } from '../closetCatalog'
 import type { ClosetStats, Item } from '../types'
 
 function usd(n: number) {
