@@ -68,6 +68,7 @@ resource "aws_route53_record" "frontend_cert_validation" {
   type    = local.frontend_cert_dvo.resource_record_type
   records = [local.frontend_cert_dvo.resource_record_value]
   ttl     = 60
+  allow_overwrite = true
 }
 
 resource "aws_acm_certificate_validation" "frontend" {
