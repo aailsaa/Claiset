@@ -57,6 +57,24 @@ for ENV in "${ENVS[@]}"; do
 
   echo
   echo "=== Destroying ${ENV} ==="
+
+  # Best-effort pre-cleanup in cluster to reduce ALB/ENI dependency leftovers that block subnet/IGW destroy.
+  CLUSTER_NAME="${EXPECTED_CLUSTER_NAME:-claiset-${ENV}}"
+  if command -v aws >/dev/null 2>&1 && command -v kubectl >/dev/null 2>&1; then
+    if aws eks describe-cluster --region "${AWS_REGION}" --name "${CLUSTER_NAME}" >/dev/null 2>&1; then
+      echo "Pre-cleanup (${ENV}): cluster=${CLUSTER_NAME} namespace=${ENV}"
+      aws eks update-kubeconfig --region "${AWS_REGION}" --name "${CLUSTER_NAME}" >/dev/null || true
+      kubectl delete ingress claiset -n "${ENV}" --ignore-not-found=true --wait=true || true
+      # Remove any LB Services that could keep ENIs/EIPs attached.
+      kubectl get svc -n "${ENV}" -o jsonpath='{range .items[?(@.spec.type=="LoadBalancer")]}{.metadata.name}{"\n"}{end}' 2>/dev/null \
+        | while IFS= read -r svc; do
+            [[ -n "${svc}" ]] || continue
+            kubectl delete svc "${svc}" -n "${ENV}" --ignore-not-found=true --wait=true || true
+          done
+      kubectl wait --for=delete ingress/claiset -n "${ENV}" --timeout=120s 2>/dev/null || true
+    fi
+  fi
+
   (
     cd "${ENV_DIR}"
     terraform init \
