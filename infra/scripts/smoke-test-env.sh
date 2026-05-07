@@ -60,7 +60,7 @@ check_internal_health() {
       echo "port-forward for ${svc} exited early." >&2
       break
     fi
-    if rg -q "Forwarding from 127\\.0\\.0\\.1:${local_port}" "${pf_log}"; then
+    if grep -Eq "Forwarding from (127\\.0\\.0\\.1|\\[::1\\]):${local_port}" "${pf_log}"; then
       ready=1
       break
     fi
