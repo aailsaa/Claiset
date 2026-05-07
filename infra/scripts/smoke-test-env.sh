@@ -39,6 +39,40 @@ for d in web items outfits schedule; do
   kubectl -n "${NAMESPACE}" rollout status "deployment/${d}" --timeout=8m
 done
 
+check_internal_health() {
+  local svc="$1"
+  local local_port="$2"
+  local pf_pid=""
+  local code="000"
+  local attempts=5
+  local i
+
+  echo "Checking in-cluster health via service/${svc} -> /health"
+  kubectl -n "${NAMESPACE}" port-forward "svc/${svc}" "${local_port}:80" >/tmp/smoke-pf-"${svc}".log 2>&1 &
+  pf_pid=$!
+  sleep 1
+
+  for ((i=1; i<=attempts; i++)); do
+    code="$(curl -sS -o /dev/null -w '%{http_code}' "http://127.0.0.1:${local_port}/health" || true)"
+    if [[ "${code}" =~ ^2|3 ]]; then
+      echo "Internal health OK for ${svc} (${code})"
+      kill "${pf_pid}" >/dev/null 2>&1 || true
+      wait "${pf_pid}" 2>/dev/null || true
+      return 0
+    fi
+    sleep 2
+  done
+
+  kill "${pf_pid}" >/dev/null 2>&1 || true
+  wait "${pf_pid}" 2>/dev/null || true
+  echo "Internal health failed for ${svc}: /health returned ${code}" >&2
+  return 1
+}
+
+check_internal_health "items" 18081
+check_internal_health "outfits" 18082
+check_internal_health "schedule" 18083
+
 LB_HOST="$(kubectl get ingress -n "${NAMESPACE}" "${PROJECT}" -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)"
 if [[ -z "${LB_HOST}" ]]; then
   echo "Ingress ${NAMESPACE}/${PROJECT} has no load balancer hostname." >&2
@@ -72,14 +106,22 @@ echo "Frontend smoke OK (${front_code}) via ${SMOKE_BASE_HOST}"
 
 check_api() {
   local path="$1"
-  local code
-  code="$(curl_code "https://${SMOKE_BASE_HOST}${path}")"
-  # Accepts 2xx/3xx/4xx for smoke; rejects transport failures/5xx.
-  if [[ "${code}" == "000" || "${code}" =~ ^5 ]]; then
-    echo "Backend smoke failed: https://${SMOKE_BASE_HOST}${path} returned ${code}" >&2
-    exit 1
-  fi
-  echo "Backend route ${path} OK (${code}) via ${SMOKE_BASE_HOST}"
+  local attempts=12
+  local sleep_s=5
+  local code="000"
+  local i
+  for ((i=1; i<=attempts; i++)); do
+    code="$(curl_code "https://${SMOKE_BASE_HOST}${path}")"
+    # Accepts 2xx/3xx/4xx for smoke; retries transient transport/5xx.
+    if [[ "${code}" != "000" && ! "${code}" =~ ^5 ]]; then
+      echo "Backend route ${path} OK (${code}) via ${SMOKE_BASE_HOST} (attempt ${i}/${attempts})"
+      return 0
+    fi
+    echo "Backend route ${path} not ready yet (${code}), retrying (${i}/${attempts})..."
+    sleep "${sleep_s}"
+  done
+  echo "Backend smoke failed: https://${SMOKE_BASE_HOST}${path} returned ${code} after ${attempts} attempts" >&2
+  exit 1
 }
 
 check_api "/api/v1/items"
