@@ -4,7 +4,8 @@
 #
 # If a prior apply was cancelled, Kubernetes objects may exist in the cluster while Terraform
 # state never recorded them. Subsequent applies then fail with "already exists".
-# This guard imports existing app objects into state so apply can converge.
+# This guard imports existing app objects (and platform `platform` / `monitoring` namespaces)
+# into state so apply can converge.
 
 set -euo pipefail
 
@@ -45,6 +46,11 @@ if ! STATE_LIST_ERR="$(terraform state list 2>&1 >/dev/null)"; then
     exit 1
   fi
 fi
+
+# Platform module namespaces (partial applies can create these without state).
+try_import "module.platform.kubernetes_namespace.platform" "platform" "Namespace"
+# Observability namespace — only in config when observability_enabled (OAuth + flags) matches CI; else import no-ops.
+try_import "module.platform.kubernetes_namespace.monitoring[0]" "monitoring" "Namespace"
 
 # Deployments
 for name in items outfits schedule web; do

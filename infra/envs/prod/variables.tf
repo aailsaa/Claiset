@@ -95,9 +95,12 @@ variable "enable_kubernetes_app" {
 }
 
 variable "enable_observability_stack" {
-  type        = bool
-  default     = false
-  description = "Self-hosted Prometheus, Grafana (Google OAuth), Alertmanager optional email, Loki, Promtail. CI sets TF_VAR_enable_observability_stack from repo variable ENABLE_OBSERVABILITY."
+  type    = bool
+  default = false
+  description = <<-EOT
+    Self-hosted Prometheus, Grafana (Google OAuth), Loki, Promtail. CI sets true via repository variable ENABLE_OBSERVABILITY and Grafana TF_VAR_* secrets.
+    Defaults false locally so plans work without OAuth; for local terraform import of monitoring resources, set true plus grafana_google_client_id/secret (same as CI). See docs/failure-playbook.md §9.
+  EOT
 }
 
 variable "grafana_google_client_id" {
