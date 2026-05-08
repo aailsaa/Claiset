@@ -18,6 +18,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+PROJECT="${TF_VAR_project:-claiset}"
 
 STATE_BUCKET="${TF_STATE_BUCKET:-}"
 LOCK_TABLE="${TF_LOCK_TABLE:-}"
@@ -48,6 +49,43 @@ else
     exit 0
   fi
 fi
+
+cleanup_orphan_k8s_enis() {
+  local env="$1"
+  local vpc_ids vpc_id eni_ids eni
+
+  # Find env VPC(s). Primary: Project/Env tags. Fallback: Name tag.
+  vpc_ids="$(aws ec2 describe-vpcs --region "${AWS_REGION}" \
+    --filters "Name=tag:Project,Values=${PROJECT}" "Name=tag:Env,Values=${env}" \
+    --query 'Vpcs[].VpcId' --output text 2>/dev/null || true)"
+  if [[ -z "${vpc_ids}" || "${vpc_ids}" == "None" ]]; then
+    vpc_ids="$(aws ec2 describe-vpcs --region "${AWS_REGION}" \
+      --filters "Name=tag:Name,Values=${PROJECT}-${env}" \
+      --query 'Vpcs[].VpcId' --output text 2>/dev/null || true)"
+  fi
+  if [[ -z "${vpc_ids}" || "${vpc_ids}" == "None" ]]; then
+    echo "No VPC found for env=${env}; skipping orphan ENI cleanup."
+    return 0
+  fi
+
+  # Kubernetes / ALB controller can leave detached aws-K8S ENIs that block SG/subnet destroy.
+  for vpc_id in ${vpc_ids}; do
+    [[ -n "${vpc_id}" ]] || continue
+    eni_ids="$(aws ec2 describe-network-interfaces --region "${AWS_REGION}" \
+      --filters "Name=vpc-id,Values=${vpc_id}" "Name=status,Values=available" \
+      --query "NetworkInterfaces[?starts_with(Description, 'aws-K8S-')].NetworkInterfaceId" \
+      --output text 2>/dev/null || true)"
+    if [[ -z "${eni_ids}" || "${eni_ids}" == "None" ]]; then
+      echo "No orphan aws-K8S ENIs found in VPC ${vpc_id}."
+      continue
+    fi
+    echo "Deleting orphan aws-K8S ENIs in VPC ${vpc_id}: ${eni_ids}"
+    for eni in ${eni_ids}; do
+      [[ -n "${eni}" ]] || continue
+      aws ec2 delete-network-interface --region "${AWS_REGION}" --network-interface-id "${eni}" >/dev/null || true
+    done
+  done
+}
 
 for ENV in "${ENVS[@]}"; do
   ENV_DIR="${ROOT_DIR}/infra/envs/${ENV}"
@@ -104,8 +142,11 @@ for ENV in "${ENVS[@]}"; do
       -target=module.platform || true
 
     # Phase 2: full environment destroy.
+    cleanup_orphan_k8s_enis "${ENV}"
     echo "Phase 2 destroy (${ENV}): full environment"
     if ! terraform destroy "${DESTROY_OPTS[@]}"; then
+      # Clear detached aws-K8S ENIs that often block SG/subnet/VPC deletion with DependencyViolation.
+      cleanup_orphan_k8s_enis "${ENV}"
       echo "Full destroy failed for ${ENV}; waiting and retrying once for eventual-consistency dependencies..."
       sleep 20
       terraform destroy "${DESTROY_OPTS[@]}"
