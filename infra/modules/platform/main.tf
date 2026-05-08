@@ -43,6 +43,18 @@ locals {
     local.frontend_host != var.domain_root ? var.domain_root : null,
     local.www_host != "" && local.frontend_host != local.www_host ? local.www_host : null,
   ]))
+  # Keep for_each keys static so plan works in one pass.
+  cert_validation_domains = var.domain_root == "" ? [] : distinct(concat(
+    [local.frontend_host],
+    local.frontend_cert_sans,
+  ))
+  cert_validation_records_by_domain = var.domain_root != "" ? {
+    for dvo in aws_acm_certificate.frontend[0].domain_validation_options : dvo.domain_name => {
+      name   = dvo.resource_record_name
+      type   = dvo.resource_record_type
+      values = [dvo.resource_record_value]
+    }
+  } : {}
 }
 
 # ACM certificate for the frontend hostname (DNS validated in Route53).
@@ -66,18 +78,12 @@ resource "aws_acm_certificate" "frontend" {
 }
 
 resource "aws_route53_record" "frontend_cert_validation" {
-  for_each = var.domain_root != "" ? {
-    for dvo in aws_acm_certificate.frontend[0].domain_validation_options : dvo.domain_name => {
-      name   = dvo.resource_record_name
-      type   = dvo.resource_record_type
-      values = [dvo.resource_record_value]
-    }
-  } : {}
+  for_each = var.domain_root != "" ? toset(local.cert_validation_domains) : toset([])
 
   zone_id         = local.zone_id
-  name            = each.value.name
-  type            = each.value.type
-  records         = each.value.values
+  name            = local.cert_validation_records_by_domain[each.value].name
+  type            = local.cert_validation_records_by_domain[each.value].type
+  records         = local.cert_validation_records_by_domain[each.value].values
   ttl             = 60
   allow_overwrite = true
 }
