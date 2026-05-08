@@ -191,6 +191,67 @@ resource "helm_release" "aws_load_balancer_controller" {
 }
 
 # ExternalDNS to create Route53 records from Ingress/Service annotations.
+locals {
+  enable_external_dns_irsa = var.domain_root != "" && var.oidc_provider_arn != "" && var.oidc_issuer_url != ""
+}
+
+data "aws_iam_policy_document" "external_dns_assume" {
+  count = local.enable_external_dns_irsa ? 1 : 0
+
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+    principals {
+      type        = "Federated"
+      identifiers = [var.oidc_provider_arn]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "${replace(var.oidc_issuer_url, "https://", "")}:sub"
+      values   = ["system:serviceaccount:platform:external-dns"]
+    }
+  }
+}
+
+data "aws_iam_policy_document" "external_dns" {
+  count = local.enable_external_dns_irsa ? 1 : 0
+
+  statement {
+    effect = "Allow"
+    actions = [
+      "route53:ChangeResourceRecordSets",
+      "route53:ListResourceRecordSets",
+      "route53:GetHostedZone",
+    ]
+    resources = ["arn:aws:route53:::hostedzone/*"]
+  }
+
+  statement {
+    effect = "Allow"
+    actions = [
+      "route53:ListHostedZones",
+      "route53:ListHostedZonesByName",
+      "route53:GetChange",
+    ]
+    resources = ["*"]
+  }
+}
+
+resource "aws_iam_role" "external_dns" {
+  count              = local.enable_external_dns_irsa ? 1 : 0
+  name               = "${local.name}-external-dns"
+  assume_role_policy = data.aws_iam_policy_document.external_dns_assume[0].json
+  tags               = var.tags
+}
+
+resource "aws_iam_role_policy" "external_dns" {
+  count  = local.enable_external_dns_irsa ? 1 : 0
+  name   = "${local.name}-external-dns"
+  role   = aws_iam_role.external_dns[0].id
+  policy = data.aws_iam_policy_document.external_dns[0].json
+}
+
 resource "helm_release" "external_dns" {
   count      = var.domain_root != "" ? 1 : 0
   name       = "external-dns"
@@ -261,6 +322,14 @@ resource "helm_release" "external_dns" {
   set {
     name  = "serviceAccount.name"
     value = "external-dns"
+  }
+
+  dynamic "set" {
+    for_each = local.enable_external_dns_irsa ? [1] : []
+    content {
+      name  = "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
+      value = aws_iam_role.external_dns[0].arn
+    }
   }
 }
 
