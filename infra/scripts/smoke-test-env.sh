@@ -272,6 +272,14 @@ check_grafana() {
   fi
   echo "Grafana OAuth smoke OK (redirects to Google Accounts)"
 
+  # Assert Grafana has GF_AUTH_GOOGLE_CLIENT_SECRET wired from grafana-google-oauth.
+  local gf_env
+  gf_env="$(kubectl -n monitoring get deployment kube-prometheus-stack-grafana -o json | jq -r '.spec.template.spec.containers[]?.env // [], .spec.template.spec.containers[]?.envFrom // empty' 2>/dev/null || true)"
+  if ! printf '%s\n' "${gf_env}" | grep -q 'GF_AUTH_GOOGLE_CLIENT_SECRET'; then
+    echo "Grafana OAuth smoke failed: GF_AUTH_GOOGLE_CLIENT_SECRET not present in deployment env." >&2
+    return 1
+  fi
+
   echo "Grafana deep smoke: rollout, API health, datasource, and Loki query path"
   kubectl -n monitoring rollout status deployment/kube-prometheus-stack-grafana --timeout=8m
 

@@ -239,17 +239,14 @@ resource "helm_release" "kube_prometheus_stack" {
         path     = "/"
         pathType = "Prefix"
       }
-      extraEnv = [
-        {
-          name = "GF_AUTH_GOOGLE_CLIENT_SECRET"
-          valueFrom = {
-            secretKeyRef = {
-              name = kubernetes_secret.grafana_google_oauth[0].metadata[0].name
-              key  = "secret"
-            }
+      envValueFrom = {
+        GF_AUTH_GOOGLE_CLIENT_SECRET = {
+          secretKeyRef = {
+            name = kubernetes_secret.grafana_google_oauth[0].metadata[0].name
+            key  = "secret"
           }
         }
-      ]
+      }
       # kube-prometheus passes this into the Grafana subchart as grafana.ini
       "grafana.ini" = {
         server = {
