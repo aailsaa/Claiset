@@ -192,7 +192,9 @@ resource "helm_release" "aws_load_balancer_controller" {
 
 # ExternalDNS to create Route53 records from Ingress/Service annotations.
 locals {
-  enable_external_dns_irsa = var.domain_root != "" && var.oidc_provider_arn != "" && var.oidc_issuer_url != ""
+  # Keep count/for_each decisions based on stable inputs so destroy/apply planning
+  # doesn't fail when OIDC outputs are temporarily unknown in graph evaluation.
+  enable_external_dns_irsa = var.domain_root != "" && var.cluster_name != ""
 }
 
 data "aws_iam_policy_document" "external_dns_assume" {
@@ -336,7 +338,8 @@ resource "helm_release" "external_dns" {
 # Cluster Autoscaler (scales managed nodegroup up/down automatically).
 # This prevents "Too many pods" hangs on tiny nodes by adding capacity only when required.
 locals {
-  enable_cluster_autoscaler = var.oidc_provider_arn != "" && var.oidc_issuer_url != ""
+  # Same rationale as external-dns IRSA: avoid unknown-dependent count expressions.
+  enable_cluster_autoscaler = var.cluster_name != ""
 }
 
 data "aws_iam_policy_document" "cluster_autoscaler_assume" {
