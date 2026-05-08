@@ -44,12 +44,12 @@ Use the **Your notes** column when you self-grade / submit comments.
 
 | Requirement | Done? | Your notes |
 | ----------- | ----- | ---------- |
-| **Prometheus + Grafana** on-cluster (**no** AWS-managed observability as substitute) | [ ] | Stack deploys via Terraform/Helm in `monitoring`, but full cross-env validation is still in progress after OAuth/secret drift issues. |
+| **Prometheus + Grafana** on-cluster (**no** AWS-managed observability as substitute) | [x] | Stack is deployed via Terraform/Helm in `monitoring`; dev login/access is now working. Still run QA/UAT checks for full cross-env proof. |
 | **Dashboards** — **CPU, memory, disk** for **all nodes** | [ ] | Components are present (Node Exporter + Prometheus), but dashboard coverage/accuracy has not been fully verified and documented for all nodes/environments. |
 | **Alerts** — **Email** and/or **Slack** at critical thresholds | [ ] | Optional SMTP/GitHub Secrets for Alertmanager (`alertmanager_*` variables). |
-| **Grafana** — reachable **from outside AWS** | [ ] | External ingress exists and HTTP reachability smoke passes, but reliability across all environments and repeated runs is not fully confirmed yet. |
-| **Grafana auth** — **OAuth2 only** (Okta/GitHub/Google); **no** username/password as primary UX | [ ] | Google OAuth wiring exists and redirect smoke is in CI, but full end-to-end login validation is still being stabilized (recent `client_secret` issues). |
-| **Centralized logging** — **Loki** or ELK/OpenSearch **or** self-hosted Sentry on EKS | [ ] | Loki + Promtail deploy, but production-grade stability and retention/query behavior across all environments still need full verification. |
+| **Grafana** — reachable **from outside AWS** | [x] | Verified in dev at `grafana-dev.<domain>` with external ingress. Validate QA/UAT/Prod endpoints to close out all envs. |
+| **Grafana auth** — **OAuth2 only** (Okta/GitHub/Google); **no** username/password as primary UX | [x] | Google OAuth login works in dev after secret wiring fix; workflow now has preflight + smoke checks to catch regressions. |
+| **Centralized logging** — **Loki** or ELK/OpenSearch **or** self-hosted Sentry on EKS | [x] | Loki + Promtail are deployed and queried in dev smoke/deep checks; complete cross-env validation and screenshots for grading evidence. |
 | **Multi-service logs** — Query across **all 3** Go backends | [ ] | Basic Loki query smoke has passed, but consistent cross-service querying and proof screenshots/queries for grading are still pending. |
 
 ---
