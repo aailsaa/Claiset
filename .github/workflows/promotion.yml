@@ -697,6 +697,16 @@ jobs:
         working-directory: infra/envs/prod
         run: bash ../../scripts/terraform-eks-import-guard.sh
 
+      # When using external hosted zone secret, stop managing any previously-created
+      # duplicate zone in state so re-runs from partial applies don't fail on zone drift.
+      - name: Route53 state rm (external hosted zone secret)
+        working-directory: infra/envs/prod
+        run: |
+          set -euo pipefail
+          if [[ -n "${TF_VAR_route53_hosted_zone_id:-}" ]]; then
+            terraform state rm 'module.platform.aws_route53_zone.this[0]' 2>/dev/null || true
+          fi
+
       - name: Terraform apply (prod)
         working-directory: infra/envs/prod
         run: |
