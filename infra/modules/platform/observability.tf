@@ -8,6 +8,15 @@ locals {
   )
   grafana_host = local.observability_enabled ? "grafana-${var.env}.${var.domain_root}" : ""
 
+  # Static for_each keys (see frontend cert in main.tf); ACM validation option values are unknown until apply.
+  grafana_cert_validation_records_by_domain = local.observability_enabled ? {
+    for dvo in aws_acm_certificate.grafana[0].domain_validation_options : dvo.domain_name => {
+      name   = dvo.resource_record_name
+      type   = dvo.resource_record_type
+      values = [dvo.resource_record_value]
+    }
+  } : {}
+
   grafana_ini_google = merge(
     {
       enabled       = true
@@ -80,18 +89,12 @@ resource "aws_acm_certificate" "grafana" {
 }
 
 resource "aws_route53_record" "grafana_cert_validation" {
-  for_each = local.observability_enabled ? {
-    for dvo in aws_acm_certificate.grafana[0].domain_validation_options : dvo.domain_name => {
-      name   = dvo.resource_record_name
-      type   = dvo.resource_record_type
-      values = [dvo.resource_record_value]
-    }
-  } : {}
+  for_each = local.observability_enabled ? toset([local.grafana_host]) : toset([])
 
   zone_id         = local.zone_id
-  name            = each.value.name
-  type            = each.value.type
-  records         = each.value.values
+  name            = local.grafana_cert_validation_records_by_domain[each.value].name
+  type            = local.grafana_cert_validation_records_by_domain[each.value].type
+  records         = local.grafana_cert_validation_records_by_domain[each.value].values
   ttl             = 60
   allow_overwrite = true
 }
