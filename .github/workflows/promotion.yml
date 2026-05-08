@@ -356,7 +356,7 @@ jobs:
           # Burst node capacity for Phase 2 rollout, then scale down again for cost.
           # Align with env defaults (desired=2, max=6): burst so Helm/controllers always have slots on t3.small.
           BASE_MIN=1
-          BASE_DESIRED=2
+          BASE_DESIRED=3
           BASE_MAX=6
           BURST_DESIRED=6
           CLUSTER="${EXPECTED_CLUSTER_NAME}"
@@ -376,6 +376,8 @@ jobs:
             fi
             sleep 10
           done
+          # Clear accidental SchedulingDisabled state that can linger after interrupted runs.
+          kubectl get nodes --no-headers 2>/dev/null | awk '$2 ~ /SchedulingDisabled/ {print $1}' | xargs -r kubectl uncordon || true
           ready_nodes="$(kubectl get nodes --no-headers 2>/dev/null | awk '$2=="Ready"{c++} END{print c+0}')"
           if [[ "${ready_nodes}" -lt "${BURST_DESIRED}" ]]; then
             echo "Burst capacity not reached (Ready nodes=${ready_nodes}, expected=${BURST_DESIRED}); continuing anyway." >&2
@@ -547,7 +549,7 @@ jobs:
 
           # Same as dev: UAT had no burst and hit "Too many pods" on platform Helm (external-dns Pending).
           BASE_MIN=1
-          BASE_DESIRED=2
+          BASE_DESIRED=3
           BASE_MAX=6
           BURST_DESIRED=6
           CLUSTER="${EXPECTED_CLUSTER_NAME}"
@@ -564,6 +566,7 @@ jobs:
             fi
             sleep 10
           done
+          kubectl get nodes --no-headers 2>/dev/null | awk '$2 ~ /SchedulingDisabled/ {print $1}' | xargs -r kubectl uncordon || true
 
           K8S_APP_NAMESPACE=uat bash ../../scripts/terraform-k8s-import-guard.sh
           EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" bash ../../scripts/helm-monitoring-reconcile.sh
@@ -691,7 +694,7 @@ jobs:
             -target=module.rds
 
           BASE_MIN=1
-          BASE_DESIRED=2
+          BASE_DESIRED=3
           BASE_MAX=6
           BURST_DESIRED=6
           CLUSTER="${EXPECTED_CLUSTER_NAME}"
@@ -708,6 +711,7 @@ jobs:
             fi
             sleep 10
           done
+          kubectl get nodes --no-headers 2>/dev/null | awk '$2 ~ /SchedulingDisabled/ {print $1}' | xargs -r kubectl uncordon || true
 
           K8S_APP_NAMESPACE=prod bash ../../scripts/terraform-k8s-import-guard.sh
           EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" bash ../../scripts/helm-monitoring-reconcile.sh
