@@ -239,12 +239,12 @@ jobs:
           # Reconcile Route53 alias each run (covers cases after manual scale-down/teardown).
           DOMAIN_ROOT=claiset.xyz FRONTEND_SUBDOMAIN= K8S_APP_NAMESPACE=dev bash ../../scripts/route53-ingress-records-guard.sh
 
-          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=dev FRONTEND_HOST=claiset.xyz EXPECT_OBSERVABILITY_SMOKE="${TF_VAR_enable_observability_stack:-false}" GRAFANA_HOST=grafana-dev.claiset.xyz bash ../../scripts/smoke-test-env.sh --wait-only
+          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=dev FRONTEND_HOST=claiset.xyz EXPECT_OBSERVABILITY_SMOKE="${TF_VAR_enable_observability_stack:-false}" EXPECT_APP_OAUTH_SMOKE=true GRAFANA_HOST=grafana-dev.claiset.xyz bash ../../scripts/smoke-test-env.sh --wait-only
 
       - name: Smoke tests
         working-directory: infra/envs/dev
         run: |
-          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=dev FRONTEND_HOST=claiset.xyz EXPECT_OBSERVABILITY_SMOKE="${TF_VAR_enable_observability_stack:-false}" GRAFANA_HOST=grafana-dev.claiset.xyz bash ../../scripts/smoke-test-env.sh --skip-wait
+          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=dev FRONTEND_HOST=claiset.xyz EXPECT_OBSERVABILITY_SMOKE="${TF_VAR_enable_observability_stack:-false}" EXPECT_APP_OAUTH_SMOKE=true GRAFANA_HOST=grafana-dev.claiset.xyz bash ../../scripts/smoke-test-env.sh --skip-wait
 
   qa:
     name: Promote to QA (nightly)
@@ -388,12 +388,12 @@ jobs:
       - name: Wait for readiness (qa)
         working-directory: infra/envs/qa
         run: |
-          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=qa FRONTEND_HOST=app-qa.claiset.xyz EXPECT_OBSERVABILITY_SMOKE="${TF_VAR_enable_observability_stack:-false}" GRAFANA_HOST=grafana-qa.claiset.xyz bash ../../scripts/smoke-test-env.sh --wait-only
+          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=qa FRONTEND_HOST=app-qa.claiset.xyz EXPECT_OBSERVABILITY_SMOKE="${TF_VAR_enable_observability_stack:-false}" EXPECT_APP_OAUTH_SMOKE=true GRAFANA_HOST=grafana-qa.claiset.xyz bash ../../scripts/smoke-test-env.sh --wait-only
 
       - name: Smoke checks (qa)
         working-directory: infra/envs/qa
         run: |
-          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=qa FRONTEND_HOST=app-qa.claiset.xyz EXPECT_OBSERVABILITY_SMOKE="${TF_VAR_enable_observability_stack:-false}" GRAFANA_HOST=grafana-qa.claiset.xyz bash ../../scripts/smoke-test-env.sh --skip-wait
+          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=qa FRONTEND_HOST=app-qa.claiset.xyz EXPECT_OBSERVABILITY_SMOKE="${TF_VAR_enable_observability_stack:-false}" EXPECT_APP_OAUTH_SMOKE=true GRAFANA_HOST=grafana-qa.claiset.xyz bash ../../scripts/smoke-test-env.sh --skip-wait
 
   uat:
     name: Promote to UAT (PR merge or RC commits)
@@ -562,12 +562,12 @@ jobs:
       - name: Wait for readiness (uat)
         working-directory: infra/envs/uat
         run: |
-          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=uat FRONTEND_HOST=app-uat.claiset.xyz EXPECT_OBSERVABILITY_SMOKE="${TF_VAR_enable_observability_stack:-false}" GRAFANA_HOST=grafana-uat.claiset.xyz bash ../../scripts/smoke-test-env.sh --wait-only
+          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=uat FRONTEND_HOST=app-uat.claiset.xyz EXPECT_OBSERVABILITY_SMOKE="${TF_VAR_enable_observability_stack:-false}" EXPECT_APP_OAUTH_SMOKE=true GRAFANA_HOST=grafana-uat.claiset.xyz bash ../../scripts/smoke-test-env.sh --wait-only
 
       - name: Smoke checks (uat)
         working-directory: infra/envs/uat
         run: |
-          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=uat FRONTEND_HOST=app-uat.claiset.xyz EXPECT_OBSERVABILITY_SMOKE="${TF_VAR_enable_observability_stack:-false}" GRAFANA_HOST=grafana-uat.claiset.xyz bash ../../scripts/smoke-test-env.sh --skip-wait
+          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=uat FRONTEND_HOST=app-uat.claiset.xyz EXPECT_OBSERVABILITY_SMOKE="${TF_VAR_enable_observability_stack:-false}" EXPECT_APP_OAUTH_SMOKE=true GRAFANA_HOST=grafana-uat.claiset.xyz bash ../../scripts/smoke-test-env.sh --skip-wait
 
   prod:
     name: Promote to production (tags)
@@ -696,10 +696,10 @@ jobs:
       - name: Wait for readiness (prod)
         working-directory: infra/envs/prod
         run: |
-          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=prod FRONTEND_HOST=app-prod.claiset.xyz EXPECT_OBSERVABILITY_SMOKE="${TF_VAR_enable_observability_stack:-false}" GRAFANA_HOST=grafana-prod.claiset.xyz bash ../../scripts/smoke-test-env.sh --wait-only
+          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=prod FRONTEND_HOST=app-prod.claiset.xyz EXPECT_OBSERVABILITY_SMOKE="${TF_VAR_enable_observability_stack:-false}" EXPECT_APP_OAUTH_SMOKE=true GRAFANA_HOST=grafana-prod.claiset.xyz bash ../../scripts/smoke-test-env.sh --wait-only
 
       - name: Smoke checks (prod)
         working-directory: infra/envs/prod
         run: |
-          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=prod FRONTEND_HOST=app-prod.claiset.xyz EXPECT_OBSERVABILITY_SMOKE="${TF_VAR_enable_observability_stack:-false}" GRAFANA_HOST=grafana-prod.claiset.xyz bash ../../scripts/smoke-test-env.sh --skip-wait
+          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=prod FRONTEND_HOST=app-prod.claiset.xyz EXPECT_OBSERVABILITY_SMOKE="${TF_VAR_enable_observability_stack:-false}" EXPECT_APP_OAUTH_SMOKE=true GRAFANA_HOST=grafana-prod.claiset.xyz bash ../../scripts/smoke-test-env.sh --skip-wait
 
