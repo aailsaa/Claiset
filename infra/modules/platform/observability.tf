@@ -179,45 +179,47 @@ resource "helm_release" "kube_prometheus_stack" {
       }
     }
 
-    alertmanager = local.alertmanager_enabled ? {
-      enabled = true
-      alertmanagerSpec = {
-        resources = {
-          requests = { cpu = "50m", memory = "128Mi" }
+    alertmanager = merge(
+      {
+        enabled = local.alertmanager_enabled
+        alertmanagerSpec = {
+          resources = {
+            requests = { cpu = "50m", memory = "128Mi" }
+          }
         }
-      }
-      config = {
-        global = local.alertmanager_smtp_global
-        route = {
-          receiver        = "null"
-          group_wait      = "30s"
-          group_interval  = "5m"
-          repeat_interval = "4h"
-          routes = [
-            {
-              receiver = "email"
-              matchers = ["severity=\"critical\""]
-            }
+      },
+      local.alertmanager_enabled ? {
+        config = {
+          global = local.alertmanager_smtp_global
+          route = {
+            receiver        = "null"
+            group_wait      = "30s"
+            group_interval  = "5m"
+            repeat_interval = "4h"
+            routes = [
+              {
+                receiver = "email"
+                matchers = ["severity=\"critical\""]
+              }
+            ]
+          }
+          receivers = [
+            { name = "null" },
+            { name = "email", email_configs = [{ to = var.alertmanager_email_to, send_resolved = true }] }
           ]
         }
-        receivers = [
-          { name = "null" },
-          { name = "email", email_configs = [{ to = var.alertmanager_email_to, send_resolved = true }] }
-        ]
-      }
       } : {
-      enabled = false
-      alertmanagerSpec = {
-        resources = {
-          requests = { cpu = "50m", memory = "128Mi" }
+        config = {
+          global = {}
+          route = {
+            receiver = "null"
+          }
+          receivers = [
+            { name = "null" }
+          ]
         }
       }
-      config = {
-        global    = {}
-        route     = {}
-        receivers = []
-      }
-    }
+    )
 
     grafana = {
       enabled       = true
