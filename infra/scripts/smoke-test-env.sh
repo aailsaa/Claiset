@@ -288,6 +288,8 @@ check_grafana() {
   local g_user=""
   local g_pass=""
   local health_code="000"
+  local prom_uid=""
+  local prom_query_status="000"
   local ds_name=""
   local loki_query_status="000"
   local i
@@ -361,10 +363,29 @@ check_grafana() {
     return 1
   fi
 
+  # Verify Prometheus datasource is provisioned and query path is reachable.
+  prom_uid="$(curl -sS -u "${g_user}:${g_pass}" "http://127.0.0.1:13000/api/datasources/name/Prometheus" | jq -r '.uid // empty' 2>/dev/null || true)"
+  if [[ -z "${prom_uid}" ]]; then
+    echo "Grafana deep smoke failed: Prometheus datasource missing from Grafana API." >&2
+    kill "${pf_pid}" >/dev/null 2>&1 || true
+    wait "${pf_pid}" 2>/dev/null || true
+    rm -f "${pf_log}" || true
+    return 1
+  fi
+  prom_query_status="$(curl -sS -u "${g_user}:${g_pass}" -o /dev/null -w '%{http_code}' \
+    "http://127.0.0.1:13000/api/datasources/proxy/uid/${prom_uid}/api/v1/query?query=up" || true)"
+  if [[ ! "${prom_query_status}" =~ ^2 ]]; then
+    echo "Grafana deep smoke failed: Prometheus datasource proxy query returned ${prom_query_status}" >&2
+    kill "${pf_pid}" >/dev/null 2>&1 || true
+    wait "${pf_pid}" 2>/dev/null || true
+    rm -f "${pf_log}" || true
+    return 1
+  fi
+
   kill "${pf_pid}" >/dev/null 2>&1 || true
   wait "${pf_pid}" 2>/dev/null || true
   rm -f "${pf_log}" || true
-  echo "Grafana deep smoke OK (health=${health_code}, datasource=${ds_name}, loki_proxy=${loki_query_status})"
+  echo "Grafana deep smoke OK (health=${health_code}, datasource=${ds_name}, loki_proxy=${loki_query_status}, prom_proxy=${prom_query_status})"
 }
 
 check_app_oauth() {

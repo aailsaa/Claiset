@@ -358,7 +358,7 @@ jobs:
           BASE_MIN=1
           BASE_DESIRED=2
           BASE_MAX=6
-          BURST_DESIRED=5
+          BURST_DESIRED=6
           CLUSTER="${EXPECTED_CLUSTER_NAME}"
           NODEGROUP="${EXPECTED_CLUSTER_NAME}-default"
           trap 'echo "Scaling nodegroup back down"; AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" "${BASE_MIN}" "${BASE_DESIRED}" "${BASE_MAX}" || true' EXIT
@@ -549,11 +549,21 @@ jobs:
           BASE_MIN=1
           BASE_DESIRED=2
           BASE_MAX=6
-          BURST_DESIRED=5
+          BURST_DESIRED=6
           CLUSTER="${EXPECTED_CLUSTER_NAME}"
           NODEGROUP="${EXPECTED_CLUSTER_NAME}-default"
           trap 'echo "Scaling nodegroup back down"; AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" "${BASE_MIN}" "${BASE_DESIRED}" "${BASE_MAX}" || true' EXIT
           AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" "${BASE_MIN}" "${BURST_DESIRED}" "${BASE_MAX}"
+          aws eks update-kubeconfig --region "${AWS_REGION}" --name "${CLUSTER}"
+          echo "Waiting for burst node count to be Ready before Phase 2..."
+          for i in {1..30}; do
+            ready_nodes="$(kubectl get nodes --no-headers 2>/dev/null | awk '$2=="Ready"{c++} END{print c+0}')"
+            echo "Ready nodes: ${ready_nodes}/${BURST_DESIRED} (attempt ${i}/30)"
+            if [[ "${ready_nodes}" -ge "${BURST_DESIRED}" ]]; then
+              break
+            fi
+            sleep 10
+          done
 
           K8S_APP_NAMESPACE=uat bash ../../scripts/terraform-k8s-import-guard.sh
           EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" bash ../../scripts/helm-monitoring-reconcile.sh
@@ -683,11 +693,21 @@ jobs:
           BASE_MIN=1
           BASE_DESIRED=2
           BASE_MAX=6
-          BURST_DESIRED=5
+          BURST_DESIRED=6
           CLUSTER="${EXPECTED_CLUSTER_NAME}"
           NODEGROUP="${EXPECTED_CLUSTER_NAME}-default"
           trap 'echo "Scaling nodegroup back down"; AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" "${BASE_MIN}" "${BASE_DESIRED}" "${BASE_MAX}" || true' EXIT
           AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" "${BASE_MIN}" "${BURST_DESIRED}" "${BASE_MAX}"
+          aws eks update-kubeconfig --region "${AWS_REGION}" --name "${CLUSTER}"
+          echo "Waiting for burst node count to be Ready before Phase 2..."
+          for i in {1..30}; do
+            ready_nodes="$(kubectl get nodes --no-headers 2>/dev/null | awk '$2=="Ready"{c++} END{print c+0}')"
+            echo "Ready nodes: ${ready_nodes}/${BURST_DESIRED} (attempt ${i}/30)"
+            if [[ "${ready_nodes}" -ge "${BURST_DESIRED}" ]]; then
+              break
+            fi
+            sleep 10
+          done
 
           K8S_APP_NAMESPACE=prod bash ../../scripts/terraform-k8s-import-guard.sh
           EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" bash ../../scripts/helm-monitoring-reconcile.sh
