@@ -353,8 +353,15 @@ check_grafana() {
   fi
 
   # Hit Loki query path via Grafana proxy API to ensure datasource query path works.
-  loki_query_status="$(curl -sS -u "${g_user}:${g_pass}" -o /dev/null -w '%{http_code}' \
-    "http://127.0.0.1:13000/api/datasources/proxy/uid/loki/loki/api/v1/query?query=vector(1)" || true)"
+  for i in {1..12}; do
+    loki_query_status="$(curl -sS -u "${g_user}:${g_pass}" -o /dev/null -w '%{http_code}' \
+      "http://127.0.0.1:13000/api/datasources/proxy/uid/loki/loki/api/v1/query?query=vector(1)" || true)"
+    if [[ "${loki_query_status}" =~ ^2|4 ]]; then
+      break
+    fi
+    echo "Grafana deep smoke: Loki proxy not ready yet (${loki_query_status}), retrying (${i}/12)..."
+    sleep 5
+  done
   if [[ ! "${loki_query_status}" =~ ^2|4 ]]; then
     echo "Grafana deep smoke failed: Loki datasource proxy query returned ${loki_query_status}" >&2
     kill "${pf_pid}" >/dev/null 2>&1 || true
@@ -372,8 +379,15 @@ check_grafana() {
     rm -f "${pf_log}" || true
     return 1
   fi
-  prom_query_status="$(curl -sS -u "${g_user}:${g_pass}" -o /dev/null -w '%{http_code}' \
-    "http://127.0.0.1:13000/api/datasources/proxy/uid/${prom_uid}/api/v1/query?query=up" || true)"
+  for i in {1..12}; do
+    prom_query_status="$(curl -sS -u "${g_user}:${g_pass}" -o /dev/null -w '%{http_code}' \
+      "http://127.0.0.1:13000/api/datasources/proxy/uid/${prom_uid}/api/v1/query?query=up" || true)"
+    if [[ "${prom_query_status}" =~ ^2 ]]; then
+      break
+    fi
+    echo "Grafana deep smoke: Prometheus proxy not ready yet (${prom_query_status}), retrying (${i}/12)..."
+    sleep 5
+  done
   if [[ ! "${prom_query_status}" =~ ^2 ]]; then
     echo "Grafana deep smoke failed: Prometheus datasource proxy query returned ${prom_query_status}" >&2
     kill "${pf_pid}" >/dev/null 2>&1 || true
