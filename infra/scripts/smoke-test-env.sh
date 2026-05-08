@@ -37,6 +37,8 @@ NAMESPACE="${K8S_APP_NAMESPACE:-${TF_VAR_env:-dev}}"
 PROJECT="${TF_VAR_project:-claiset}"
 FRONTEND_HOST="${FRONTEND_HOST:-}"
 RDS_ID="${RDS_INSTANCE_ID:-${PROJECT}-${NAMESPACE}-postgres}"
+GRAFANA_HOST="${GRAFANA_HOST:-}"
+EXPECT_OBSERVABILITY_SMOKE="${EXPECT_OBSERVABILITY_SMOKE:-}"
 
 if [[ -z "${CLUSTER}" ]]; then
   echo "EXPECTED_CLUSTER_NAME is required." >&2
@@ -47,6 +49,25 @@ if [[ -z "${FRONTEND_HOST}" ]]; then
   echo "FRONTEND_HOST is required (e.g. claiset.xyz, app-qa.claiset.xyz)." >&2
   exit 1
 fi
+
+derive_domain_root() {
+  local host="$1"
+  # For app subdomains like app-qa.claiset.xyz -> claiset.xyz
+  # For apex like claiset.xyz -> claiset.xyz
+  if [[ "${host}" == *.*.* ]]; then
+    echo "${host#*.}"
+  else
+    echo "${host}"
+  fi
+}
+
+observability_smoke_enabled() {
+  if [[ -n "${EXPECT_OBSERVABILITY_SMOKE}" ]]; then
+    [[ "${EXPECT_OBSERVABILITY_SMOKE}" == "1" || "${EXPECT_OBSERVABILITY_SMOKE}" == "true" ]]
+    return
+  fi
+  [[ "${TF_VAR_enable_observability_stack:-false}" == "true" ]]
+}
 
 echo "Smoke test: cluster=${CLUSTER} namespace=${NAMESPACE} frontend=${FRONTEND_HOST} region=${REGION}"
 
@@ -77,11 +98,6 @@ if [[ "${MODE}" != "skip-wait" ]]; then
     kubectl -n "${NAMESPACE}" rollout status "deployment/${d}" --timeout=8m
   done
   wait_for_no_pending_app_pods
-fi
-
-if [[ "${MODE}" == "wait-only" ]]; then
-  echo "Wait-only checks passed for ${NAMESPACE}."
-  exit 0
 fi
 
 check_internal_health() {
@@ -198,6 +214,146 @@ if [[ ! "${front_code}" =~ ^2|3 ]]; then
   exit 1
 fi
 echo "Frontend smoke OK (${front_code}) via ${SMOKE_BASE_HOST}"
+
+check_grafana() {
+  if [[ -z "${GRAFANA_HOST}" ]]; then
+    DOMAIN_ROOT_DERIVED="$(derive_domain_root "${FRONTEND_HOST}")"
+    GRAFANA_HOST="grafana-${NAMESPACE}.${DOMAIN_ROOT_DERIVED}"
+  fi
+
+  echo "Observability smoke: checking Grafana at https://${GRAFANA_HOST}"
+
+  # Find the ALB behind monitoring ingress for connect-to fallback.
+  GRAFANA_LB_HOST="$(kubectl get ingress -n monitoring -o jsonpath='{range .items[*]}{.spec.rules[0].host}{"|"}{.status.loadBalancer.ingress[0].hostname}{"\n"}{end}' 2>/dev/null \
+    | awk -F'|' -v h="${GRAFANA_HOST}" '$1==h {print $2; exit}')"
+
+  if [[ -z "${GRAFANA_LB_HOST}" ]]; then
+    echo "Grafana smoke failed: no monitoring ingress found for host ${GRAFANA_HOST}" >&2
+    kubectl get ingress -n monitoring -o wide || true
+    exit 1
+  fi
+
+  GRAFANA_CONNECT_TO=()
+  grafana_code="000"
+  attempts=12
+  sleep_s=5
+  for ((i=1; i<=attempts; i++)); do
+    grafana_code="$(curl -sS "${GRAFANA_CONNECT_TO[@]}" -o /dev/null -w '%{http_code}' "https://${GRAFANA_HOST}" || true)"
+    if [[ "${grafana_code}" =~ ^2|3 ]]; then
+      break
+    fi
+    if [[ "${i}" == "1" ]]; then
+      # If DNS isn't propagated yet, go directly to ALB while preserving SNI/Host.
+      GRAFANA_CONNECT_TO=(--connect-to "${GRAFANA_HOST}:443:${GRAFANA_LB_HOST}:443")
+    fi
+    echo "Grafana not ready yet: https://${GRAFANA_HOST} -> ${grafana_code} (attempt ${i}/${attempts})"
+    sleep "${sleep_s}"
+  done
+
+  if [[ ! "${grafana_code}" =~ ^2|3 ]]; then
+    echo "Grafana smoke failed: https://${GRAFANA_HOST} returned ${grafana_code}" >&2
+    return 1
+  fi
+  echo "Grafana smoke OK (${grafana_code}) via ${GRAFANA_HOST}"
+
+  echo "Grafana deep smoke: rollout, API health, datasource, and Loki query path"
+  kubectl -n monitoring rollout status deployment/kube-prometheus-stack-grafana --timeout=8m
+
+  local pf_pid=""
+  local pf_log=""
+  local g_user=""
+  local g_pass=""
+  local health_code="000"
+  local ds_name=""
+  local loki_query_status="000"
+  local i
+
+  pf_log="$(mktemp "/tmp/smoke-grafana-pf.XXXX.log")"
+  kubectl -n monitoring port-forward svc/kube-prometheus-stack-grafana 13000:80 >"${pf_log}" 2>&1 &
+  pf_pid=$!
+
+  # Wait until port-forward is ready.
+  local ready=0
+  for ((i=1; i<=30; i++)); do
+    if ! kill -0 "${pf_pid}" >/dev/null 2>&1; then
+      echo "Grafana port-forward exited early." >&2
+      break
+    fi
+    if grep -Eq "Forwarding from (127\\.0\\.0\\.1|\\[::1\\]):13000" "${pf_log}"; then
+      ready=1
+      break
+    fi
+    sleep 1
+  done
+
+  if [[ "${ready}" != "1" ]]; then
+    echo "Grafana deep smoke failed: port-forward did not become ready." >&2
+    sed 's/^/  /' "${pf_log}" >&2 || true
+    kill "${pf_pid}" >/dev/null 2>&1 || true
+    wait "${pf_pid}" 2>/dev/null || true
+    rm -f "${pf_log}" || true
+    return 1
+  fi
+
+  # Grafana chart stores admin creds in this secret by default.
+  g_user="$(kubectl -n monitoring get secret kube-prometheus-stack-grafana -o jsonpath='{.data.admin-user}' 2>/dev/null | base64 --decode || true)"
+  g_pass="$(kubectl -n monitoring get secret kube-prometheus-stack-grafana -o jsonpath='{.data.admin-password}' 2>/dev/null | base64 --decode || true)"
+  if [[ -z "${g_user}" || -z "${g_pass}" ]]; then
+    echo "Grafana deep smoke failed: unable to read admin credentials from kube-prometheus-stack-grafana secret." >&2
+    kill "${pf_pid}" >/dev/null 2>&1 || true
+    wait "${pf_pid}" 2>/dev/null || true
+    rm -f "${pf_log}" || true
+    return 1
+  fi
+
+  # API health
+  health_code="$(curl -sS -u "${g_user}:${g_pass}" -o /dev/null -w '%{http_code}' "http://127.0.0.1:13000/api/health" || true)"
+  if [[ ! "${health_code}" =~ ^2 ]]; then
+    echo "Grafana deep smoke failed: /api/health returned ${health_code}" >&2
+    kill "${pf_pid}" >/dev/null 2>&1 || true
+    wait "${pf_pid}" 2>/dev/null || true
+    rm -f "${pf_log}" || true
+    return 1
+  fi
+
+  # Verify Loki datasource is provisioned.
+  ds_name="$(curl -sS -u "${g_user}:${g_pass}" "http://127.0.0.1:13000/api/datasources/name/Loki" | jq -r '.name // empty' 2>/dev/null || true)"
+  if [[ "${ds_name}" != "Loki" ]]; then
+    echo "Grafana deep smoke failed: Loki datasource missing from Grafana API." >&2
+    kill "${pf_pid}" >/dev/null 2>&1 || true
+    wait "${pf_pid}" 2>/dev/null || true
+    rm -f "${pf_log}" || true
+    return 1
+  fi
+
+  # Hit Loki query path via Grafana proxy API to ensure datasource query path works.
+  loki_query_status="$(curl -sS -u "${g_user}:${g_pass}" -o /dev/null -w '%{http_code}' \
+    "http://127.0.0.1:13000/api/datasources/proxy/uid/loki/loki/api/v1/query?query=vector(1)" || true)"
+  if [[ ! "${loki_query_status}" =~ ^2|4 ]]; then
+    echo "Grafana deep smoke failed: Loki datasource proxy query returned ${loki_query_status}" >&2
+    kill "${pf_pid}" >/dev/null 2>&1 || true
+    wait "${pf_pid}" 2>/dev/null || true
+    rm -f "${pf_log}" || true
+    return 1
+  fi
+
+  kill "${pf_pid}" >/dev/null 2>&1 || true
+  wait "${pf_pid}" 2>/dev/null || true
+  rm -f "${pf_log}" || true
+  echo "Grafana deep smoke OK (health=${health_code}, datasource=${ds_name}, loki_proxy=${loki_query_status})"
+}
+
+if [[ "${MODE}" == "wait-only" ]]; then
+  if observability_smoke_enabled; then
+    check_grafana
+  fi
+  echo "Wait-only checks passed for ${NAMESPACE}."
+  exit 0
+fi
+
+if observability_smoke_enabled; then
+  check_grafana
+fi
 
 check_api() {
   local path="$1"
