@@ -2,20 +2,36 @@ provider "aws" {
   region = var.aws_region
 }
 
-# These are configured once the EKS cluster exists. During the very first apply,
-# Terraform will create the cluster, then these providers will become usable in
-# subsequent applies (or a single apply if your environment supports it).
+# Use exec auth (aws eks get-token) instead of embedding cluster_auth_token. EKS bearer
+# tokens expire in ~15m; long Helm installs (kube-prometheus-stack, Loki) exceed that and fail.
 provider "kubernetes" {
   host                   = module.eks.cluster_endpoint
   cluster_ca_certificate = base64decode(module.eks.cluster_ca_certificate)
-  token                  = module.eks.cluster_auth_token
+
+  exec {
+    api_version = "client.authentication.k8s.io/v1beta1"
+    command     = "aws"
+    args = [
+      "eks", "get-token",
+      "--cluster-name", module.eks.cluster_name,
+      "--region", var.aws_region,
+    ]
+  }
 }
 
 provider "helm" {
   kubernetes {
     host                   = module.eks.cluster_endpoint
     cluster_ca_certificate = base64decode(module.eks.cluster_ca_certificate)
-    token                  = module.eks.cluster_auth_token
+
+    exec {
+      api_version = "client.authentication.k8s.io/v1beta1"
+      command     = "aws"
+      args = [
+        "eks", "get-token",
+        "--cluster-name", module.eks.cluster_name,
+        "--region", var.aws_region,
+      ]
+    }
   }
 }
-

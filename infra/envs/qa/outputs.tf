@@ -23,3 +23,8 @@ output "ecr_repository_urls" {
   description = "ECR repo URLs (repos created in envs/dev; shared across environments)."
 }
 
+output "grafana_url" {
+  value       = module.platform.grafana_url
+  description = "Grafana URL when observability stack is enabled."
+}
+

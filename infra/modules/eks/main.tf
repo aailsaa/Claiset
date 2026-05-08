@@ -229,7 +229,7 @@ resource "aws_eks_node_group" "default" {
   # Tags required for Cluster Autoscaler ASG auto-discovery.
   # These propagate to the underlying Auto Scaling Group created by the managed node group.
   tags = merge(var.tags, {
-    "k8s.io/cluster-autoscaler/enabled"             = "true"
+    "k8s.io/cluster-autoscaler/enabled"                      = "true"
     "k8s.io/cluster-autoscaler/${aws_eks_cluster.this.name}" = "owned"
   })
 }

@@ -10,6 +10,7 @@
 #
 # Notes:
 # - Uses the same backend layout as promotion.yml: envs/<env>/terraform.tfstate
+# - Pre-cleans Ingress in the env namespace and all Ingress + LoadBalancer Services in `monitoring` (observability Grafana ALB) before Terraform
 # - In CI, set TF_DESTROY_AUTO_APPROVE=1 and pass env names (e.g. qa) to skip the prompt.
 # - Run this from your laptop, not inside GitHub Actions (unless TF_DESTROY_AUTO_APPROVE=1).
 # - Make sure no CI job is currently running terraform for these envs.
@@ -59,10 +60,11 @@ for ENV in "${ENVS[@]}"; do
   echo "=== Destroying ${ENV} ==="
 
   # Best-effort pre-cleanup in cluster to reduce ALB/ENI dependency leftovers that block subnet/IGW destroy.
+  # App Ingress (ALB): namespace matches env name (dev/qa/uat/prod). Observability Grafana Ingress lives in monitoring.
   CLUSTER_NAME="${EXPECTED_CLUSTER_NAME:-claiset-${ENV}}"
   if command -v aws >/dev/null 2>&1 && command -v kubectl >/dev/null 2>&1; then
     if aws eks describe-cluster --region "${AWS_REGION}" --name "${CLUSTER_NAME}" >/dev/null 2>&1; then
-      echo "Pre-cleanup (${ENV}): cluster=${CLUSTER_NAME} namespace=${ENV}"
+      echo "Pre-cleanup (${ENV}): cluster=${CLUSTER_NAME} namespaces=${ENV},monitoring"
       aws eks update-kubeconfig --region "${AWS_REGION}" --name "${CLUSTER_NAME}" >/dev/null || true
       kubectl delete ingress claiset -n "${ENV}" --ignore-not-found=true --wait=true || true
       # Remove any LB Services that could keep ENIs/EIPs attached.
@@ -72,6 +74,16 @@ for ENV in "${ENVS[@]}"; do
             kubectl delete svc "${svc}" -n "${ENV}" --ignore-not-found=true --wait=true || true
           done
       kubectl wait --for=delete ingress/claiset -n "${ENV}" --timeout=120s 2>/dev/null || true
+
+      # Self-hosted Grafana (kube-prometheus-stack) Ingress is in monitoring, not env namespace — release ALBs early.
+      if kubectl get ns monitoring >/dev/null 2>&1; then
+        kubectl delete ingress --all -n monitoring --ignore-not-found=true --wait=true --timeout=180s || true
+        kubectl get svc -n monitoring -o jsonpath='{range .items[?(@.spec.type=="LoadBalancer")]}{.metadata.name}{"\n"}{end}' 2>/dev/null \
+          | while IFS= read -r svc; do
+              [[ -n "${svc}" ]] || continue
+              kubectl delete svc "${svc}" -n monitoring --ignore-not-found=true --wait=true || true
+            done
+      fi
     fi
   fi
 
@@ -84,7 +96,7 @@ for ENV in "${ENVS[@]}"; do
       -backend-config="dynamodb_table=${LOCK_TABLE}" \
       -backend-config="encrypt=true"
 
-    # Phase 1: tear down Kubernetes/platform resources first to release ALB/ENI/EIP dependencies.
+    # Phase 1: Kubernetes app + platform (Ingress/ALB, external-dns, cert automation, Prometheus/Grafana/Loki/Promtail when enabled).
     # If these modules are already gone, continue to full destroy.
     echo "Phase 1 destroy (${ENV}): app/platform resources"
     terraform destroy "${DESTROY_OPTS[@]}" \

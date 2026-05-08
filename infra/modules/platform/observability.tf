@@ -1,0 +1,355 @@
+locals {
+  # OAuth secret cannot participate in `for_each`/`count` conditionals without marking them sensitive-derived.
+  observability_enabled = (
+    var.enable_observability_stack &&
+    trimspace(var.domain_root) != "" &&
+    trimspace(var.grafana_google_client_id) != "" &&
+    var.wait_for_acm_validation
+  )
+  grafana_host = local.observability_enabled ? "grafana-${var.env}.${var.domain_root}" : ""
+
+  grafana_ini_google = merge(
+    {
+      enabled       = true
+      allow_sign_up = true
+      client_id     = var.grafana_google_client_id
+      scopes        = "openid email profile"
+      auth_url      = "https://accounts.google.com/o/oauth2/auth"
+      token_url     = "https://accounts.google.com/o/oauth2/token"
+      use_pkce      = true
+    },
+    trimspace(var.grafana_google_allowed_domains) != "" ? { allowed_domains = var.grafana_google_allowed_domains } : {}
+  )
+
+  alertmanager_enabled = trimspace(var.alertmanager_email_to) != "" && trimspace(var.alertmanager_smtp_smarthost) != ""
+
+  alertmanager_smtp_global = merge(
+    {
+      smtp_smarthost = var.alertmanager_smtp_smarthost
+      smtp_from      = var.alertmanager_smtp_from != "" ? var.alertmanager_smtp_from : "alerts@${var.domain_root}"
+    },
+    trimspace(var.alertmanager_smtp_user) != "" ? {
+      smtp_auth_username = var.alertmanager_smtp_user
+      smtp_auth_password = nonsensitive(var.alertmanager_smtp_password)
+    } : {}
+  )
+}
+
+resource "kubernetes_namespace" "monitoring" {
+  count = local.observability_enabled ? 1 : 0
+
+  metadata {
+    name = "monitoring"
+    labels = {
+      "app.kubernetes.io/part-of" = var.project
+      "env"                       = var.env
+    }
+  }
+
+  depends_on = [helm_release.aws_load_balancer_controller]
+}
+
+resource "kubernetes_secret" "grafana_google_oauth" {
+  count = local.observability_enabled ? 1 : 0
+
+  metadata {
+    name      = "grafana-google-oauth"
+    namespace = kubernetes_namespace.monitoring[0].metadata[0].name
+  }
+
+  # Provider base64-encodes Secret data; do not wrap in base64encode() or Grafana OAuth breaks.
+  data = {
+    secret = var.grafana_google_client_secret
+  }
+
+  type = "Opaque"
+
+  depends_on = [kubernetes_namespace.monitoring]
+}
+
+resource "aws_acm_certificate" "grafana" {
+  count = local.observability_enabled ? 1 : 0
+
+  domain_name       = local.grafana_host
+  validation_method = "DNS"
+  tags              = merge(var.tags, { Name = "${local.name}-grafana" })
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_route53_record" "grafana_cert_validation" {
+  for_each = local.observability_enabled ? {
+    for dvo in aws_acm_certificate.grafana[0].domain_validation_options : dvo.domain_name => {
+      name   = dvo.resource_record_name
+      type   = dvo.resource_record_type
+      values = [dvo.resource_record_value]
+    }
+  } : {}
+
+  zone_id         = local.zone_id
+  name            = each.value.name
+  type            = each.value.type
+  records         = each.value.values
+  ttl             = 60
+  allow_overwrite = true
+}
+
+resource "aws_acm_certificate_validation" "grafana" {
+  count = local.observability_enabled ? 1 : 0
+
+  certificate_arn         = aws_acm_certificate.grafana[0].arn
+  validation_record_fqdns = [for r in aws_route53_record.grafana_cert_validation : r.fqdn]
+
+  timeouts {
+    create = "25m"
+  }
+}
+
+resource "helm_release" "kube_prometheus_stack" {
+  count = local.observability_enabled ? 1 : 0
+
+  name       = "kube-prometheus-stack"
+  repository = "https://prometheus-community.github.io/helm-charts"
+  chart      = "kube-prometheus-stack"
+  version    = "59.1.0"
+  namespace  = kubernetes_namespace.monitoring[0].metadata[0].name
+
+  timeout         = 1800
+  atomic          = true
+  cleanup_on_fail = true
+  replace         = true
+  depends_on = [
+    helm_release.aws_load_balancer_controller,
+    aws_acm_certificate_validation.grafana,
+    kubernetes_secret.grafana_google_oauth,
+  ]
+
+  values = [yamlencode({
+    prometheus = {
+      prometheusSpec = {
+        scrapeInterval     = "60s"
+        evaluationInterval = "60s"
+        retention          = "5d"
+        resources = {
+          requests = { cpu = "200m", memory = "512Mi" }
+        }
+      }
+    }
+
+    kubeStateMetrics = { enabled = true }
+
+    nodeExporter = { enabled = true }
+
+    defaultRules = {
+      create = true
+      rules = {
+        alertmanager            = local.alertmanager_enabled
+        etcd                    = false
+        kubeControllerManager   = false
+        kubeSchedulerAlerting   = false
+        kubernetesSystemKubelet = true
+      }
+    }
+
+    alertmanager = local.alertmanager_enabled ? {
+      enabled = true
+      alertmanagerSpec = {
+        resources = {
+          requests = { cpu = "50m", memory = "128Mi" }
+        }
+      }
+      config = {
+        global = local.alertmanager_smtp_global
+        route  = { receiver = "email", group_wait = "30s", repeat_interval = "4h" }
+        receivers = [
+          { name = "email", email_configs = [{ to = var.alertmanager_email_to, send_resolved = true }] }
+        ]
+      }
+      } : {
+      enabled = false
+      alertmanagerSpec = {
+        resources = {
+          requests = { cpu = "50m", memory = "128Mi" }
+        }
+      }
+      config = {
+        global    = {}
+        route     = {}
+        receivers = []
+      }
+    }
+
+    grafana = {
+      enabled       = true
+      adminPassword = "do-not-use-oauth-required"
+      rbac          = { create = true }
+      ingress = {
+        enabled          = true
+        ingressClassName = "alb"
+        annotations = {
+          "kubernetes.io/ingress.class"               = "alb"
+          "alb.ingress.kubernetes.io/scheme"          = "internet-facing"
+          "alb.ingress.kubernetes.io/target-type"     = "ip"
+          "alb.ingress.kubernetes.io/listen-ports"    = "[{\"HTTP\":80},{\"HTTPS\":443}]"
+          "alb.ingress.kubernetes.io/ssl-redirect"    = "443"
+          "alb.ingress.kubernetes.io/certificate-arn" = aws_acm_certificate_validation.grafana[0].certificate_arn
+          "external-dns.alpha.kubernetes.io/hostname" = local.grafana_host
+        }
+        hosts    = [local.grafana_host]
+        path     = "/"
+        pathType = "Prefix"
+      }
+      extraEnv = [
+        {
+          name = "GF_AUTH_GOOGLE_CLIENT_SECRET"
+          valueFrom = {
+            secretKeyRef = {
+              name = kubernetes_secret.grafana_google_oauth[0].metadata[0].name
+              key  = "secret"
+            }
+          }
+        }
+      ]
+      # kube-prometheus passes this into the Grafana subchart as grafana.ini
+      "grafana.ini" = {
+        server = {
+          domain    = local.grafana_host
+          root_url  = "https://${local.grafana_host}/"
+          http_port = 3000
+        }
+        auth = {
+          disable_login_form = true
+        }
+        "auth.anonymous" = {
+          enabled = false
+        }
+        "auth.google" = local.grafana_ini_google
+        users = {
+          auto_assign_org      = true
+          auto_assign_org_role = "Editor"
+          viewers_can_edit     = false
+        }
+      }
+      resources = {
+        requests = { cpu = "100m", memory = "384Mi" }
+      }
+      additionalDataSources = [
+        {
+          name      = "Loki"
+          type      = "loki"
+          url       = "http://loki.monitoring.svc.cluster.local:3100"
+          access    = "proxy"
+          isDefault = false
+        }
+      ]
+    }
+  })]
+}
+
+resource "helm_release" "loki" {
+  count = local.observability_enabled ? 1 : 0
+
+  name       = "loki"
+  repository = "https://grafana.github.io/helm-charts"
+  chart      = "loki"
+  version    = "6.6.2"
+  namespace  = kubernetes_namespace.monitoring[0].metadata[0].name
+
+  depends_on = [helm_release.kube_prometheus_stack]
+
+  # Loki can take a while to become Ready on first install (charts + pods + schema init).
+  # If the timeout is too low, Helm fails and Terraform uninstalls Loki due to atomic=true.
+  timeout         = 2400
+  atomic          = true
+  cleanup_on_fail = true
+  replace         = true
+  values = [yamlencode({
+    deploymentMode = "SingleBinary"
+
+    # For small/dev clusters, disable memcached caches (they can request huge memory).
+    # This keeps Helm `wait=true` from timing out on Pending cache StatefulSets.
+    chunksCache  = { enabled = false }
+    resultsCache = { enabled = false }
+    # Loki chart requires the canary to be enabled for Helm validation/tests.
+    lokiCanary = { enabled = true }
+
+    singleBinary = {
+      replicas = 1
+      # Loki (especially ruler/storage modules) expects a writable /var/loki.
+      # Disabling persistence can leave /var/loki on a read-only filesystem in the chart's container.
+      persistence = { enabled = false }
+      # Chart has `readOnlyRootFilesystem: true`; mount writable storage at /var/loki.
+      extraVolumes = [
+        {
+          name     = "loki-storage"
+          emptyDir = {}
+        }
+      ]
+      extraVolumeMounts = [
+        {
+          name      = "loki-storage"
+          mountPath = "/var/loki"
+        }
+      ]
+      resources = {
+        requests = { cpu = "50m", memory = "384Mi" }
+      }
+    }
+
+    # Chart defaults deploymentMode SimpleScalable (write/read/backend replicas); must zero them for SingleBinary.
+    backend = { replicas = 0 }
+    read    = { replicas = 0 }
+    write   = { replicas = 0 }
+
+    ingester       = { replicas = 0 }
+    querier        = { replicas = 0 }
+    queryFrontend  = { replicas = 0 }
+    queryScheduler = { replicas = 0 }
+    distributor    = { replicas = 0 }
+    compactor      = { replicas = 0 }
+    indexGateway   = { replicas = 0 }
+    bloomCompactor = { replicas = 0 }
+    bloomGateway   = { replicas = 0 }
+
+    loki = {
+      # Loki 6.x requires schemaConfig unless this test flag is set; matches ephemeral singleBinary + no PVC.
+      useTestSchema = true
+      auth_enabled  = false
+      commonConfig = {
+        replication_factor = 1
+      }
+      storage = {
+        type = "filesystem"
+      }
+    }
+  })]
+}
+
+resource "helm_release" "promtail" {
+  count = local.observability_enabled ? 1 : 0
+
+  name       = "promtail"
+  repository = "https://grafana.github.io/helm-charts"
+  chart      = "promtail"
+  version    = "6.15.5"
+  namespace  = kubernetes_namespace.monitoring[0].metadata[0].name
+
+  depends_on = [helm_release.loki]
+
+  timeout         = 900
+  atomic          = true
+  cleanup_on_fail = true
+  replace         = true
+  values = [yamlencode({
+    resources = {
+      requests = { cpu = "40m", memory = "96Mi" }
+    }
+    config = {
+      clients = [
+        { url = "http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/push" }
+      ]
+    }
+  })]
+}

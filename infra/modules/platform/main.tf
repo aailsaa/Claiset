@@ -52,11 +52,11 @@ locals {
 # into the wrong zone_id), or your registrar still points at different nameservers
 # than the hosted zone in `route53_hosted_zone_id`. Fix public NS/DNS, then re-apply.
 resource "aws_acm_certificate" "frontend" {
-  count             = var.domain_root != "" ? 1 : 0
-  domain_name       = local.frontend_host
+  count                     = var.domain_root != "" ? 1 : 0
+  domain_name               = local.frontend_host
   subject_alternative_names = length(local.frontend_cert_sans) > 0 ? local.frontend_cert_sans : null
-  validation_method = "DNS"
-  tags              = var.tags
+  validation_method         = "DNS"
+  tags                      = var.tags
 
   # When hostnames/cert fields change, replace cert by creating the new one first.
   # Prevents "ResourceInUseException" from deleting a cert still attached to ALB listeners.
@@ -129,7 +129,6 @@ resource "helm_release" "aws_load_balancer_controller" {
   atomic          = true
   cleanup_on_fail = true
   replace         = true
-
   # With hostNetwork enabled this chart binds fixed host ports; running >1 replica can
   # fail to schedule on small node groups ("didn't have free ports"). One replica is
   # enough for this project and keeps costs low.
@@ -200,7 +199,6 @@ resource "helm_release" "external_dns" {
   atomic          = true
   cleanup_on_fail = true
   replace         = true
-
   set {
     name  = "replicaCount"
     value = "1"
@@ -328,7 +326,6 @@ resource "helm_release" "cluster_autoscaler" {
   atomic          = true
   cleanup_on_fail = true
   replace         = true
-
   set {
     name  = "autoDiscovery.clusterName"
     value = var.cluster_name
