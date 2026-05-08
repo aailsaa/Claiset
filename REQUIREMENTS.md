@@ -44,13 +44,13 @@ Use the **Your notes** column when you self-grade / submit comments.
 
 | Requirement | Done? | Your notes |
 | ----------- | ----- | ---------- |
-| **Prometheus + Grafana** on-cluster (**no** AWS-managed observability as substitute) | [x] | `kube-prometheus-stack` deploys via Terraform/Helm in `monitoring`; validated in dev and promotion workflow. |
-| **Dashboards** — **CPU, memory, disk** for **all nodes** | [x] | Node Exporter + Prometheus targets available from kube-prometheus-stack; node metrics visible in Grafana dashboards. |
+| **Prometheus + Grafana** on-cluster (**no** AWS-managed observability as substitute) | [ ] | Stack deploys via Terraform/Helm in `monitoring`, but full cross-env validation is still in progress after OAuth/secret drift issues. |
+| **Dashboards** — **CPU, memory, disk** for **all nodes** | [ ] | Components are present (Node Exporter + Prometheus), but dashboard coverage/accuracy has not been fully verified and documented for all nodes/environments. |
 | **Alerts** — **Email** and/or **Slack** at critical thresholds | [ ] | Optional SMTP/GitHub Secrets for Alertmanager (`alertmanager_*` variables). |
-| **Grafana** — reachable **from outside AWS** | [x] | Public ALB ingress at `https://grafana-<env>.<domain>` (OAuth-protected). |
-| **Grafana auth** — **OAuth2 only** (Okta/GitHub/Google); **no** username/password as primary UX | [x] | Google OAuth configured for Grafana; redirect URI allowlist required per env (`/login/google`). |
-| **Centralized logging** — **Loki** or ELK/OpenSearch **or** self-hosted Sentry on EKS | [x] | Loki + Promtail deployed on-cluster; Terraform/Helm tuned for stable install in small clusters. |
-| **Multi-service logs** — Query across **all 3** Go backends | [x] | Loki push/query smoke test passed (`hello` entries retrievable); cross-service query available via labels in Explore. |
+| **Grafana** — reachable **from outside AWS** | [ ] | External ingress exists and HTTP reachability smoke passes, but reliability across all environments and repeated runs is not fully confirmed yet. |
+| **Grafana auth** — **OAuth2 only** (Okta/GitHub/Google); **no** username/password as primary UX | [ ] | Google OAuth wiring exists and redirect smoke is in CI, but full end-to-end login validation is still being stabilized (recent `client_secret` issues). |
+| **Centralized logging** — **Loki** or ELK/OpenSearch **or** self-hosted Sentry on EKS | [ ] | Loki + Promtail deploy, but production-grade stability and retention/query behavior across all environments still need full verification. |
+| **Multi-service logs** — Query across **all 3** Go backends | [ ] | Basic Loki query smoke has passed, but consistent cross-service querying and proof screenshots/queries for grading are still pending. |
 
 ---
 

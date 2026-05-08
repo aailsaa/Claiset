@@ -153,6 +153,32 @@ resource "helm_release" "kube_prometheus_stack" {
       }
     }
 
+    # Starter custom alerts for grading/demo evidence.
+    additionalPrometheusRulesMap = {
+      claiset-custom = {
+        groups = [
+          {
+            name = "claiset.custom.rules"
+            rules = [
+              {
+                alert = "ClaisetBackendPodNotReady"
+                expr  = "sum by (namespace) (kube_pod_status_ready{namespace=~\"dev|qa|uat|prod\",condition=\"false\",pod=~\"items-.*|outfits-.*|schedule-.*\"}) > 0"
+                for   = "10m"
+                labels = {
+                  severity = "critical"
+                  service  = "backend"
+                }
+                annotations = {
+                  summary     = "One or more Claiset backend pods are NotReady"
+                  description = "Backend pod readiness has been failing for at least 10 minutes in {{$labels.namespace}}."
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+
     alertmanager = local.alertmanager_enabled ? {
       enabled = true
       alertmanagerSpec = {
@@ -162,8 +188,20 @@ resource "helm_release" "kube_prometheus_stack" {
       }
       config = {
         global = local.alertmanager_smtp_global
-        route  = { receiver = "email", group_wait = "30s", repeat_interval = "4h" }
+        route = {
+          receiver        = "null"
+          group_wait      = "30s"
+          group_interval  = "5m"
+          repeat_interval = "4h"
+          routes = [
+            {
+              receiver = "email"
+              matchers = ["severity=\"critical\""]
+            }
+          ]
+        }
         receivers = [
+          { name = "null" },
           { name = "email", email_configs = [{ to = var.alertmanager_email_to, send_resolved = true }] }
         ]
       }
