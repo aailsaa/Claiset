@@ -179,47 +179,44 @@ resource "helm_release" "kube_prometheus_stack" {
       }
     }
 
-    alertmanager = merge(
-      {
-        enabled = local.alertmanager_enabled
-        alertmanagerSpec = {
-          resources = {
-            requests = { cpu = "50m", memory = "128Mi" }
-          }
+    # Keep a consistent object shape for `config` so Terraform's type checker
+    # doesn't fail on conditional type mismatches.
+    alertmanager = {
+      enabled = local.alertmanager_enabled
+      alertmanagerSpec = {
+        resources = {
+          requests = { cpu = "50m", memory = "128Mi" }
         }
-      },
-      local.alertmanager_enabled ? {
-        config = {
-          global = local.alertmanager_smtp_global
-          route = {
-            receiver        = "null"
-            group_wait      = "30s"
-            group_interval  = "5m"
-            repeat_interval = "4h"
-            routes = [
+      }
+      config = {
+        global = local.alertmanager_smtp_global
+        route = {
+          receiver        = "null"
+          group_wait      = "30s"
+          group_interval  = "5m"
+          repeat_interval = "4h"
+          # Only route critical alerts to email when alerting is enabled.
+          routes = local.alertmanager_enabled ? [
+            {
+              receiver = "email"
+              matchers = ["severity=\"critical\""]
+            }
+          ] : []
+        }
+        receivers = [
+          { name = "null" },
+          {
+            name = "email"
+            email_configs = [
               {
-                receiver = "email"
-                matchers = ["severity=\"critical\""]
+                to             = local.alertmanager_enabled ? var.alertmanager_email_to : ""
+                send_resolved = true
               }
             ]
           }
-          receivers = [
-            { name = "null" },
-            { name = "email", email_configs = [{ to = var.alertmanager_email_to, send_resolved = true }] }
-          ]
-        }
-      } : {
-        config = {
-          global = {}
-          route = {
-            receiver = "null"
-          }
-          receivers = [
-            { name = "null" }
-          ]
-        }
+        ]
       }
-    )
+    }
 
     grafana = {
       enabled       = true
