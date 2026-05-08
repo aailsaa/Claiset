@@ -122,6 +122,9 @@ resource "kubernetes_job" "migrate" {
 
 resource "kubernetes_deployment" "items" {
   count = local.enabled ? 1 : 0
+  # CI performs explicit rollout checks in smoke scripts; avoid Terraform failing
+  # early on transient scheduler pressure during cluster scale events.
+  wait_for_rollout = false
 
   metadata {
     name      = "items"
@@ -208,6 +211,7 @@ resource "kubernetes_service" "items" {
 
 resource "kubernetes_deployment" "outfits" {
   count = local.enabled ? 1 : 0
+  wait_for_rollout = false
 
   metadata {
     name      = "outfits"
@@ -290,6 +294,7 @@ resource "kubernetes_service" "outfits" {
 
 resource "kubernetes_deployment" "schedule" {
   count = local.enabled ? 1 : 0
+  wait_for_rollout = false
 
   metadata {
     name      = "schedule"
@@ -372,6 +377,7 @@ resource "kubernetes_service" "schedule" {
 
 resource "kubernetes_deployment" "web" {
   count = local.enabled ? 1 : 0
+  wait_for_rollout = false
 
   metadata {
     name      = "web"
