@@ -4,7 +4,7 @@
 #
 # If a prior apply was cancelled, Kubernetes objects may exist in the cluster while Terraform
 # state never recorded them. Subsequent applies then fail with "already exists".
-# This guard imports existing app objects (and platform `platform` / `monitoring` namespaces)
+# This guard imports existing app objects, platform namespaces, and observability secrets
 # into state so apply can converge.
 
 set -euo pipefail
@@ -51,6 +51,8 @@ fi
 try_import "module.platform.kubernetes_namespace.platform" "platform" "Namespace"
 # Observability namespace — only in config when observability_enabled (OAuth + flags) matches CI; else import no-ops.
 try_import "module.platform.kubernetes_namespace.monitoring[0]" "monitoring" "Namespace"
+# Grafana OAuth secret (same observability_enabled gate as namespace).
+try_import "module.platform.kubernetes_secret.grafana_google_oauth[0]" "monitoring/grafana-google-oauth" "Secret"
 
 # Deployments
 for name in items outfits schedule web; do

@@ -3,10 +3,10 @@
 #
 # Problem: interrupted applies leave releases in pending-install/failed → next apply hits
 # "cannot re-use a name that is still in use". Terraform Helm does not auto-uninstall those.
+# Also: **deployed** releases still in-cluster but missing from Terraform state → import (same as helm-platform-reconcile).
 #
-# Run from infra/envs/<env> AFTER cluster exists & kube-credentials work (same as k8s import guard).
-# Safe: only touches whitelisted charts in monitoring, only when STATUS is pending-install or failed.
-# Deployed/upgrading releases are untouched.
+# Run from infra/envs/<env> AFTER cluster exists, kube-credentials work, and `terraform init` (same as k8s import guard).
+# Uninstall only when STATUS is stuck; healthy **deployed** releases are imported into state, not deleted.
 #
 # Usage:
 #   export EXPECTED_CLUSTER_NAME=claiset-dev   # required
@@ -75,13 +75,47 @@ maybe_uninstall() {
   if [[ "${status}" == "" ]]; then
     return 0
   fi
-  if [[ "${status}" != "pending-install" && "${status}" != "failed" ]]; then
+  if [[ "${status}" != "pending-install" && "${status}" != "failed" && "${status}" != "pending-upgrade" && "${status}" != "pending-rollback" ]]; then
     return 0
   fi
 
   echo "helm-monitoring-reconcile: uninstalling stuck release '${release}' in ${MON_NS} (STATUS=${status})"
   helm uninstall "${release}" -n "${MON_NS}" --wait --timeout=15m \
     || echo "helm-monitoring-reconcile: uninstall of ${release} returned non-zero; continuing anyway" >&2
+}
+
+maybe_import_deployed() {
+  local tf_addr="$1"
+  local ns="$2"
+  local helm_name="$3"
+
+  if ! command -v terraform >/dev/null 2>&1; then
+    return 0
+  fi
+  if ! terraform state list >/dev/null 2>&1; then
+    echo "helm-monitoring-reconcile: terraform not initialized in $(pwd); skipping import for ${tf_addr}" >&2
+    return 0
+  fi
+  if terraform state show -no-color "${tf_addr}" >/dev/null 2>&1; then
+    return 0
+  fi
+
+  local status
+  status="$(helm status "${helm_name}" -n "${ns}" 2>/dev/null | awk '/^STATUS:/{print tolower($2); exit}')"
+  if [[ "${status}" != "deployed" ]]; then
+    return 0
+  fi
+
+  local import_id="${ns}/${helm_name}"
+  echo "helm-monitoring-reconcile: importing deployed release into Terraform state: ${tf_addr} <- ${import_id}"
+  set +e
+  terraform import "${tf_addr}" "${import_id}"
+  local rc=$?
+  set -e
+  if [[ "${rc}" -ne 0 ]]; then
+    echo "helm-monitoring-reconcile: terraform import ${tf_addr} failed (exit ${rc}); often OK if observability is off in this workspace" >&2
+  fi
+  return 0
 }
 
 if [[ -z "${CLUSTER}" ]]; then
@@ -121,5 +155,10 @@ fi
 for rel in "${STACK_RELS[@]}"; do
   maybe_uninstall "${rel}"
 done
+
+# Adopt healthy releases missing from state (stack order: prometheus → loki → promtail).
+maybe_import_deployed "module.platform.helm_release.kube_prometheus_stack[0]" "${MON_NS}" "kube-prometheus-stack"
+maybe_import_deployed "module.platform.helm_release.loki[0]" "${MON_NS}" "loki"
+maybe_import_deployed "module.platform.helm_release.promtail[0]" "${MON_NS}" "promtail"
 
 echo "helm-monitoring-reconcile: OK (${CLUSTER}/${MON_NS})"
