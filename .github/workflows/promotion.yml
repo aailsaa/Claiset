@@ -229,6 +229,8 @@ jobs:
           # If a previous apply was cancelled, K8s objects may already exist but not be in state.
           # Import them so Phase 2 can converge (avoids "already exists" errors).
           bash ../../scripts/terraform-k8s-import-guard.sh
+          # Stuck ALB controller / external-dns / cluster-autoscaler releases block Helm apply.
+          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" bash ../../scripts/helm-platform-reconcile.sh
           # Orphaned / stuck observability Helm releases (pending-install, failed) block Terraform.
           EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" bash ../../scripts/helm-monitoring-reconcile.sh
           # Phase 2: platform (ACM, controllers) + app_bluegreen and the rest.
@@ -396,6 +398,7 @@ jobs:
           fi
 
           K8S_APP_NAMESPACE=qa bash ../../scripts/terraform-k8s-import-guard.sh
+          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" bash ../../scripts/helm-platform-reconcile.sh
           EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" bash ../../scripts/helm-monitoring-reconcile.sh
           terraform apply -auto-approve
           DOMAIN_ROOT=claiset.xyz K8S_APP_NAMESPACE=qa FRONTEND_SUBDOMAIN=app-qa bash ../../scripts/route53-ingress-records-guard.sh
@@ -581,6 +584,7 @@ jobs:
           kubectl get nodes --no-headers 2>/dev/null | awk '$2 ~ /SchedulingDisabled/ {print $1}' | xargs -r kubectl uncordon || true
 
           K8S_APP_NAMESPACE=uat bash ../../scripts/terraform-k8s-import-guard.sh
+          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" bash ../../scripts/helm-platform-reconcile.sh
           EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" bash ../../scripts/helm-monitoring-reconcile.sh
           terraform apply -auto-approve
           DOMAIN_ROOT=claiset.xyz K8S_APP_NAMESPACE=uat FRONTEND_SUBDOMAIN=app-uat bash ../../scripts/route53-ingress-records-guard.sh
@@ -736,6 +740,7 @@ jobs:
           kubectl get nodes --no-headers 2>/dev/null | awk '$2 ~ /SchedulingDisabled/ {print $1}' | xargs -r kubectl uncordon || true
 
           K8S_APP_NAMESPACE=prod bash ../../scripts/terraform-k8s-import-guard.sh
+          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" bash ../../scripts/helm-platform-reconcile.sh
           EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" bash ../../scripts/helm-monitoring-reconcile.sh
           terraform apply -auto-approve
           DOMAIN_ROOT=claiset.xyz K8S_APP_NAMESPACE=prod FRONTEND_SUBDOMAIN=app-prod bash ../../scripts/route53-ingress-records-guard.sh

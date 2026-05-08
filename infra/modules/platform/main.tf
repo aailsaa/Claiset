@@ -122,9 +122,9 @@ resource "kubernetes_namespace" "platform" {
 # Note: AWS Academy accounts often restrict IAM role creation (IRSA). This install
 # relies on the node IAM role (LabRole) having permission.
 #
-# Recovery: "cannot re-use a name that is still in use" → a failed prior release.
-#   helm uninstall aws-load-balancer-controller -n kube-system
-# or import: terraform import 'module.platform.helm_release.aws_load_balancer_controller' 'kube-system/aws-load-balancer-controller'
+# Recovery: "cannot re-use a name that is still in use" → stuck prior release; CI runs
+# ../../scripts/helm-platform-reconcile.sh before apply. Manual: helm uninstall … or terraform import
+# 'module.platform.helm_release.aws_load_balancer_controller' 'kube-system/aws-load-balancer-controller'
 resource "helm_release" "aws_load_balancer_controller" {
   name       = "aws-load-balancer-controller"
   repository = "https://aws.github.io/eks-charts"
