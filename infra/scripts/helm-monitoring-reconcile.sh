@@ -100,8 +100,9 @@ maybe_import_deployed() {
     return 0
   fi
 
+  # pipefail + missing release => helm exits 1; must not kill this script before Phase 2 apply.
   local status
-  status="$(helm status "${helm_name}" -n "${ns}" 2>/dev/null | awk '/^STATUS:/{print tolower($2); exit}')"
+  status="$(helm status "${helm_name}" -n "${ns}" 2>/dev/null | awk '/^STATUS:/{print tolower($2); exit}')" || true
   if [[ "${status}" != "deployed" ]]; then
     return 0
   fi
