@@ -78,6 +78,23 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Observability OAuth preflight (dev)
+        run: |
+          set -euo pipefail
+          if [[ "${TF_VAR_enable_observability_stack:-false}" == "true" ]]; then
+            id_trimmed="$(printf '%s' "${TF_VAR_grafana_google_client_id:-}" | tr -d '[:space:]')"
+            secret_trimmed="$(printf '%s' "${TF_VAR_grafana_google_client_secret:-}" | tr -d '[:space:]')"
+            if [[ -z "${id_trimmed}" || -z "${secret_trimmed}" ]]; then
+              echo "Observability enabled but Grafana Google OAuth secrets are empty." >&2
+              echo "Set repository secrets GRAFANA_GOOGLE_CLIENT_ID and GRAFANA_GOOGLE_CLIENT_SECRET." >&2
+              exit 1
+            fi
+            echo "::add-mask::${TF_VAR_grafana_google_client_secret}"
+            echo "Observability OAuth preflight OK (dev)."
+          else
+            echo "Observability disabled; skipping OAuth preflight."
+          fi
+
       - name: Set ECR registry from AWS account
         run: |
           acct="$(aws sts get-caller-identity --query Account --output text)"
@@ -250,6 +267,23 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Observability OAuth preflight (qa)
+        run: |
+          set -euo pipefail
+          if [[ "${TF_VAR_enable_observability_stack:-false}" == "true" ]]; then
+            id_trimmed="$(printf '%s' "${TF_VAR_grafana_google_client_id:-}" | tr -d '[:space:]')"
+            secret_trimmed="$(printf '%s' "${TF_VAR_grafana_google_client_secret:-}" | tr -d '[:space:]')"
+            if [[ -z "${id_trimmed}" || -z "${secret_trimmed}" ]]; then
+              echo "Observability enabled but Grafana Google OAuth secrets are empty." >&2
+              echo "Set repository secrets GRAFANA_GOOGLE_CLIENT_ID and GRAFANA_GOOGLE_CLIENT_SECRET." >&2
+              exit 1
+            fi
+            echo "::add-mask::${TF_VAR_grafana_google_client_secret}"
+            echo "Observability OAuth preflight OK (qa)."
+          else
+            echo "Observability disabled; skipping OAuth preflight."
+          fi
+
       - name: Set ECR registry from AWS account
         run: |
           acct="$(aws sts get-caller-identity --query Account --output text)"
@@ -410,6 +444,23 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Observability OAuth preflight (uat)
+        run: |
+          set -euo pipefail
+          if [[ "${TF_VAR_enable_observability_stack:-false}" == "true" ]]; then
+            id_trimmed="$(printf '%s' "${TF_VAR_grafana_google_client_id:-}" | tr -d '[:space:]')"
+            secret_trimmed="$(printf '%s' "${TF_VAR_grafana_google_client_secret:-}" | tr -d '[:space:]')"
+            if [[ -z "${id_trimmed}" || -z "${secret_trimmed}" ]]; then
+              echo "Observability enabled but Grafana Google OAuth secrets are empty." >&2
+              echo "Set repository secrets GRAFANA_GOOGLE_CLIENT_ID and GRAFANA_GOOGLE_CLIENT_SECRET." >&2
+              exit 1
+            fi
+            echo "::add-mask::${TF_VAR_grafana_google_client_secret}"
+            echo "Observability OAuth preflight OK (uat)."
+          else
+            echo "Observability disabled; skipping OAuth preflight."
+          fi
+
       - name: Set ECR registry from AWS account
         run: |
           acct="$(aws sts get-caller-identity --query Account --output text)"
@@ -538,6 +589,23 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
+
+      - name: Observability OAuth preflight (prod)
+        run: |
+          set -euo pipefail
+          if [[ "${TF_VAR_enable_observability_stack:-false}" == "true" ]]; then
+            id_trimmed="$(printf '%s' "${TF_VAR_grafana_google_client_id:-}" | tr -d '[:space:]')"
+            secret_trimmed="$(printf '%s' "${TF_VAR_grafana_google_client_secret:-}" | tr -d '[:space:]')"
+            if [[ -z "${id_trimmed}" || -z "${secret_trimmed}" ]]; then
+              echo "Observability enabled but Grafana Google OAuth secrets are empty." >&2
+              echo "Set repository secrets GRAFANA_GOOGLE_CLIENT_ID and GRAFANA_GOOGLE_CLIENT_SECRET." >&2
+              exit 1
+            fi
+            echo "::add-mask::${TF_VAR_grafana_google_client_secret}"
+            echo "Observability OAuth preflight OK (prod)."
+          else
+            echo "Observability disabled; skipping OAuth preflight."
+          fi
 
       - name: Set ECR registry from AWS account
         run: |

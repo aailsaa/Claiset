@@ -39,6 +39,7 @@ FRONTEND_HOST="${FRONTEND_HOST:-}"
 RDS_ID="${RDS_INSTANCE_ID:-${PROJECT}-${NAMESPACE}-postgres}"
 GRAFANA_HOST="${GRAFANA_HOST:-}"
 EXPECT_OBSERVABILITY_SMOKE="${EXPECT_OBSERVABILITY_SMOKE:-}"
+EXPECT_APP_OAUTH_SMOKE="${EXPECT_APP_OAUTH_SMOKE:-true}"
 
 if [[ -z "${CLUSTER}" ]]; then
   echo "EXPECTED_CLUSTER_NAME is required." >&2
@@ -67,6 +68,10 @@ observability_smoke_enabled() {
     return
   fi
   [[ "${TF_VAR_enable_observability_stack:-false}" == "true" ]]
+}
+
+app_oauth_smoke_enabled() {
+  [[ "${EXPECT_APP_OAUTH_SMOKE}" == "1" || "${EXPECT_APP_OAUTH_SMOKE}" == "true" ]]
 }
 
 echo "Smoke test: cluster=${CLUSTER} namespace=${NAMESPACE} frontend=${FRONTEND_HOST} region=${REGION}"
@@ -256,6 +261,17 @@ check_grafana() {
   fi
   echo "Grafana smoke OK (${grafana_code}) via ${GRAFANA_HOST}"
 
+  # OAuth entrypoint must redirect to Google accounts for auth code flow.
+  local oauth_headers=""
+  local oauth_location=""
+  oauth_headers="$(curl -sS -D - -o /dev/null "${GRAFANA_CONNECT_TO[@]}" "https://${GRAFANA_HOST}/login/google" || true)"
+  oauth_location="$(printf '%s\n' "${oauth_headers}" | awk 'BEGIN{IGNORECASE=1} /^location:/ {print $2; exit}' | tr -d '\r')"
+  if [[ "${oauth_location}" != https://accounts.google.com/* ]]; then
+    echo "Grafana OAuth smoke failed: /login/google did not redirect to Google. location=${oauth_location:-<empty>}" >&2
+    return 1
+  fi
+  echo "Grafana OAuth smoke OK (redirects to Google Accounts)"
+
   echo "Grafana deep smoke: rollout, API health, datasource, and Loki query path"
   kubectl -n monitoring rollout status deployment/kube-prometheus-stack-grafana --timeout=8m
 
@@ -343,6 +359,17 @@ check_grafana() {
   echo "Grafana deep smoke OK (health=${health_code}, datasource=${ds_name}, loki_proxy=${loki_query_status})"
 }
 
+check_app_oauth() {
+  # App uses Google Identity JS in-browser. CLI smoke can verify login route availability only.
+  local login_code="000"
+  login_code="$(curl_code "https://${SMOKE_BASE_HOST}/login")"
+  if [[ ! "${login_code}" =~ ^2|3 ]]; then
+    echo "App OAuth smoke failed: /login returned ${login_code}" >&2
+    return 1
+  fi
+  echo "App OAuth smoke OK (/login -> ${login_code})"
+}
+
 if [[ "${MODE}" == "wait-only" ]]; then
   if observability_smoke_enabled; then
     check_grafana
@@ -353,6 +380,10 @@ fi
 
 if observability_smoke_enabled; then
   check_grafana
+fi
+
+if app_oauth_smoke_enabled; then
+  check_app_oauth
 fi
 
 check_api() {
