@@ -203,15 +203,14 @@ jobs:
             -target=module.rds \
             -target=module.ecr
 
-          # Burst node capacity for Phase 2 rollout, then scale down again for cost.
-          # This prevents "Too many pods" from stalling Deployments on tiny nodes.
+          # Burst node capacity for Phase 2 rollout. Scale-down runs AFTER smoke tests (separate step)
+          # so Grafana/monitoring checks are not racing cluster autoscaler right after apply.
           BASE_MIN=2
           BASE_DESIRED=3
           BASE_MAX=6
           BURST_DESIRED=6
           CLUSTER="${EXPECTED_CLUSTER_NAME}"
           NODEGROUP="${EXPECTED_CLUSTER_NAME}-default"
-          trap 'echo "Scaling nodegroup back down"; AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" "${BASE_MIN}" "${BASE_DESIRED}" "${BASE_MAX}" || true' EXIT
           AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" "${BASE_MIN}" "${BURST_DESIRED}" "${BASE_MAX}"
           aws eks update-kubeconfig --region "${AWS_REGION}" --name "${CLUSTER}"
           echo "Waiting for burst node count to be Ready before Phase 2..."
@@ -259,6 +258,15 @@ jobs:
         working-directory: infra/envs/dev
         run: |
           EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=dev FRONTEND_HOST=claiset.xyz EXPECT_OBSERVABILITY_SMOKE="${TF_VAR_enable_observability_stack:-false}" EXPECT_APP_OAUTH_SMOKE=true GRAFANA_HOST=grafana-dev.claiset.xyz bash ../../scripts/smoke-test-env.sh --skip-wait
+
+      # Post-smoke: warmer baseline than min=1/desired=3 — avoids single-node pinch (app + observability).
+      - name: Scale dev nodegroup down (post-smoke)
+        if: always()
+        working-directory: infra/envs/dev
+        run: |
+          CLUSTER="${EXPECTED_CLUSTER_NAME}"
+          NODEGROUP="${EXPECTED_CLUSTER_NAME}-default"
+          AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" 2 4 6
 
   qa:
     name: Promote to QA (nightly)
@@ -367,15 +375,13 @@ jobs:
             -target=module.eks \
             -target=module.rds
 
-          # Burst node capacity for Phase 2 rollout, then scale down again for cost.
-          # Align with env defaults (desired=2, max=6): burst so Helm/controllers always have slots on t3.small.
+          # Burst for Phase 2; scale-down after smoke tests (do not EXIT-trap before smoke — hurts Grafana).
           BASE_MIN=1
           BASE_DESIRED=3
           BASE_MAX=6
           BURST_DESIRED=6
           CLUSTER="${EXPECTED_CLUSTER_NAME}"
           NODEGROUP="${EXPECTED_CLUSTER_NAME}-default"
-          trap 'echo "Scaling nodegroup back down"; AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" "${BASE_MIN}" "${BASE_DESIRED}" "${BASE_MAX}" || true' EXIT
           AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" "${BASE_MIN}" "${BURST_DESIRED}" "${BASE_MAX}"
 
           # ALB controller is created by module.platform in Phase 2 below.
@@ -412,6 +418,14 @@ jobs:
         working-directory: infra/envs/qa
         run: |
           EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=qa FRONTEND_HOST=app-qa.claiset.xyz EXPECT_OBSERVABILITY_SMOKE="${TF_VAR_enable_observability_stack:-false}" EXPECT_APP_OAUTH_SMOKE=true GRAFANA_HOST=grafana-qa.claiset.xyz bash ../../scripts/smoke-test-env.sh --skip-wait
+
+      - name: Scale qa nodegroup down (post-smoke)
+        if: always()
+        working-directory: infra/envs/qa
+        run: |
+          CLUSTER="${EXPECTED_CLUSTER_NAME}"
+          NODEGROUP="${EXPECTED_CLUSTER_NAME}-default"
+          AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" 2 4 6
 
   uat:
     name: Promote to UAT (PR merge or RC commits)
@@ -562,14 +576,13 @@ jobs:
             -target=module.eks \
             -target=module.rds
 
-          # Same as dev: UAT had no burst and hit "Too many pods" on platform Helm (external-dns Pending).
+          # Same as dev: burst for Phase 2; scale-down after smoke only.
           BASE_MIN=1
           BASE_DESIRED=3
           BASE_MAX=6
           BURST_DESIRED=6
           CLUSTER="${EXPECTED_CLUSTER_NAME}"
           NODEGROUP="${EXPECTED_CLUSTER_NAME}-default"
-          trap 'echo "Scaling nodegroup back down"; AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" "${BASE_MIN}" "${BASE_DESIRED}" "${BASE_MAX}" || true' EXIT
           AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" "${BASE_MIN}" "${BURST_DESIRED}" "${BASE_MAX}"
           aws eks update-kubeconfig --region "${AWS_REGION}" --name "${CLUSTER}"
           echo "Waiting for burst node count to be Ready before Phase 2..."
@@ -598,6 +611,14 @@ jobs:
         working-directory: infra/envs/uat
         run: |
           EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=uat FRONTEND_HOST=app-uat.claiset.xyz EXPECT_OBSERVABILITY_SMOKE="${TF_VAR_enable_observability_stack:-false}" EXPECT_APP_OAUTH_SMOKE=true GRAFANA_HOST=grafana-uat.claiset.xyz bash ../../scripts/smoke-test-env.sh --skip-wait
+
+      - name: Scale uat nodegroup down (post-smoke)
+        if: always()
+        working-directory: infra/envs/uat
+        run: |
+          CLUSTER="${EXPECTED_CLUSTER_NAME}"
+          NODEGROUP="${EXPECTED_CLUSTER_NAME}-default"
+          AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" 2 4 6
 
   prod:
     name: Promote to production (tags)
@@ -725,7 +746,6 @@ jobs:
           BURST_DESIRED=6
           CLUSTER="${EXPECTED_CLUSTER_NAME}"
           NODEGROUP="${EXPECTED_CLUSTER_NAME}-default"
-          trap 'echo "Scaling nodegroup back down"; AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" "${BASE_MIN}" "${BASE_DESIRED}" "${BASE_MAX}" || true' EXIT
           AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" "${BASE_MIN}" "${BURST_DESIRED}" "${BASE_MAX}"
           aws eks update-kubeconfig --region "${AWS_REGION}" --name "${CLUSTER}"
           echo "Waiting for burst node count to be Ready before Phase 2..."
@@ -754,4 +774,12 @@ jobs:
         working-directory: infra/envs/prod
         run: |
           EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=prod FRONTEND_HOST=app-prod.claiset.xyz EXPECT_OBSERVABILITY_SMOKE="${TF_VAR_enable_observability_stack:-false}" EXPECT_APP_OAUTH_SMOKE=true GRAFANA_HOST=grafana-prod.claiset.xyz bash ../../scripts/smoke-test-env.sh --skip-wait
+
+      - name: Scale prod nodegroup down (post-smoke)
+        if: always()
+        working-directory: infra/envs/prod
+        run: |
+          CLUSTER="${EXPECTED_CLUSTER_NAME}"
+          NODEGROUP="${EXPECTED_CLUSTER_NAME}-default"
+          AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" 2 4 6
 
