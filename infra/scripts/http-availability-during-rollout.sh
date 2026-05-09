@@ -7,6 +7,9 @@
 # Args:
 #   $1 — optional max seconds (default 0 = until Ctrl+C)
 #
+# Optional debugging (shows why sustained HTTP ERR ≠ scale-down by itself):
+#   HTTP_PROBE_DIAG=1 — print curl stderr once per probe when curl fails before an HTTP status
+#
 set -euo pipefail
 
 HOST_OR_URL="${FRONTEND_HOST:-}"
@@ -28,12 +31,30 @@ echo "---"
 
 samples=0
 start_ts="$(date +%s)"
+diag_tmp=""
+if [[ "${HTTP_PROBE_DIAG:-}" == "1" ]]; then
+  diag_tmp="$(mktemp)"
+  trap '[[ -n "${diag_tmp:-}" ]] && rm -f "${diag_tmp}"' EXIT
+fi
+
 while true; do
   ts="$(date -u '+%H:%M:%S')"
-  if code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 8 "${URL}" 2>/dev/null)"; then
-    [[ -z "${code}" ]] && code="000"
+  if [[ "${HTTP_PROBE_DIAG:-}" == "1" ]]; then
+    rm -f "${diag_tmp}"
+    if code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 8 "${URL}" 2>"${diag_tmp}")"; then
+      [[ -z "${code}" ]] && code="000"
+    else
+      code="ERR"
+      curl_err=""
+      curl_err="$(tr -d '\r' <"${diag_tmp}" | tail -n 1)"
+      [[ -n "${curl_err}" ]] && echo "${ts} DIAG ${curl_err}" >&2
+    fi
   else
-    code="ERR"
+    if code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 8 "${URL}" 2>/dev/null)"; then
+      [[ -z "${code}" ]] && code="000"
+    else
+      code="ERR"
+    fi
   fi
   echo "${ts} HTTP ${code}"
 
