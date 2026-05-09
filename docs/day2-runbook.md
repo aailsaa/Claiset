@@ -31,6 +31,8 @@ terraform init \
 terraform apply
 ```
 
+If apply fails with **state lock** after cancelling CI, see [failure-playbook.md §1](failure-playbook.md#1-terraform-state-lock-error) (do not unlock while another apply is running).
+
 4. **Observe rollout**
 
 ```bash

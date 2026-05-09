@@ -33,6 +33,8 @@ terraform apply
 - `TF_LOCK_TABLE` (DynamoDB lock table name)
 - `ROUTE53_HOSTED_ZONE_ID` (public hosted zone ID for `domain_root`, e.g. `Z123...`; CI sets `TF_VAR_route53_hosted_zone_id`)
 
+**Stuck state lock** (e.g. cancelled workflow): see [`docs/failure-playbook.md`](../docs/failure-playbook.md).
+
 ### Promotion workflow (git-driven)
 CI/CD is implemented via GitHub Actions in [`.github/workflows/promotion.yml`](../.github/workflows/promotion.yml):
 - **Dev**: push to `main` builds/pushes images tagged `:dev` and applies Terraform in `envs/dev`
@@ -97,4 +99,4 @@ Grafana is exposed on **`https://grafana-<env>.<domain_root>`** via ALB Ingress;
 
 If `ENABLE_OBSERVABILITY` is `true` but Grafana secrets are empty, Terraform will fail validation. Register **every** Grafana redirect URI you need in Google Cloud before the first CI apply per environment.
 
-**Stuck Helm / recover before apply:** If an apply was interrupted, observability charts can sit in Helm `pending-install` / `failed` and the next Terraform run errors with **`cannot re-use a name that is still in use`**. The workflow runs [`scripts/helm-monitoring-reconcile.sh`](scripts/helm-monitoring-reconcile.sh) after the Kubernetes import guard: it uninstalls **only** `promtail` / `loki` / `kube-prometheus-stack` in `monitoring` when their status is stuck (never touches `deployed` releases). Run the same script locally from `infra/envs/<env>` with `EXPECTED_CLUSTER_NAME` set if you see that error.
+**Stuck Helm / recover before apply:** If an apply was interrupted, charts can sit in Helm `pending-install` / `failed` / `pending-upgrade` / `pending-rollback` and the next Terraform run errors with **`cannot re-use a name that is still in use`**. The workflow runs [`scripts/helm-platform-reconcile.sh`](scripts/helm-platform-reconcile.sh) (unstuck uninstall + **`terraform import`** for healthy **deployed** platform charts missing from state) then [`scripts/helm-monitoring-reconcile.sh`](scripts/helm-monitoring-reconcile.sh) (same for `kube-prometheus-stack` / `loki` / `promtail` in `monitoring`). Run the same scripts locally from `infra/envs/<env>` after `terraform init`, with `EXPECTED_CLUSTER_NAME` set, if you see that error.

@@ -44,13 +44,13 @@ Use the **Your notes** column when you self-grade / submit comments.
 
 | Requirement | Done? | Your notes |
 | ----------- | ----- | ---------- |
-| **Prometheus + Grafana** on-cluster (**no** AWS-managed observability as substitute) | [x] | Stack is deployed via Terraform/Helm in `monitoring`; dev login/access is now working. Still run QA/UAT checks for full cross-env proof. |
-| **Dashboards** — **CPU, memory, disk** for **all nodes** | [ ] | Components are present (Node Exporter + Prometheus), but dashboard coverage/accuracy has not been fully verified and documented for all nodes/environments. |
-| **Alerts** — **Email** and/or **Slack** at critical thresholds | [ ] | Optional SMTP/GitHub Secrets for Alertmanager (`alertmanager_*` variables). |
-| **Grafana** — reachable **from outside AWS** | [x] | Verified in dev at `grafana-dev.<domain>` with external ingress. Validate QA/UAT/Prod endpoints to close out all envs. |
-| **Grafana auth** — **OAuth2 only** (Okta/GitHub/Google); **no** username/password as primary UX | [x] | Google OAuth login works in dev after secret wiring fix; workflow now has preflight + smoke checks to catch regressions. |
-| **Centralized logging** — **Loki** or ELK/OpenSearch **or** self-hosted Sentry on EKS | [x] | Loki + Promtail are deployed and queried in dev smoke/deep checks; complete cross-env validation and screenshots for grading evidence. |
-| **Multi-service logs** — Query across **all 3** Go backends | [ ] | Basic Loki query smoke has passed, but consistent cross-service querying and proof screenshots/queries for grading are still pending. |
+| **Prometheus + Grafana** on-cluster (**no** AWS-managed observability as substitute) | [x] | Deployed via Terraform/Helm in `monitoring`. **Dev, QA, and UAT** validated in CI (smoke + rollout); **prod** still to run/confirm for full four-env proof. |
+| **Dashboards** — **CPU, memory, disk** for **all nodes** | [x] | Node Exporter + Prometheus + Grafana stack; node metrics available in **dev/QA/UAT**. Capture rubric screenshots (and spot-check **prod** after deploy). |
+| **Alerts** — **Email** and/or **Slack** at critical thresholds | [ ] | Alertmanager wired for critical → email when SMTP/`alertmanager_*` secrets are set; optional demo via `infra/scripts/alert-drill.sh`. |
+| **Grafana** — reachable **from outside AWS** | [x] | **Dev, QA, UAT:** `grafana-<env>.<domain>` via ALB ingress; CI smoke passes. **Prod:** validate `grafana-prod.<domain>` after prod promotion. |
+| **Grafana auth** — **OAuth2 only** (Okta/GitHub/Google); **no** username/password as primary UX | [x] | **Google OAuth** end-to-end in **dev, QA, UAT**; repo preflight + smoke checks catch empty OAuth secrets. Confirm **prod** after release. |
+| **Centralized logging** — **Loki** or ELK/OpenSearch **or** self-hosted Sentry on EKS | [x] | Loki + Promtail in **dev/QA/UAT**; Explore + CI deep checks (datasources, queries). **Prod** pending until prod workflow runs. |
+| **Multi-service logs** — Query across **all 3** Go backends | [x] | Loki query smoke and Explore validated in **dev/QA/UAT**; keep query examples + screenshots for graders. Repeat in **prod** once live. |
 
 ---
 
