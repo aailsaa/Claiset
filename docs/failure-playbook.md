@@ -137,3 +137,17 @@ Symptoms: `kubernetes_job.migrate` fails on **refresh** during apply (`Refreshin
 **Cause:** The one-shot migrate Job finished and was **removed** from the cluster (or never created) while **Terraform state** still tracks it. Apply tries to refresh a missing object and errors.
 
 **Fix:** The **k8s import guard** removes that address from state when the job is missing so the next apply **recreates** it. If you need to do it manually: `terraform state rm 'module.app_bluegreen.kubernetes_job.migrate[0]'` from `infra/envs/<env>` (then re-apply). The guard’s **“Skipping Job … import failed”** line when the job does not exist yet is normal and not a failed step by itself.
+
+## 11) EKS managed node group: `NodeCreationFailure` / new nodes not joining
+
+Symptoms: `waiting for EKS Node Group ... unexpected state 'Failed' ... NodeCreationFailure: ... new nodes are not joining`.
+
+**Common causes:** launch template / instance-type rollouts racing `$Latest`, **insufficient EC2 capacity** for the chosen type/AZ, subnets/NAT so nodes cannot reach the **public** EKS API endpoint, or a **stuck** partial update after a **`-target`** apply.
+
+**In AWS Console:** EKS → cluster → **Compute** → node group → **Health issues** and **Events**; EC2 → instances launched by the node group ASG → **Status checks** and **Get system log** (bootstrap/kubelet errors).
+
+**After a failed update:** when no other apply is running, retry from the same `infra/envs/<env>` after `terraform init` (same backend as CI), then a **full** `terraform plan` (avoid `-target` unless you are recovering a documented partial apply). The EKS module pins the **launch template version** and sets **`update_config`** so rolls are less likely to wedge.
+
+**If capacity is the issue:** temporarily switch `node_instance_types` (e.g. try `t3a.medium` instead of `t3.medium` in `infra/envs/prod/variables.tf`) and re-apply, or change **capacity**/AZ by adjusting the node group.
+
+**If the node group stays `DEGRADED`/`FAILED`:** use AWS support guidance / Console **Rollback** or open a case; avoid cancelling mid-apply. Do not `force-unlock` while a real node group update is still running in AWS.

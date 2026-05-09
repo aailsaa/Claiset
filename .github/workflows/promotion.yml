@@ -234,7 +234,7 @@ jobs:
           EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" bash ../../scripts/helm-monitoring-reconcile.sh
           # Phase 2: platform (ACM, controllers) + app_bluegreen and the rest.
           terraform apply -auto-approve
-          DOMAIN_ROOT=claiset.xyz FRONTEND_SUBDOMAIN= K8S_APP_NAMESPACE=dev bash ../../scripts/route53-ingress-records-guard.sh
+          DOMAIN_ROOT=claiset.xyz FRONTEND_SUBDOMAIN=app-dev UPDATE_APEX_DNS=false K8S_APP_NAMESPACE=dev bash ../../scripts/route53-ingress-records-guard.sh
 
       - name: Wait for readiness
         working-directory: infra/envs/dev
@@ -250,14 +250,14 @@ jobs:
           aws rds wait db-instance-available --region "${AWS_REGION}" --db-instance-identifier "${RDS_ID}"
 
           # Reconcile Route53 alias each run (covers cases after manual scale-down/teardown).
-          DOMAIN_ROOT=claiset.xyz FRONTEND_SUBDOMAIN= K8S_APP_NAMESPACE=dev bash ../../scripts/route53-ingress-records-guard.sh
+          DOMAIN_ROOT=claiset.xyz FRONTEND_SUBDOMAIN=app-dev UPDATE_APEX_DNS=false K8S_APP_NAMESPACE=dev bash ../../scripts/route53-ingress-records-guard.sh
 
-          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=dev FRONTEND_HOST=claiset.xyz EXPECT_OBSERVABILITY_SMOKE="${TF_VAR_enable_observability_stack:-false}" EXPECT_APP_OAUTH_SMOKE=true GRAFANA_HOST=grafana-dev.claiset.xyz bash ../../scripts/smoke-test-env.sh --wait-only
+          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=dev FRONTEND_HOST=app-dev.claiset.xyz EXPECT_OBSERVABILITY_SMOKE="${TF_VAR_enable_observability_stack:-false}" EXPECT_APP_OAUTH_SMOKE=true GRAFANA_HOST=grafana-dev.claiset.xyz bash ../../scripts/smoke-test-env.sh --wait-only
 
       - name: Smoke tests
         working-directory: infra/envs/dev
         run: |
-          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=dev FRONTEND_HOST=claiset.xyz EXPECT_OBSERVABILITY_SMOKE="${TF_VAR_enable_observability_stack:-false}" EXPECT_APP_OAUTH_SMOKE=true GRAFANA_HOST=grafana-dev.claiset.xyz bash ../../scripts/smoke-test-env.sh --skip-wait
+          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=dev FRONTEND_HOST=app-dev.claiset.xyz EXPECT_OBSERVABILITY_SMOKE="${TF_VAR_enable_observability_stack:-false}" EXPECT_APP_OAUTH_SMOKE=true GRAFANA_HOST=grafana-dev.claiset.xyz bash ../../scripts/smoke-test-env.sh --skip-wait
 
       # Post-smoke: warmer baseline than min=1/desired=3 — avoids single-node pinch (app + observability).
       - name: Scale dev nodegroup down (post-smoke)
@@ -407,7 +407,7 @@ jobs:
           EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" bash ../../scripts/helm-platform-reconcile.sh
           EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" bash ../../scripts/helm-monitoring-reconcile.sh
           terraform apply -auto-approve
-          DOMAIN_ROOT=claiset.xyz K8S_APP_NAMESPACE=qa FRONTEND_SUBDOMAIN=app-qa bash ../../scripts/route53-ingress-records-guard.sh
+          DOMAIN_ROOT=claiset.xyz K8S_APP_NAMESPACE=qa FRONTEND_SUBDOMAIN=app-qa UPDATE_APEX_DNS=false bash ../../scripts/route53-ingress-records-guard.sh
 
       - name: Wait for readiness (qa)
         working-directory: infra/envs/qa
@@ -600,7 +600,7 @@ jobs:
           EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" bash ../../scripts/helm-platform-reconcile.sh
           EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" bash ../../scripts/helm-monitoring-reconcile.sh
           terraform apply -auto-approve
-          DOMAIN_ROOT=claiset.xyz K8S_APP_NAMESPACE=uat FRONTEND_SUBDOMAIN=app-uat bash ../../scripts/route53-ingress-records-guard.sh
+          DOMAIN_ROOT=claiset.xyz K8S_APP_NAMESPACE=uat FRONTEND_SUBDOMAIN=app-uat UPDATE_APEX_DNS=false bash ../../scripts/route53-ingress-records-guard.sh
 
       - name: Wait for readiness (uat)
         working-directory: infra/envs/uat
@@ -764,7 +764,7 @@ jobs:
           EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" bash ../../scripts/helm-platform-reconcile.sh
           EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" bash ../../scripts/helm-monitoring-reconcile.sh
           terraform apply -auto-approve
-          DOMAIN_ROOT=claiset.xyz K8S_APP_NAMESPACE=prod FRONTEND_SUBDOMAIN=app-prod bash ../../scripts/route53-ingress-records-guard.sh
+          DOMAIN_ROOT=claiset.xyz K8S_APP_NAMESPACE=prod FRONTEND_SUBDOMAIN=app-prod UPDATE_APEX_DNS=true bash ../../scripts/route53-ingress-records-guard.sh
 
       - name: Wait for readiness (prod)
         working-directory: infra/envs/prod

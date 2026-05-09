@@ -80,8 +80,8 @@ variable "create_hosted_zone" {
 
 variable "frontend_subdomain" {
   type        = string
-  description = "Subdomain for the frontend (e.g. app). Full name becomes app.<domain_root>."
-  default     = ""
+  description = "Subdomain for the frontend. Use app-dev so apex (claiset.xyz) can stay on prod; empty uses apex as canonical (not recommended with shared zone)."
+  default     = "app-dev"
 }
 
 variable "wait_for_acm_validation" {

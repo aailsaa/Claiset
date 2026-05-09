@@ -8,7 +8,7 @@
 # 5) RDS instance for this env is Available
 #
 # Usage (run from infra/envs/<env> after apply):
-#   EXPECTED_CLUSTER_NAME=claiset-dev K8S_APP_NAMESPACE=dev FRONTEND_HOST=claiset.xyz \
+#   EXPECTED_CLUSTER_NAME=claiset-dev K8S_APP_NAMESPACE=dev FRONTEND_HOST=app-dev.claiset.xyz \
 #   bash ../../scripts/smoke-test-env.sh
 
 set -euo pipefail

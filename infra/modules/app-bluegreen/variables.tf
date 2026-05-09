@@ -22,6 +22,12 @@ variable "frontend_subdomain" {
   # Set to "" to use apex as canonical host (domain_root directly).
 }
 
+variable "include_apex_and_www_in_external_dns" {
+  type        = bool
+  default     = false
+  description = "If true, Ingress external-dns hostname list includes apex and www. Use true only for prod so root DNS is not repointed by non-prod clusters."
+}
+
 variable "frontend_certificate_arn" {
   type        = string
   description = "ACM certificate ARN for the frontend hostname (for ALB Ingress TLS)."

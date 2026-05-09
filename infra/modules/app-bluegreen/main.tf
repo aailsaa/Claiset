@@ -7,6 +7,13 @@ locals {
   )
   apex_host = var.domain_root
   www_host  = var.domain_root != "" ? "www.${var.domain_root}" : ""
+  # Non-prod must not publish apex/www to external-dns or the last deploy steals claiset.xyz from prod.
+  external_dns_hostnames = (
+    var.domain_root == "" ? "" :
+    var.include_apex_and_www_in_external_dns ?
+    "${local.frontend_host},${local.apex_host},${local.www_host}" :
+    local.frontend_host
+  )
   # Keep count decisions based only on root input variables, not on values computed from
   # other modules during the same plan (e.g. RDS address/password, ACM ARN). Those can be
   # unknown at plan time and would make count invalid.
@@ -465,7 +472,7 @@ resource "kubernetes_ingress_v1" "app" {
       "alb.ingress.kubernetes.io/listen-ports"    = "[{\"HTTP\":80},{\"HTTPS\":443}]"
       "alb.ingress.kubernetes.io/ssl-redirect"    = "443"
       "alb.ingress.kubernetes.io/certificate-arn" = var.frontend_certificate_arn
-      "external-dns.alpha.kubernetes.io/hostname" = "${local.frontend_host},${local.apex_host},${local.www_host}"
+      "external-dns.alpha.kubernetes.io/hostname" = local.external_dns_hostnames
 
       # Redirect apex/www → canonical frontend host (https://app.<domain>/)
       "alb.ingress.kubernetes.io/actions.redirect-to-frontend" = jsonencode({

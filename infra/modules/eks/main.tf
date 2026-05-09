@@ -208,6 +208,8 @@ resource "aws_eks_node_group" "default" {
   node_group_name = "${local.name}-default"
   node_role_arn   = local.resolved_node_role_arn
   subnet_ids      = var.subnet_ids
+  # Pin to control plane so node AMIs/kubelet stay aligned; avoids ambiguous "version update" states.
+  version = aws_eks_cluster.this.version
 
   scaling_config {
     desired_size = var.node_group_desired_size
@@ -215,9 +217,16 @@ resource "aws_eks_node_group" "default" {
     min_size     = var.node_group_min_size
   }
 
+  # Pin concrete LT version so the node group never applies an older template revision while AWS
+  # rolls instances (reduces NodeCreationFailure from template/instance-type drift).
   launch_template {
     id      = aws_launch_template.nodes.id
-    version = "$Latest"
+    version = tostring(aws_launch_template.nodes.latest_version)
+  }
+
+  # Lets EKS replace more than one old node at a time when LT/instance type changes (within ASG limits).
+  update_config {
+    max_unavailable_percentage = 33
   }
 
   depends_on = [

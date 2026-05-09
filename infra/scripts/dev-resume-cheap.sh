@@ -13,7 +13,7 @@
 #   DEV_CLUSTER_NAME=claiset-dev
 #   DEV_NODEGROUP_NAME=claiset-dev-default
 #   DEV_NAMESPACE=dev
-#   DEV_FRONTEND_HOST=claiset.xyz
+#   DEV_FRONTEND_HOST=app-dev.claiset.xyz
 #   DEV_RDS_ID=claiset-dev-postgres
 #   DEV_NODE_MIN=1 DEV_NODE_DESIRED=1 DEV_NODE_MAX=2
 #   DEV_SCALE_SCHEDULE=0   # set to 1 if you want schedule deployment running
@@ -25,7 +25,7 @@ REGION="${AWS_REGION:-us-east-1}"
 CLUSTER="${DEV_CLUSTER_NAME:-claiset-dev}"
 NODEGROUP="${DEV_NODEGROUP_NAME:-${CLUSTER}-default}"
 NAMESPACE="${DEV_NAMESPACE:-dev}"
-FRONTEND_HOST="${DEV_FRONTEND_HOST:-claiset.xyz}"
+FRONTEND_HOST="${DEV_FRONTEND_HOST:-app-dev.claiset.xyz}"
 RDS_ID="${DEV_RDS_ID:-claiset-dev-postgres}"
 NODE_MIN="${DEV_NODE_MIN:-1}"
 NODE_DESIRED="${DEV_NODE_DESIRED:-1}"
@@ -66,7 +66,7 @@ kubectl -n "${NAMESPACE}" scale deployment schedule --replicas="${SCALE_SCHEDULE
 
 echo "Step 5/5: Reconcile Route53 alias from current Ingress"
 pushd "${ROOT_DIR}/infra/envs/dev" >/dev/null
-DOMAIN_ROOT=claiset.xyz FRONTEND_SUBDOMAIN= K8S_APP_NAMESPACE="${NAMESPACE}" bash ../../scripts/route53-ingress-records-guard.sh
+DOMAIN_ROOT=claiset.xyz FRONTEND_SUBDOMAIN=app-dev UPDATE_APEX_DNS=false K8S_APP_NAMESPACE="${NAMESPACE}" bash ../../scripts/route53-ingress-records-guard.sh
 popd >/dev/null
 
 echo "Dev resume complete."

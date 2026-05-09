@@ -103,5 +103,7 @@ module "app_bluegreen" {
     web      = "${local.ecr_repository_urls.web}:prod"
     migrate  = "${local.ecr_repository_urls.migrate}:prod"
   }
+
+  include_apex_and_www_in_external_dns = true
 }
 
