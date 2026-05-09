@@ -96,7 +96,6 @@ module "platform" {
   alertmanager_smtp_password     = var.alertmanager_smtp_password
 }
 
-# Blue/Green deployment scaffolding (two stacks + traffic switch) will live here.
 module "app_bluegreen" {
   source  = "../../modules/app-bluegreen"
   project = var.project
