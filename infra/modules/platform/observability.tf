@@ -147,7 +147,12 @@ resource "helm_release" "kube_prometheus_stack" {
 
     kubeStateMetrics = { enabled = true }
 
-    nodeExporter = { enabled = var.enable_observability_daemonsets && var.enable_node_exporter }
+    nodeExporter = {
+      enabled = var.enable_observability_daemonsets && var.enable_node_exporter
+      resources = {
+        requests = { cpu = "20m", memory = "48Mi" }
+      }
+    }
 
     defaultRules = {
       create = true
@@ -399,7 +404,7 @@ resource "helm_release" "promtail" {
   replace         = true
   values = [yamlencode({
     resources = {
-      requests = { cpu = "40m", memory = "96Mi" }
+      requests = { cpu = "20m", memory = "48Mi" }
     }
     config = {
       clients = [
