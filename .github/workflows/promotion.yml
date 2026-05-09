@@ -774,6 +774,8 @@ jobs:
           BURST_DESIRED=16
           CLUSTER="${EXPECTED_CLUSTER_NAME}"
           NODEGROUP="${EXPECTED_CLUSTER_NAME}-default"
+          # Raise pod density on micro nodes before scheduling observability + app pods.
+          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-enable-prefix-delegation.sh
           AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" "${BASE_MIN}" "${BURST_DESIRED}" "${BASE_MAX}"
           aws eks update-kubeconfig --region "${AWS_REGION}" --name "${CLUSTER}"
           echo "Waiting for burst node count to be Ready before Phase 2..."
