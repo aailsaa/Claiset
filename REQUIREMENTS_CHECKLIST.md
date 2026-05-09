@@ -20,11 +20,11 @@
 
 | Requirement | Done? | Your notes |
 | ----------- | ----- | ---------- |
-| **Flow** — **Dev → Nightly QA → UAT → Prod** | [x] | QA scheduled + manual; teardown optional for cost |
+| **Flow** — **Dev → Nightly QA → UAT → Prod** | [x] | Implemented in Actions workflow; nightly QA and manual targets verified. Prod trigger via tag/manual is implemented; final green evidence run still being stabilized under free-tier capacity constraints. |
 | **Dev/QA → UAT** — **Conventional Commits** (e.g. `RC1`) **or** **PR merges** must trigger UAT automatically | [x] | **PR merge → UAT** (same repo). **RC** token on `main` still works for direct pushes. Add `RC1`-style in message if grader wants explicit conventional examples. |
 | **UAT → Prod** — **Release tags** (e.g. `v1.0.1`); **no** primary path via **click-to-deploy in AWS Console** | [x] | `v*` tags + manual workflow target |
 | **Strategy** — Choose and **justify** **Blue/Green** *or* **Canary** for EKS | [ ] | Currently implemented as **rolling Deployments** (module name `app-bluegreen`). Add write-up + demo narrative mapping this to the chosen strategy (or implement true blue/green/canary). |
-| **Zero downtime** — Promotions/updates must **not drop requests** | [ ] | CI uses rolling + readiness; still need an explicit **evidence demo** (e.g., continuous curl during rollout + logs/metrics showing no 5xx/timeouts). |
+| **Zero downtime** — Promotions/updates must **not drop requests** | [ ] | Controls are in place (rolling deploy + readiness/liveness probes + staged smoke checks), but grader-proof evidence still needed: continuous request stream + no 5xx during rollout. |
 
 ---
 
@@ -32,8 +32,8 @@
 
 | Requirement | Done? | Your notes |
 | ----------- | ----- | ---------- |
-| **OS / security patching** — EC2 worker **AMI** updates **without interrupting service** | [ ] | Document + **demo** (drain / roll / verify). |
-| **Schema changes** — Deploy change that **updates RDS schema**; **explain + demonstrate** how migrations apply | [x] | `cmd/migrate` + Job; still need grader-facing **walkthrough**. |
+| **OS / security patching** — EC2 worker **AMI** updates **without interrupting service** | [ ] | Runbook approach prepared (nodegroup rolling replacement + readiness/smoke validation). Need one recorded/live execution with before/after node versions and no user-facing downtime. |
+| **Schema changes** — Deploy change that **updates RDS schema**; **explain + demonstrate** how migrations apply | [x] | Implemented via `migrate` Kubernetes Job (`claiset-migrate` image) before app deployment. For demo: show Job creation/completion and resulting app behavior. |
 
 ---
 
@@ -41,13 +41,13 @@
 
 | Requirement | Done? | Your notes |
 | ----------- | ----- | ---------- |
-| **Prometheus + Grafana** on-cluster (**no** AWS-managed observability as substitute) | [x] | Deployed via Terraform/Helm in `monitoring`. Validated in CI for **dev/qa/uat**. **Prod** still needs a clean run + screenshots for “all envs” proof. |
-| **Dashboards** — **CPU, memory, disk** for **all nodes** | [x] | Node Exporter + Prometheus + Grafana stack; node metrics available in **dev/QA/UAT**. Capture rubric screenshots (and spot-check **prod** after deploy). |
-| **Alerts** — **Email** and/or **Slack** at critical thresholds | [ ] | Alertmanager routes `severity="critical"` → email when `alertmanager_email_to` + `alertmanager_smtp_smarthost` (+ optional auth) are set. Demo: `./infra/scripts/alert-drill.sh trigger` (wait ≥10m) then confirm email, then `revert`. |
-| **Grafana** — reachable **from outside AWS** | [x] | **Dev, QA, UAT:** `grafana-<env>.<domain>` via ALB ingress; CI smoke passes. **Prod:** validate `grafana-prod.<domain>` after prod promotion and capture proof. |
+| **Prometheus + Grafana** on-cluster (**no** AWS-managed observability as substitute) | [x] | Deployed via Terraform/Helm in `monitoring`. Verified in dev/qa/uat and repeatedly exercised in prod troubleshooting. Capture one clean prod screenshot set for final rubric proof. |
+| **Dashboards** — **CPU, memory, disk** for **all nodes** | [x] | Node Exporter + Prometheus dashboards are present; metrics visible in non-prod. Final evidence needed: prod node metrics screenshots (CPU/memory/disk) during/after rollout. |
+| **Alerts** — **Email** and/or **Slack** at critical thresholds | [ ] | SMTP wiring completed in Terraform/workflow (`TF_VAR_alertmanager_*`). Remaining proof: trigger drill, show received email, then revert drill. |
+| **Grafana** — reachable **from outside AWS** | [x] | External ALB ingress + DNS configured. Non-prod confirmed; prod URL has been provisioned in runs and needs one final stable screenshot proof in final demo. |
 | **Grafana auth** — **OAuth2 only** (Okta/GitHub/Google); **no** username/password as primary UX | [x] | **Google OAuth** end-to-end in **dev, QA, UAT**; repo preflight + smoke checks catch empty OAuth secrets. Confirm **prod** after release. |
-| **Centralized logging** — **Loki** or ELK/OpenSearch **or** self-hosted Sentry on EKS | [x] | Loki + Promtail validated in **dev/qa/uat** (datasources + query path). **Prod** still needs a clean run + screenshots. |
-| **Multi-service logs** — Query across **all 3** Go backends | [x] | Loki query path validated in **dev/qa/uat**; capture 1–2 cross-service query examples + screenshots and repeat in **prod** once live. |
+| **Centralized logging** — **Loki** or ELK/OpenSearch **or** self-hosted Sentry on EKS | [x] | Loki + Promtail installed via Terraform and validated in non-prod; prod hardening complete (timeouts/capacity/CNI guardrails). Final evidence capture pending stable prod run screenshots. |
+| **Multi-service logs** — Query across **all 3** Go backends | [x] | Query path implemented and tested; final deliverable is screenshot/video of one query per service (items/outfits/schedule) plus combined filter in prod. |
 
 ---
 
@@ -57,7 +57,7 @@
 | ----------- | ----- | ---------- |
 | **Silent video rule** — Long-running parts (e.g. Day 1) may use **silent** video only | [ ] | |
 | **Live narration** — Explain technical decisions and workflow over demo/video | [ ] | |
-| **Live chaos defense** — Instructor triggers failure; you use **monitoring + logging** to diagnose and explain recovery **in ~1–2 minutes** | [ ] | Requires section 4 in place for full credit story. |
+| **Live chaos defense** — Instructor triggers failure; you use **monitoring + logging** to diagnose and explain recovery **in ~1–2 minutes** | [ ] | Story is prepared from real incident history (pod-slot exhaustion, CNI limits, rollout recovery). Need one timed practice run with commands + explanation flow. |
 
 ---
 

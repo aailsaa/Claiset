@@ -220,6 +220,7 @@ jobs:
           NODEGROUP="${EXPECTED_CLUSTER_NAME}-default"
           AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" "${BASE_MIN}" "${BURST_DESIRED}" "${BASE_MAX}"
           aws eks update-kubeconfig --region "${AWS_REGION}" --name "${CLUSTER}"
+          K8S_NAMESPACES="prod monitoring platform kube-system" bash ../../scripts/k8s-gc-pods.sh
           echo "Waiting for burst node count to be Ready before Phase 2..."
           for i in {1..30}; do
             ready_nodes="$(kubectl get nodes --no-headers 2>/dev/null | awk '$2=="Ready"{c++} END{print c+0}')"
@@ -770,7 +771,7 @@ jobs:
           # pod-density churn while observability and app pods converge.
           BASE_MIN=16
           BASE_DESIRED=16
-          BASE_MAX=20
+          BASE_MAX=16
           BURST_DESIRED=16
           CLUSTER="${EXPECTED_CLUSTER_NAME}"
           NODEGROUP="${EXPECTED_CLUSTER_NAME}-default"
@@ -802,6 +803,7 @@ jobs:
           # Second full apply can reset nodegroup desired_size to Terraform defaults.
           # Re-burst before readiness checks so rollout/smoke do not run on an under-capacity cluster.
           AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" "${BASE_MIN}" "${BURST_DESIRED}" "${BASE_MAX}"
+          K8S_NAMESPACES="prod monitoring platform kube-system" bash ../../scripts/k8s-gc-pods.sh
           echo "Waiting for post-apply burst node count to be Ready..."
           for i in {1..30}; do
             ready_nodes="$(kubectl get nodes --no-headers 2>/dev/null | awk '$2=="Ready"{c++} END{print c+0}')"
@@ -831,5 +833,5 @@ jobs:
           CLUSTER="${EXPECTED_CLUSTER_NAME}"
           NODEGROUP="${EXPECTED_CLUSTER_NAME}-default"
           # Do not fail the whole workflow if nodegroup is not ACTIVE after an earlier apply failure.
-          AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" 2 4 20 || true
+          AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" 2 4 16 || true
 

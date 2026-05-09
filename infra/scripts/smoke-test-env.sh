@@ -113,14 +113,25 @@ print_rollout_diagnostics() {
   kubectl -n "${NAMESPACE}" get events --sort-by='.lastTimestamp' | tail -30 || true
 }
 
+print_cluster_scheduling_diagnostics() {
+  echo "Cluster scheduling diagnostics (${CLUSTER}):"
+  kubectl get nodes -o wide || true
+  echo "Node allocatable pod slots:"
+  kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{" allocatable.pods="}{.status.allocatable.pods}{" capacity.pods="}{.status.capacity.pods}{"\n"}{end}' || true
+  echo "Current pod counts per node (all namespaces):"
+  kubectl get pods -A -o wide --no-headers 2>/dev/null | awk '$8!="" {c[$8]++} END{for (n in c) print n " pods=" c[n]}' || true
+  echo "aws-node CNI env (prefix delegation/warm targets):"
+  kubectl -n kube-system get ds aws-node -o jsonpath='{range .spec.template.spec.containers[0].env[*]}{.name}{"="}{.value}{"\n"}{end}' 2>/dev/null | awk '/ENABLE_PREFIX_DELEGATION|WARM_PREFIX_TARGET|WARM_IP_TARGET|MINIMUM_IP_TARGET/' || true
+}
+
 prod_rollout_recovery_bump() {
   local nodegroup="${CLUSTER}-default"
-  echo "Prod rollout recovery: scaling nodegroup ${nodegroup} to min=16 desired=16 max=20 before retry."
+  echo "Prod rollout recovery: scaling nodegroup ${nodegroup} to min=16 desired=16 max=16 before retry."
   aws eks update-nodegroup-config \
     --region "${REGION}" \
     --cluster-name "${CLUSTER}" \
     --nodegroup-name "${nodegroup}" \
-    --scaling-config "minSize=16,desiredSize=16,maxSize=20" >/dev/null || return 1
+    --scaling-config "minSize=16,desiredSize=16,maxSize=16" >/dev/null || return 1
   aws eks wait nodegroup-active --region "${REGION}" --cluster-name "${CLUSTER}" --nodegroup-name "${nodegroup}" || return 1
   for i in {1..24}; do
     ready_nodes="$(kubectl get nodes --no-headers 2>/dev/null | awk '$2=="Ready"{c++} END{print c+0}')"
@@ -136,11 +147,13 @@ prod_rollout_recovery_bump() {
 rollout_with_recovery() {
   local deployment="$1"
   echo "Checking rollout: deployment/${deployment} in ${NAMESPACE}"
+  print_cluster_scheduling_diagnostics
   if kubectl -n "${NAMESPACE}" rollout status "deployment/${deployment}" --timeout="${ROLLOUT_TIMEOUT}"; then
     return 0
   fi
 
   print_rollout_diagnostics "${deployment}"
+  print_cluster_scheduling_diagnostics
   if [[ "${NAMESPACE}" == "prod" ]]; then
     echo "Prod rollout did not complete within ${ROLLOUT_TIMEOUT}; attempting one capacity recovery + retry."
     prod_rollout_recovery_bump || true
