@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Bring dev back to a low-cost but usable state.
+# Companion to park workloads: infra/scripts/dev-scale-down-cheap.sh
 # - Keeps EKS nodegroup small
 # - Starts dev RDS and waits for availability
 # - Scales core app deployments up

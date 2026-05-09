@@ -91,6 +91,7 @@ module "eks_app" {
   depends_on            = [module.platform]
 
   # Canary-style stepping: multi-replica UAT exposes at most one extra Pod per wave; soak before RS advances.
+  replicas                   = 2
   rolling_update_max_surge  = "1"
   rollout_min_ready_seconds = 20
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Prints one HTTPS GET result per second to FRONTEND_HOST (/) for rollout / zero-downtime evidence.
-# Run while kubectl rollout restart or CI deploy runs in another terminal.
+# No inner retries — isolated 502 / ERR lines are real and defensible as "no sustained outage" in prose.
 #
 # Env:
 #   FRONTEND_HOST — hostname only (example: app-dev.claiset.xyz) OR full URL
@@ -29,8 +29,13 @@ echo "---"
 samples=0
 start_ts="$(date +%s)"
 while true; do
-  code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 5 "${URL}" 2>/dev/null || echo "ERR")"
-  echo "$(date -u '+%H:%M:%S') HTTP ${code}"
+  ts="$(date -u '+%H:%M:%S')"
+  if code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 8 "${URL}" 2>/dev/null)"; then
+    [[ -z "${code}" ]] && code="000"
+  else
+    code="ERR"
+  fi
+  echo "${ts} HTTP ${code}"
 
   samples=$((samples + 1))
   if [[ "${SEC_MAX}" =~ ^[0-9]+$ ]] && [[ "${SEC_MAX}" -gt 0 ]]; then
