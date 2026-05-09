@@ -43,6 +43,8 @@ env:
   # Self-hosted Grafana/Prometheus/Loki (all env Terraform jobs inherit these).
   # Repository variable ENABLE_OBSERVABILITY = true to turn on; requires secrets below.
   TF_VAR_enable_observability_stack: ${{ (vars.ENABLE_OBSERVABILITY == 'true' && vars.ALLOW_COSTLY_RUNS == 'true') && 'true' || 'false' }}
+  # Enable DaemonSet collectors (promtail/node-exporter) only when explicitly requested.
+  TF_VAR_enable_observability_daemonsets: ${{ (vars.ENABLE_OBSERVABILITY_DAEMONSETS == 'true' && vars.ALLOW_COSTLY_RUNS == 'true') && 'true' || 'false' }}
   TF_VAR_grafana_google_client_id: ${{ secrets.GRAFANA_GOOGLE_CLIENT_ID }}
   TF_VAR_grafana_google_client_secret: ${{ secrets.GRAFANA_GOOGLE_CLIENT_SECRET }}
   TF_VAR_grafana_google_allowed_domains: ${{ vars.GRAFANA_GOOGLE_ALLOWED_DOMAINS }}
@@ -52,7 +54,9 @@ env:
   TF_VAR_alertmanager_smtp_user: ${{ secrets.ALERTMANAGER_SMTP_USER }}
   TF_VAR_alertmanager_smtp_password: ${{ secrets.ALERTMANAGER_SMTP_PASSWORD }}
   # Keep prod nodegroup warm through the whole pipeline unless explicitly opted-in.
-  PROD_SCALE_DOWN_AFTER_SMOKE: "true"
+  # Repo variable toggle: set PROD_SCALE_DOWN_AFTER_SMOKE=true/false in GitHub Variables.
+  # Defaults to true when unset.
+  PROD_SCALE_DOWN_AFTER_SMOKE: ${{ vars.PROD_SCALE_DOWN_AFTER_SMOKE == 'false' && 'false' || 'true' }}
   ALLOW_COSTLY_RUNS: ${{ vars.ALLOW_COSTLY_RUNS == 'true' && 'true' || 'false' }}
   # Single canonical ECR namespace (provisioned in infra/envs/dev; qa+ reference URLs only).
   ECR_ITEMS_REPO: claiset-items
