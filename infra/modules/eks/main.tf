@@ -179,7 +179,6 @@ resource "aws_security_group_rule" "cluster_to_nodes_pods_1025_65535" {
 
 resource "aws_launch_template" "nodes" {
   name_prefix   = "${local.name}-nodes-"
-  instance_type = var.node_instance_types[0]
 
   vpc_security_group_ids = [aws_security_group.node.id]
 
@@ -210,6 +209,10 @@ resource "aws_eks_node_group" "default" {
   subnet_ids      = var.subnet_ids
   # Pin to control plane so node AMIs/kubelet stay aligned; avoids ambiguous "version update" states.
   version = aws_eks_cluster.this.version
+
+  # Allow EKS/ASG to pick from multiple types for capacity. This significantly reduces
+  # NodeCreationFailure during nodegroup updates when one type/AZ is temporarily out of capacity.
+  instance_types = var.node_instance_types
 
   scaling_config {
     desired_size = var.node_group_desired_size

@@ -30,8 +30,8 @@ variable "eks_cluster_version" {
 
 variable "node_instance_types" {
   type        = list(string)
-  description = "EKS node instance types (passed to infra/modules/eks). Prod runs the app plus self-hosted observability; t3.small (~11 pods/node) routinely hits FailedScheduling (Too many pods). t3.medium (~17) or larger is recommended."
-  default     = ["t3.medium"]
+  description = "EKS node instance types (passed to infra/modules/eks). Prod runs the app plus self-hosted observability; t3.small (~11 pods/node) routinely hits FailedScheduling (Too many pods). Use multiple types to avoid EKS NodeCreationFailure when a single type has no capacity."
+  default     = ["t3a.medium", "t3.medium"]
 }
 
 variable "node_group_desired_size" {
