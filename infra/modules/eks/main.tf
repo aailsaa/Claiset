@@ -232,6 +232,15 @@ resource "aws_eks_node_group" "default" {
     max_unavailable_percentage = 33
   }
 
+  lifecycle {
+    # CI intentionally bursts nodegroup desired_size during rollouts/smoke.
+    # Ignoring desired_size drift prevents Terraform apply from scaling back down
+    # mid-run and starving critical pods/jobs (e.g., prod migrate + observability).
+    ignore_changes = [
+      scaling_config[0].desired_size,
+    ]
+  }
+
   depends_on = [
     aws_iam_role_policy_attachment.node_worker,
     aws_iam_role_policy_attachment.node_cni,
