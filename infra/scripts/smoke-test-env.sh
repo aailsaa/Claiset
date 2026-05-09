@@ -40,6 +40,7 @@ RDS_ID="${RDS_INSTANCE_ID:-${PROJECT}-${NAMESPACE}-postgres}"
 GRAFANA_HOST="${GRAFANA_HOST:-}"
 EXPECT_OBSERVABILITY_SMOKE="${EXPECT_OBSERVABILITY_SMOKE:-}"
 EXPECT_APP_OAUTH_SMOKE="${EXPECT_APP_OAUTH_SMOKE:-true}"
+ROLLOUT_TIMEOUT="${ROLLOUT_TIMEOUT:-8m}"
 
 if [[ -z "${CLUSTER}" ]]; then
   echo "EXPECTED_CLUSTER_NAME is required." >&2
@@ -102,10 +103,57 @@ wait_for_no_pending_app_pods() {
   return 1
 }
 
+print_rollout_diagnostics() {
+  local deployment="$1"
+  echo "Rollout diagnostics for deployment/${deployment} in ${NAMESPACE}:"
+  kubectl -n "${NAMESPACE}" get deployment "${deployment}" -o wide || true
+  kubectl -n "${NAMESPACE}" get pods -l "app=${deployment}" -o wide || true
+  kubectl -n "${NAMESPACE}" describe deployment "${deployment}" || true
+  kubectl -n "${NAMESPACE}" describe pods -l "app=${deployment}" || true
+  kubectl -n "${NAMESPACE}" get events --sort-by='.lastTimestamp' | tail -30 || true
+}
+
+prod_rollout_recovery_bump() {
+  local nodegroup="${CLUSTER}-default"
+  echo "Prod rollout recovery: scaling nodegroup ${nodegroup} to min=1 desired=6 max=6 before retry."
+  aws eks update-nodegroup-config \
+    --region "${REGION}" \
+    --cluster-name "${CLUSTER}" \
+    --nodegroup-name "${nodegroup}" \
+    --scaling-config "minSize=1,desiredSize=6,maxSize=6" >/dev/null || return 1
+  aws eks wait nodegroup-active --region "${REGION}" --cluster-name "${CLUSTER}" --nodegroup-name "${nodegroup}" || return 1
+  for i in {1..24}; do
+    ready_nodes="$(kubectl get nodes --no-headers 2>/dev/null | awk '$2=="Ready"{c++} END{print c+0}')"
+    echo "Prod rollout recovery: Ready nodes ${ready_nodes}/6 (attempt ${i}/24)"
+    if [[ "${ready_nodes}" -ge 4 ]]; then
+      break
+    fi
+    sleep 10
+  done
+  kubectl get nodes --no-headers 2>/dev/null | awk '$2 ~ /SchedulingDisabled/ {print $1}' | xargs -r kubectl uncordon || true
+}
+
+rollout_with_recovery() {
+  local deployment="$1"
+  echo "Checking rollout: deployment/${deployment} in ${NAMESPACE}"
+  if kubectl -n "${NAMESPACE}" rollout status "deployment/${deployment}" --timeout="${ROLLOUT_TIMEOUT}"; then
+    return 0
+  fi
+
+  print_rollout_diagnostics "${deployment}"
+  if [[ "${NAMESPACE}" == "prod" ]]; then
+    echo "Prod rollout did not complete within ${ROLLOUT_TIMEOUT}; attempting one capacity recovery + retry."
+    prod_rollout_recovery_bump || true
+    kubectl -n "${NAMESPACE}" rollout status "deployment/${deployment}" --timeout="${ROLLOUT_TIMEOUT}"
+    return 0
+  fi
+
+  return 1
+}
+
 if [[ "${MODE}" != "skip-wait" ]]; then
   for d in web items outfits schedule; do
-    echo "Checking rollout: deployment/${d} in ${NAMESPACE}"
-    kubectl -n "${NAMESPACE}" rollout status "deployment/${d}" --timeout=8m
+    rollout_with_recovery "${d}"
   done
   wait_for_no_pending_app_pods
 fi

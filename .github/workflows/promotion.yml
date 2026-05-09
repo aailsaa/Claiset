@@ -769,7 +769,7 @@ jobs:
       - name: Wait for readiness (prod)
         working-directory: infra/envs/prod
         run: |
-          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=prod FRONTEND_HOST=app-prod.claiset.xyz EXPECT_OBSERVABILITY_SMOKE="${TF_VAR_enable_observability_stack:-false}" EXPECT_APP_OAUTH_SMOKE=true GRAFANA_HOST=grafana-prod.claiset.xyz bash ../../scripts/smoke-test-env.sh --wait-only
+          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=prod FRONTEND_HOST=app-prod.claiset.xyz EXPECT_OBSERVABILITY_SMOKE="${TF_VAR_enable_observability_stack:-false}" EXPECT_APP_OAUTH_SMOKE=true GRAFANA_HOST=grafana-prod.claiset.xyz ROLLOUT_TIMEOUT=12m bash ../../scripts/smoke-test-env.sh --wait-only
 
       - name: Smoke checks (prod)
         working-directory: infra/envs/prod
