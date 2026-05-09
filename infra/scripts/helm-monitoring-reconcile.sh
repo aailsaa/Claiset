@@ -152,12 +152,15 @@ maybe_burst_prod_capacity() {
     return 0
   fi
 
-  echo "helm-monitoring-reconcile: prod capacity check (ready=${ready}, pending=${pending}, too_many_pods_events=${too_many}) -> bursting ${NODEGROUP} to min=16 desired=16 max=16"
+  local min_size="${PROD_MON_BURST_MIN_SIZE:-1}"
+  local desired_size="${PROD_MON_BURST_DESIRED_SIZE:-2}"
+  local max_size="${PROD_MON_BURST_MAX_SIZE:-4}"
+  echo "helm-monitoring-reconcile: prod capacity check (ready=${ready}, pending=${pending}, too_many_pods_events=${too_many}) -> bursting ${NODEGROUP} to min=${min_size} desired=${desired_size} max=${max_size}"
   aws eks update-nodegroup-config \
     --region "${REGION}" \
     --cluster-name "${CLUSTER}" \
     --nodegroup-name "${NODEGROUP}" \
-    --scaling-config "minSize=16,desiredSize=16,maxSize=16" >/dev/null \
+    --scaling-config "minSize=${min_size},desiredSize=${desired_size},maxSize=${max_size}" >/dev/null \
     || echo "helm-monitoring-reconcile: burst update failed; continuing" >&2
   aws eks wait nodegroup-active --region "${REGION}" --cluster-name "${CLUSTER}" --nodegroup-name "${NODEGROUP}" \
     || echo "helm-monitoring-reconcile: nodegroup-active wait failed; continuing" >&2

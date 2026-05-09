@@ -126,17 +126,21 @@ print_cluster_scheduling_diagnostics() {
 
 prod_rollout_recovery_bump() {
   local nodegroup="${CLUSTER}-default"
-  echo "Prod rollout recovery: scaling nodegroup ${nodegroup} to min=16 desired=16 max=16 before retry."
+  local min_size="${PROD_RECOVERY_MIN_SIZE:-1}"
+  local desired_size="${PROD_RECOVERY_DESIRED_SIZE:-2}"
+  local max_size="${PROD_RECOVERY_MAX_SIZE:-4}"
+  local ready_floor="${PROD_RECOVERY_READY_FLOOR:-2}"
+  echo "Prod rollout recovery: scaling nodegroup ${nodegroup} to min=${min_size} desired=${desired_size} max=${max_size} before retry."
   aws eks update-nodegroup-config \
     --region "${REGION}" \
     --cluster-name "${CLUSTER}" \
     --nodegroup-name "${nodegroup}" \
-    --scaling-config "minSize=16,desiredSize=16,maxSize=16" >/dev/null || return 1
+    --scaling-config "minSize=${min_size},desiredSize=${desired_size},maxSize=${max_size}" >/dev/null || return 1
   aws eks wait nodegroup-active --region "${REGION}" --cluster-name "${CLUSTER}" --nodegroup-name "${nodegroup}" || return 1
   for i in {1..24}; do
     ready_nodes="$(kubectl get nodes --no-headers 2>/dev/null | awk '$2=="Ready"{c++} END{print c+0}')"
-    echo "Prod rollout recovery: Ready nodes ${ready_nodes}/16 (attempt ${i}/24)"
-    if [[ "${ready_nodes}" -ge 14 ]]; then
+    echo "Prod rollout recovery: Ready nodes ${ready_nodes}/${desired_size} (attempt ${i}/24)"
+    if [[ "${ready_nodes}" -ge "${ready_floor}" ]]; then
       break
     fi
     sleep 10

@@ -42,7 +42,7 @@ env:
   TF_VAR_route53_hosted_zone_id: ${{ secrets.ROUTE53_HOSTED_ZONE_ID }}
   # Self-hosted Grafana/Prometheus/Loki (all env Terraform jobs inherit these).
   # Repository variable ENABLE_OBSERVABILITY = true to turn on; requires secrets below.
-  TF_VAR_enable_observability_stack: ${{ vars.ENABLE_OBSERVABILITY == 'true' && 'true' || 'false' }}
+  TF_VAR_enable_observability_stack: ${{ (vars.ENABLE_OBSERVABILITY == 'true' && vars.ALLOW_COSTLY_RUNS == 'true') && 'true' || 'false' }}
   TF_VAR_grafana_google_client_id: ${{ secrets.GRAFANA_GOOGLE_CLIENT_ID }}
   TF_VAR_grafana_google_client_secret: ${{ secrets.GRAFANA_GOOGLE_CLIENT_SECRET }}
   TF_VAR_grafana_google_allowed_domains: ${{ vars.GRAFANA_GOOGLE_ALLOWED_DOMAINS }}
@@ -53,6 +53,7 @@ env:
   TF_VAR_alertmanager_smtp_password: ${{ secrets.ALERTMANAGER_SMTP_PASSWORD }}
   # Keep prod nodegroup warm through the whole pipeline unless explicitly opted-in.
   PROD_SCALE_DOWN_AFTER_SMOKE: "true"
+  ALLOW_COSTLY_RUNS: ${{ vars.ALLOW_COSTLY_RUNS == 'true' && 'true' || 'false' }}
   # Single canonical ECR namespace (provisioned in infra/envs/dev; qa+ reference URLs only).
   ECR_ITEMS_REPO: claiset-items
   ECR_OUTFITS_REPO: claiset-outfits
@@ -656,7 +657,7 @@ jobs:
     concurrency:
       group: tf-prod-${{ github.repository }}
       cancel-in-progress: false
-    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'prod')
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'prod' && vars.ALLOW_COSTLY_RUNS == 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -798,7 +799,7 @@ jobs:
 
           K8S_APP_NAMESPACE=prod bash ../../scripts/terraform-k8s-import-guard.sh
           EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" bash ../../scripts/helm-platform-reconcile.sh
-          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" bash ../../scripts/helm-monitoring-reconcile.sh
+          PROD_MON_BURST_MIN_SIZE="${BASE_MIN}" PROD_MON_BURST_DESIRED_SIZE="${BURST_DESIRED}" PROD_MON_BURST_MAX_SIZE="${BASE_MAX}" EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" bash ../../scripts/helm-monitoring-reconcile.sh
           terraform apply -auto-approve
           # Second full apply can reset nodegroup desired_size to Terraform defaults.
           # Re-burst before readiness checks so rollout/smoke do not run on an under-capacity cluster.
@@ -819,7 +820,7 @@ jobs:
       - name: Wait for readiness (prod)
         working-directory: infra/envs/prod
         run: |
-          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=prod FRONTEND_HOST=app-prod.claiset.xyz EXPECT_OBSERVABILITY_SMOKE="${TF_VAR_enable_observability_stack:-false}" EXPECT_APP_OAUTH_SMOKE=true GRAFANA_HOST=grafana-prod.claiset.xyz ROLLOUT_TIMEOUT=12m bash ../../scripts/smoke-test-env.sh --wait-only
+          PROD_RECOVERY_MIN_SIZE=16 PROD_RECOVERY_DESIRED_SIZE=16 PROD_RECOVERY_MAX_SIZE=16 PROD_RECOVERY_READY_FLOOR=14 EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=prod FRONTEND_HOST=app-prod.claiset.xyz EXPECT_OBSERVABILITY_SMOKE="${TF_VAR_enable_observability_stack:-false}" EXPECT_APP_OAUTH_SMOKE=true GRAFANA_HOST=grafana-prod.claiset.xyz ROLLOUT_TIMEOUT=12m bash ../../scripts/smoke-test-env.sh --wait-only
 
       - name: Smoke checks (prod)
         working-directory: infra/envs/prod

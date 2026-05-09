@@ -81,6 +81,12 @@ variable "enable_observability_stack" {
   }
 }
 
+variable "enable_observability_daemonsets" {
+  type        = bool
+  default     = true
+  description = "When false, disables DaemonSet-based observability collectors (node-exporter, promtail). Useful on micro nodes with very low pod-per-node limits."
+}
+
 variable "grafana_google_client_id" {
   type        = string
   default     = ""

@@ -34,8 +34,8 @@ locals {
 
   alertmanager_smtp_global = merge(
     {
-      smtp_smarthost = var.alertmanager_smtp_smarthost
-      smtp_from      = var.alertmanager_smtp_from != "" ? var.alertmanager_smtp_from : "alerts@${var.domain_root}"
+      smtp_smarthost   = var.alertmanager_smtp_smarthost
+      smtp_from        = var.alertmanager_smtp_from != "" ? var.alertmanager_smtp_from : "alerts@${var.domain_root}"
       smtp_require_tls = true
     },
     trimspace(var.alertmanager_smtp_user) != "" ? {
@@ -147,7 +147,7 @@ resource "helm_release" "kube_prometheus_stack" {
 
     kubeStateMetrics = { enabled = true }
 
-    nodeExporter = { enabled = true }
+    nodeExporter = { enabled = var.enable_observability_daemonsets }
 
     defaultRules = {
       create = true
@@ -216,7 +216,7 @@ resource "helm_release" "kube_prometheus_stack" {
             name = "email"
             email_configs = [
               {
-                to             = local.alertmanager_enabled ? var.alertmanager_email_to : ""
+                to            = local.alertmanager_enabled ? var.alertmanager_email_to : ""
                 send_resolved = true
               }
             ]
@@ -381,7 +381,7 @@ resource "helm_release" "loki" {
 }
 
 resource "helm_release" "promtail" {
-  count = local.observability_enabled ? 1 : 0
+  count = local.observability_enabled && var.enable_observability_daemonsets ? 1 : 0
 
   name       = "promtail"
   repository = "https://grafana.github.io/helm-charts"

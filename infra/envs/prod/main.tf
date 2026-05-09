@@ -68,15 +68,16 @@ module "platform" {
   wait_for_acm_validation = var.wait_for_acm_validation
   create_hosted_zone      = var.create_hosted_zone
 
-  enable_observability_stack     = var.enable_observability_stack
-  grafana_google_client_id       = var.grafana_google_client_id
-  grafana_google_client_secret   = var.grafana_google_client_secret
-  grafana_google_allowed_domains = var.grafana_google_allowed_domains
-  alertmanager_email_to          = var.alertmanager_email_to
-  alertmanager_smtp_smarthost    = var.alertmanager_smtp_smarthost
-  alertmanager_smtp_from         = var.alertmanager_smtp_from
-  alertmanager_smtp_user         = var.alertmanager_smtp_user
-  alertmanager_smtp_password     = var.alertmanager_smtp_password
+  enable_observability_stack      = var.enable_observability_stack
+  enable_observability_daemonsets = var.enable_observability_daemonsets
+  grafana_google_client_id        = var.grafana_google_client_id
+  grafana_google_client_secret    = var.grafana_google_client_secret
+  grafana_google_allowed_domains  = var.grafana_google_allowed_domains
+  alertmanager_email_to           = var.alertmanager_email_to
+  alertmanager_smtp_smarthost     = var.alertmanager_smtp_smarthost
+  alertmanager_smtp_from          = var.alertmanager_smtp_from
+  alertmanager_smtp_user          = var.alertmanager_smtp_user
+  alertmanager_smtp_password      = var.alertmanager_smtp_password
 }
 
 module "app_bluegreen" {
@@ -88,7 +89,7 @@ module "app_bluegreen" {
   enable_kubernetes_app = var.enable_kubernetes_app
   depends_on            = [module.platform]
   # Free-tier node constraints are tight; keep one replica per service in prod for deterministic scheduling.
-  replicas              = 1
+  replicas = 1
 
   aws_region               = var.aws_region
   domain_root              = var.domain_root
