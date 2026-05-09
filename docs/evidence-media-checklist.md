@@ -1,108 +1,305 @@
 # Evidence media checklist (screenshots & recordings)
 
-Use this list to **capture everything before teardown** or on the next healthy env (**dev**/**uat**/**prod**—adjust hostnames accordingly). Prefer **silent screen recordings** for long flows; narrate live over them during the defense per the rubric.
+Use this list on **dev** / **uat** / **prod** (adjust URLs). Prefer **silent** screen captures for long flows; **narrate live** during the defense.
 
 **Cross-links:** [REQUIREMENTS_CHECKLIST.md](../REQUIREMENTS_CHECKLIST.md) · [REQUIREMENTS.md](../REQUIREMENTS.md) · [final-defense-script.md](final-defense-script.md)
 
----
+**Files live in:** [evidence-media/](evidence-media/) · Original macOS timestamps: [evidence-media/MEDIA_MAPPING.txt](evidence-media/MEDIA_MAPPING.txt)
 
-## Pre-capture (once)
-
-- [ ] Create a folder, e.g. `submission-media/2026-05-09/` (dated), and drop all files there with short names: `01-app-home.png`, `02-rds-console.png`, etc.
-- [ ] Note **which environment** each capture is from (`dev` / `uat` / `prod`) in a `README.txt` in that folder.
-- [ ] Save **URLs** to green **GitHub Actions** runs (dev, UAT merge, prod dispatch) in a text file for your slide deck.
+**This bundle (applied 2026-05-09):** Mostly **`app-dev`**, **`grafana-dev`**, **`claiset-dev`** kubectl; one **`EXTRA-`** **`app-prod`** still.
 
 ---
 
 ## Architecture & Terraform (≈20% + part of 15%)
 
-| # | Artifact | What to show |
-|---|----------|----------------|
-| A1 | **Screenshot** | App **homepage** + one **inner page** (items/outfits/calendar). URL bar visible with **HTTPS** lock. |
-| A2 | **Screenshot** | **AWS RDS** console: instance **identifier**, engine, **Available**, same region as EKS. |
-| A3 | **Screenshot or terminal paste** | `terraform state list` (excerpt) showing **RDS** + **EKS**-related resources, or `module.rds.*` / `module.eks.*` lines. |
-| A4 | **Screenshot** | `kubectl -n <env> get deploy` showing **`items`**, **`outfits`**, **`schedule`** (and `web` if you want). |
-| A5 | **Screenshot** | **Ingress**: `kubectl -n <env> get ingress` (or AWS console ALB listener **HTTPS**) showing hostname / certificate in use. |
-| A6 | **Screenshot(s)** | **IDE or GitHub**: `infra/modules/` tree OR 1–2 module files proving **VPC / EKS / RDS / IAM** live under Terraform—not required to be flashy. |
+### A1: App homepage + one inner functional page
+
+**Rubric:** Screenshot(s) — **homepage** and **another** page (items / outfits / calendar). **HTTPS** + URL bar visible.
+
+**Submission notes:** Primary captures use **`https://app-dev.claiset.xyz`** — **All items** (closet) and **Outfit calendar** (`/calendar`). For grading text that cites **prod**, narrate parity or add prod grabs later.
+
+![A1 homepage — dev All items](evidence-media/A1-app-home.png)
+
+![A1 inner page — dev calendar](evidence-media/A1-app-inner.png)
+
+#### Extra angles (same A1 storyline)
+
+Prod supplement, login, HTTPS site info, more dev pages — additional proof only.
+
+![EXTRA prod — app-prod items](evidence-media/EXTRA-A1-app-prod-all-items.png)
+
+![EXTRA dev — Sign in with Google](evidence-media/EXTRA-app-dev-login-google.png)
+
+![EXTRA dev — Chrome HTTPS / connection secure](evidence-media/EXTRA-app-dev-HTTPS-connection-details.png)
+
+![EXTRA dev — new item modal](evidence-media/EXTRA-app-dev-new-item-modal.png)
+
+![EXTRA dev — outfits](evidence-media/EXTRA-app-dev-outfits.png)
+
+![EXTRA dev — stats](evidence-media/EXTRA-app-dev-stats.png)
+
+### A2: AWS RDS instance (console)
+
+**Rubric:** Screenshot — RDS **identifier**, engine, status **Available**, same region as EKS.
+
+**Submission notes:** *Not bundled yet.* Drop **`evidence-media/A2-rds-console.png`** here when captured (ideally **before** any prod teardown).
+
+### A3: Terraform state excerpt
+
+**Rubric:** Screenshot or paste — **`terraform state list`** lines showing **RDS** + **EKS** (`module.rds.*`, `module.eks.*`, etc.).
+
+**Submission notes:** *Not bundled.* Add **`evidence-media/A3-terraform-state.png`** or paste terminal output under this section.
+
+### A4: Microservice Deployments (`kubectl get deploy`)
+
+**Rubric:** Screenshot — `kubectl -n <env> get deploy` with **`items`**, **`outfits`**, **`schedule`** (and **`web`** if useful).
+
+**Submission notes:** Example from **`claiset-dev`** / namespace **`dev`**.
+
+![A4 kubectl get deploy -n dev](evidence-media/A4-kubectl-deploy.png)
+
+### A5: Ingress — DNS hostname + HTTPS / ACM
+
+**Rubric:** Screenshot — `kubectl get ingress` (and/or **`describe`**) showing **hosts**, **ALB**, **ACM** annotation; ALB HTTPS in console works too.
+
+**Submission notes:** **`app-dev.claiset.xyz`** + redirect / cert wiring on **`claiset`** Ingress.
+
+![A5 kubectl ingress + describe excerpt](evidence-media/A5-kubectl-ingress.png)
+
+### A6: Terraform repo structure (`infra/modules`)
+
+**Rubric:** Screenshot — IDE/GitHub **`infra/modules/`** tree (or sample files proving **VPC / EKS / RDS / IAM** under Terraform).
+
+**Submission notes:** *Not bundled.* Add **`evidence-media/A6-infra-modules.png`** or link to repo path in slides.
 
 ---
 
 ## CI/CD & Git-driven promotion (≈15%)
 
-| # | Artifact | What to show |
-|---|----------|----------------|
-| C1 | **Screenshot** | GitHub Actions **workflow graph** for **promotion** (`promotion.yml`)—at least one **successful** path (e.g. dev + UAT or prod). |
-| C2 | **Screenshot / link** | Run triggered by **`pull_request`** **merged** → **UAT** (shows merge commit / PR number in summary). |
-| C3 | **Screenshot / link** | **Prod** (or gated prod) triggered by **`workflow_dispatch`** / tag—**Summary** showing **Inputs** (`target: prod`) and **no AWS Console deploy** narrative in slide. |
-| C4 | **Screenshot or snippet** | **Terraform apply** log excerpt (green) from Actions **or** terminal—proves automation. |
-| C5 | **Slide or cite README** | **Canary-style rolling** strategy: one slide pointing to **[README.md](../README.md)** “Deployment strategy for EKS” (no separate recording required beyond rubric ). |
-| C6 | **Short clip OR logs** (**zero-downtime row**) | Prefer: **silent** screen record of **deployment rollout** with **kubectl** `rollout status` **or** workflow step “rollout succeeded” **plus** a **health** probe (curl 2xx to `/health` / front page) **during** the rollout window. Alternate: Grafana **HTTP 5xx** panel flat at 0 over rollout if you have it. |
+### C1: GitHub Actions — promotion workflow graph (green path)
+
+**Rubric:** Screenshot — **promotion.yml** workflow **graph**, at least one **successful** run (dev / UAT / prod path).
+
+**Submission notes:** *Not bundled.* Save run as **`evidence-media/C1-actions-promotion-graph.png`** or paste **Actions URL** here in notes.
+
+### C2: UAT triggered by merged PR
+
+**Rubric:** Screenshot or link — run from **`pull_request` merged → UAT**, merge commit / PR visible.
+
+**Submission notes:** *Not bundled.* Add **`C2-…`** or link the green run.
+
+### C3: Prod / gated prod — refs + Inputs
+
+**Rubric:** Screenshot — **`workflow_dispatch`** or tag run; Summary shows **inputs** (**`target: prod`**) — no AWS Console deploy.
+
+**Submission notes:** *Not bundled.* Add **`C3-…`** or link.
+
+### C4: Terraform apply log (green)
+
+**Rubric:** Screenshot/snippet — **apply** succeeding in Actions or terminal.
+
+**Submission notes:** *Not bundled.* Add **`C4-…`** snippet.
+
+### C5: Canary / rolling strategy (README slide)
+
+**Rubric:** One slide OR README pointer — chosen strategy **and why**.
+
+**Submission notes:** Cite **[partial-canary-justification.md](partial-canary-justification.md)** (essay) + **[README.md](../README.md#progressive-rollout-strategy-eks)** (overview) and **`infra/modules/eks-app`** — no mandated screenshot.
+
+### C6: Zero-downtime / rollout recording
+
+**Rubric:** **Silent** clip or logs — rollout / **no sustained 5xx** + rollout success (**`kubectl rollout status`** or workflow step).
+
+**How to reproduce / refresh:** **[zero-downtime-promotion-evidence.md](../zero-downtime-promotion-evidence.md)** · poll script **`infra/scripts/http-availability-during-rollout.sh`**.
+
+**Submission notes:** **Verify file content** matches this rubric filename; remap using **MEDIA_MAPPING** if mislabeled.
+
+📹 **[C6-rollout-or-deployment-recording.mov](evidence-media/C6-rollout-or-deployment-recording.mov)**
+
+**Extra supporting clip:** 📹 **[S1-terraform-apply-or-infra-recording.mov](evidence-media/S1-terraform-apply-or-infra-recording.mov)** (_also_ supports **Presentation S1**.)
 
 ---
 
-## Day 2: schema migration (≈10%)
+## Day 2: Schema migration (≈10%)
 
-| # | Artifact | What to show |
-|---|----------|----------------|
-| D1 | **Screenshot** | `kubectl -n <env> get jobs` with **`migrate`** **Complete** or recent. |
-| D2 | **Screenshot or terminal paste** | `kubectl -n <env> describe job migrate` (key lines: completion, backoff). |
-| D3 | **Optional short clip** | You explaining **migrate image** runs **before** app Deployments rely on schema (can be narrated slide + `schema.sql`/migrate reference). |
+### D1: Migrate Job — `kubectl get jobs`
+
+**Rubric:** Screenshot — **`migrate`** job **Complete**.
+
+**Submission notes:** Namespace **`dev`** in current bundle.
+
+![D1 kubectl get jobs migrate Complete](evidence-media/D1-migrate-job.png)
+
+### D2: Migrate Job — `kubectl describe job migrate`
+
+**Rubric:** Screenshot/paste — completion, backoff, image, events as applicable.
+
+![D2 kubectl describe job migrate — dev](evidence-media/D2-migrate-describe.png)
+
+### D3 (optional): Explain migrate-before-app narrative
+
+**Rubric:** Short clip or slide voice-over — migrate image/schema order vs app Deployments.
+
+**Submission notes:** Optional; defend from **`migrate`** Dockerfile / entrypoint — no file required unless you record one.
 
 ---
 
 ## Day 2: OS / security patching (≈10%)
 
-| # | Artifact | What to show |
-|---|----------|----------------|
-| P1 | **Screenshot(s)** | **Before**: EKS **node group** (console or CLI) AMI / release version / launch template version. |
-| P2 | **Screenshot(s)** | **After** a roll or AMI update—the field **changed**. |
-| P3 | **Recording or logs** | **Smoke/tests still pass** during/after rotation (workflow green **or** `kubectl get nodes` + app **Ready**). |
-| P4 | **1 slide** | **Your spoken logic**: cordon/drain/maxUnavailable / surge / why users still get healthy pods—match what you actually did (managed node group update, etc.). |
+**Full runbook (console + CLI + what to narrate):** **[day2-os-node-patching.md](../day2-os-node-patching.md)** · **`bash infra/scripts/eks-node-patch-evidence.sh CLUSTER NODEGROUP`** for text snapshots.
+
+### P1: Node AMI / LT — before
+
+**Rubric:** Before shot — managed nodegroup **AMI** / launch template indicator.
+
+**Submission notes:** *Not bundled yet.* Recommend: AWS Console node group overview **or** script output (**`describe-nodegroup`** `releaseVersion` / AMI line) saved as **`P1-nodegroup-before.png`** / **`.txt`**.
+
+### P2: Node AMI / LT — after
+
+**Rubric:** After shot — value **changed** post rotation.
+
+**Submission notes:** *Not bundled.* Same capture after **`update-nodegroup-version`** / Console update → **`P2-nodegroup-after.…`**.
+
+### P3: Smoke / tests pass during or after rotation
+
+**Rubric:** Recording or logs — green workflow or **`kubectl`** + Ready app.
+
+**Submission notes:** *Not bundled.* Run **`FRONTEND_HOST=… http-availability…sh`** during node recycle + **`bash infra/scripts/smoke-test-env.sh …`** afterward; paste log or **`P3-…`** filename.
+
+### P4 (slide): Spoken patching logic
+
+**Rubric:** One slide narrative — cordon/drain, **maxUnavailable** / surge, why users stay on healthy Pods.
+
+**Submission notes:** Talk track bullets are in **`day2-os-node-patching.md` § 5**. Live defense / optional slide — Terraform **`max_unavailable_percentage`** sits in **`infra/modules/eks/main.tf`** (**`aws_eks_node_group.default`** **`update_config`**).
 
 ---
 
 ## Observability & logging (≈15%)
 
-Record **one continuous silent screen capture** (**3–8 min**) if possible; split into clips if easier.
+_Target **silent** Grafana tour **~3–8 min** if one file._
 
-| # | Artifact | What to show |
-|---|----------|----------------|
-| O1 | **Screenshot** | `kubectl -n monitoring get pods`—**Prometheus / Grafana / Loki** (and **Alertmanager** if enabled) **Running**. |
-| O2 | **Recording** | **Grafana** on **`https://grafana-<env>.<domain>`**—**URL bar** visible. |
-| O3 | **Recording** | **Google OAuth**: click **Sign in with Google** → **redirect** → **land in Grafana** (no password-as-primary story). |
-| O4 | **Recording** | **Explore → Prometheus**: one query with data (e.g. `up`, or node CPU). |
-| O5 | **Recording** | **Node metrics**: **CPU**, **memory**, and **disk** (dashboard or Explore—rubric asks for all three). |
-| O6 | **Recording** | **Explore → Loki**: `{namespace="<env>",container="items"}` then **outfits**, **schedule**; then `{namespace="<env>"}` or combined filter. Time range **Last 15m** / **1h** after hitting APIs. |
-| O7 | **Screenshot** | **Alertmanager → email** (**or Slack**): **received** notification after **`infra/scripts/alert-drill.sh`** (or your drill). Include **terminal** output of drill command if needed. |
+### O1: Monitoring pods — Prometheus, Grafana, Loki (+ Alertmanager, Promtail)
+
+**Rubric:** Screenshot — `kubectl -n monitoring get pods` — core stack **Running/Ready**.
+
+![O1 kubectl get pods -n monitoring](evidence-media/O1-monitoring-pods.png)
+
+**Extra:**
+
+![EXTRA O1 — get pods wide (same cluster session)](evidence-media/EXTRA-O1-monitoring-pods-wide.png)
+
+### O2: Grafana — reachable URL (+ URL bar)
+
+**Rubric:** Recording — **`https://grafana-<env>.<domain>`** with URL bar visible.
+
+**Submission notes:** Use combined tour; narration says **prod vs dev** if host differs.
+
+📹 **[O2-O6-grafana-and-observability.mov](evidence-media/O2-O6-grafana-and-observability.mov)**
+
+### O3: Grafana — Google OAuth path
+
+**Rubric:** Recording — Sign in → **Google** redirect → land in Grafana (not password-first).
+
+📹 **[O2-O6-grafana-and-observability.mov](evidence-media/O2-O6-grafana-and-observability.mov)**
+
+**Screenshot assist:** OAuth entry context on **`app-dev` login**:
+
+![EXTRA app-dev login Google — related UX](evidence-media/EXTRA-app-dev-login-google.png)
+
+### O4: Explore → Prometheus sample query
+
+**Rubric:** Recording — Prometheus query returning data (**`up`**, CPU, etc.).
+
+📹 **[O2-O6-grafana-and-observability.mov](evidence-media/O2-O6-grafana-and-observability.mov)**
+
+### O5: Node metrics — CPU, memory, disk
+
+**Rubric:** Recording **or** strong stills — **CPU**, **memory**, **disk** (dashboard or Explore).
+
+**Still images:** Node exporter dashboard (**CPU/mem**) + Explore **filesystem** avail + preset dashboard (**disk I/O**; preset “disk space” may be empty narrate Explore fix).
+
+![EXTRA Grafana Node Exporter — CPU/memory](evidence-media/EXTRA-O5-grafana-node-exporter-cpu-mem.png)
+
+![EXTRA preset dashboard disk I/O (+ empty disk-space panel narrative)](evidence-media/EXTRA-O5-grafana-dashboard-disk-io-disk-space-empty.png)
+
+![Explore — node_filesystem_avail_bytes (disk capacity)](evidence-media/O5-disk-capacity-explore.png)
+
+📹 Same topic in motion:
+
+📹 **[O2-O6-grafana-and-observability.mov](evidence-media/O2-O6-grafana-and-observability.mov)**
+
+### O6: Loki queries — items, outfits, schedule (+ combined)
+
+**Rubric:** Recording — **`{namespace="<env>",container="items"}`** (then outfits, schedule) plus broader **`{namespace="<env>"}`** or equivalent.
+
+📹 **[O2-O6-grafana-and-observability.mov](evidence-media/O2-O6-grafana-and-observability.mov)**
+
+### O7: Alerts — drill + received notification
+
+**Rubric:** Screenshot — **received** Email/Slack + optional terminal from **`infra/scripts/alert-drill.sh`**.
+
+**Submission notes:** *Not bundled.*
 
 ---
 
 ## Presentation format (≈15% rubric bucket)
 
-| # | Artifact | What to show |
-|---|----------|----------------|
-| S1 | **Silent video** | **Long-running** parts only: Terraform apply / nodegroup update / **`terraform destroy`** excerpt—**no voice on file** per assignment. |
-| S2 | **Prepared deck** | Slides embedding **thumbnail + link** to recordings; bullets from **[final-defense-script.md](final-defense-script.md)**. |
-| S3 | **Practice** | **Timed** **chaos story** (below)—**2-minute** rehearsal with a timer. |
+### S1: Silent video — provisioning / deploy / destroy slice
+
+**Rubric:** **Silent** footage only for long infra operations.
+
+📹 **[S1-terraform-apply-or-infra-recording.mov](evidence-media/S1-terraform-apply-or-infra-recording.mov)**
+
+_(Also listed under **C6** as supporting infra automation.)_
+
+### S2: Deck + links
+
+**Rubric:** Slides with **thumbnail + link** to clips; bullets from **`docs/final-defense-script.md`**.
+
+**Submission notes:** Slide deck artifact outside repo or course upload.
+
+### S3: Chaos-defense practice (~2 minutes)
+
+**Rubric:** Rehearsed timer run — instructor chaos scenario rehearsal.
+
+**Submission notes:** No file — practice offline.
 
 ---
 
-## Live demo only (minimal—do live)
+## Live demo only (during grading — minimal capture)
 
-Do **not** rely on prod staying up for these **during** grading; rehearse against **dev/uat** or **dry-run** Grafana if needed.
+### L1: Live narration over silent / prerecorded material
 
-| # | Live item | Why it’s live |
-|---|-----------|----------------|
-| L1 | **Narration** | Rubric expects you to **narrate** over the silent / pre-recorded material—**your voice**, not new clicking. |
-| L2 | **Chaos defense (~1–2 min)** | Instructor gives a **random failure**; you **live** use **metrics + logs** to **diagnose** and **explain recovery** (e.g. pending pod + events, Loki query, Prometheus alert, rollout). **Prepare** 2–3 “likely” scenarios and **bookmark** Explore queries; **avoid** depending on a cold prod cluster. |
-| L3 | **Q&A** | Short **live** answers; optional: show **one** pre-opened Grafana tab if network allows—**not** required if clips already prove it. |
+**Rubric:** **Your voice** over prepared media — avoid “new silent clicking” replacing narration.
 
-**Optional** (only if asked): single **live** `kubectl get pods -n <env>` or **one** Grafana query—keep a **fallback screenshot** if Wi‑Fi fails.
+### L2: Chaos defense (~1–2 min instructor-driven)
+
+**Rubric:** **Metrics + logs** to diagnose hypothetical failure — bookmark Explore queries beforehand.
+
+### L3: Q&A
+
+**Rubric:** Short live answers; optional one Grafana tab if network allows *(not required)*.
+
+**Optional fallback:** Single live **`kubectl get pods`** or one Explore query — keep **offline screenshot** backup if Wi‑Fi flakes.
+
+---
+
+## Pre-capture (once)
+
+- [ ] Add **`A2`**, **`A3`**, **`A6`**, **`C1–C4`**, **`O7`** if missing for final submission (or cite **URLs** in slides instead).
+- [ ] **`evidence-media/NOTES.txt`** — env + date per capture.
+- [ ] Paste **green Actions** URLs (dev merge, UAT, prod) in NOTES or slides.
 
 ---
 
 ## Quick “done” gate
 
-- [ ] Every **unchecked** row in [REQUIREMENTS_CHECKLIST.md](../REQUIREMENTS_CHECKLIST.md) has at least one **file** or **URL** in your bundle.
-- [ ] **Self-grading** comments filled (template at bottom of checklist).
-- [ ] **Chaos** rehearsed **twice** with timer.
+- [ ] Every unchecked item in **[REQUIREMENTS_CHECKLIST.md](../REQUIREMENTS_CHECKLIST.md)** has either a **file** here, a **URL**, or an **explicit slide**.
+- [ ] Self-grading comments filled (bottom of **`REQUIREMENTS_CHECKLIST.md`**).
+- [ ] Chaos story rehearsed **twice** on a timer.
+
+---
+
+## Rubric weight reference (compact)
+
+Infrastructure (Terraform): **20%** — aligns with § Architecture + parts of deployments. Application & networking: **15%** — § Architecture + rollout. CI/CD GitOps: **15%** — § CI/CD. Day 2 patching: **10%** § P*. Day 2 schema: **10%** § D*. Observability & logging: **15%** — § Observability. Presentation / defense: **15%** — § Presentation + live **L***.

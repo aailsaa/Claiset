@@ -34,18 +34,54 @@ For the **canonical checklist** (checkboxes + rubric mapping), open **[REQUIREME
 | Infra exclusively via Terraform (VPC, EKS, RDS, …) | **Done** under `infra/` |
 | Multi-environment Terraform | **Done** — `infra/envs/{dev,qa,uat,prod}` + remote S3/DynamoDB state |
 
-#### Deployment strategy for EKS (assignment: Blue/Green **or** Canary)
+#### Progressive rollout strategy (EKS)
 
-**Choice: Canary-style progressive rollout** (as required by [REQUIREMENTS.md](REQUIREMENTS.md)), **not** classical Blue/Green with two live stacks and a single traffic flip.
+**Written justification (submission-ready prose):** [docs/partial-canary-justification.md](docs/partial-canary-justification.md)
 
-- **What we run:** Standard Kubernetes **Deployments** with an explicit **`RollingUpdate`** strategy (`maxUnavailable: 0`, `maxSurge: 25%` in [`infra/modules/app-bluegreen`](infra/modules/app-bluegreen)), plus **readiness** and **liveness** HTTP probes and optional **soft anti-affinity** so app pods spread across nodes. New pods only receive traffic after readiness passes; old pods are phased out in small steps, which **limits blast radius** the way a canary does—without a service mesh or weighted ALB splits.
-- **Why not Blue/Green here:** Full Blue/Green implies **two parallel versions** of every service and a cutover (or double capacity during the switch). On small managed node groups that is **costly and operationally heavy** for this project; rolling canary steps match the rubric’s “reduce risk during promotion” goal with less duplicate capacity.
-- **What would be “more canary” later:** Add **Argo Rollouts** or **ALB traffic weighting** for percentage-based exposure; the current design is **deliberately the native-Kubernetes baseline (option A)**.
+[REQUIREMENTS.md](REQUIREMENTS.md) asks you to **pick and justify** a deployment strategy between **Blue/Green–style** ideas and **Canary**. This project implements a **hosted-service canary**: **progressive replacement** of Pods using native **`RollingUpdate`**, without running two full immutable stacks or doing a single hard traffic flip. That matches the rubric’s “canary” option in spirit while staying within **core Kubernetes** APIs (no mesh, no weighted target groups in this iteration).
 
-Workloads and Ingress live in Terraform module **`app_bluegreen`** ([`infra/modules/app-bluegreen`](infra/modules/app-bluegreen)).
+##### What is implemented (partial canary)
 
-State note: if a prior commit used `module.k8s_app`, run once per env from `infra/envs/<env>` after `terraform init`:  
-`terraform state mv 'module.k8s_app' 'module.app_bluegreen'`
+| Mechanism | Role in “canary” terms |
+| --- | --- |
+| **`RollingUpdate` + `maxUnavailable: 0`** | Old Pods are not removed until **new** Pods are **Ready**; you never intentionally drop below declared capacity during the roll. |
+| **`maxSurge: 1`** in **UAT** and **Prod** (see `infra/envs/uat/main.tf`, `infra/envs/prod/main.tf`) | Limits how many **extra** Pods of the new revision run at once—**one wave at a time** when `replicas > 1` (UAT default), and explicit single-Pod burst when `replicas == 1`. **Dev/QA** keep the module default **`maxSurge: 25%`** for faster inner loops. |
+| **`minReadySeconds` soak** (**20s** UAT, **30s** Prod) | After `/health` succeeds, the new Pod must stay **Ready** for this window before the Deployment controller advances; catches **flapping** or **slow failures** that a one-shot readiness check might miss—a lightweight **“observe before promote”** gate. |
+| **Readiness / liveness HTTP probes** | **Service endpoints exclude** Pods until readiness passes; only healthy revision serves traffic. |
+| **`PodDisruptionBudget`** (`replicas > 1`) | Caps **voluntary** eviction during node drains so you do not lose an entire service surface at once—complements rollout safety during **cluster** changes. |
+
+##### Justification (why this counts as canary for the assignment)
+
+- **Progressive exposure:** New code is introduced in **small increments** (bounded surge + ordered replacement), not all-at-once cutover.
+- **Automated promotion gate:** **Readiness** + **`minReadySeconds`** act as successive checks before the controller retires old Pods—the same *idea* as canary stages, expressed with **Kubernetes-native** knobs instead of an external rollout controller.
+- **Operational fit:** Managed node groups and **budget** favors **minimal extra capacity**; we avoid **double-deploy** Blue/Green for every microservice simultaneously.
+- **Honest boundary:** There is **no percentage-based HTTP split** (e.g. 5% → 50% → 100%) across two arbitrary revisions. Adding that would mean **AWS Load Balancer weights**, **Ingress canary controllers**, or **Argo Rollouts**—tracked as optional hardening below.
+
+##### Defaults vs environment policy
+
+All knobs live on module [`infra/modules/eks-app`](infra/modules/eks-app) (`rolling_update_*`, `rollout_*`, PDB). **Prod** (and **UAT** once rebuilt) use **stricter** stepping/soak; **dev/QA** prioritize **iteration speed**.
+
+##### Future hardening (full traffic-weighted canary)
+
+If grading or production needs **measurable traffic share** per revision: add **Argo Rollouts**, **Ingress/ALB weighted rules**, or a **service mesh**—the current design is intentionally the **baseline** that already satisfies **progressive, probed, capacity-safe** rollout.
+
+Workloads and Ingress live in Terraform module **`eks_app`** ([`infra/modules/eks-app`](infra/modules/eks-app)).
+
+**State after the `eks_app` rename:** If remote state still lists `module.app_bluegreen.*`, run once per env (after `terraform init` against the same S3 backend GitHub Actions uses).
+
+From the repo root, with **`TF_STATE_BUCKET`** and **`TF_LOCK_TABLE`** set (your Actions secrets) and AWS credentials in the environment:
+
+```bash
+export TF_STATE_BUCKET=… TF_LOCK_TABLE=…
+export AWS_REGION=us-east-1   # if different from default
+
+bash infra/scripts/terraform-migrate-remote-state-for-eks-app-rename.sh dev
+bash infra/scripts/terraform-migrate-remote-state-for-eks-app-rename.sh qa
+bash infra/scripts/terraform-migrate-remote-state-for-eks-app-rename.sh prod
+# If you still have a UAT state object in S3 from before teardown, run for uat too; skip if UAT will be created from an empty state.
+```
+
+Manual equivalent (per env directory): `terraform init -reconfigure` with the same `-backend-config=…` flags as [`.github/workflows/promotion.yml`](.github/workflows/promotion.yml), then `bash ../../scripts/terraform-state-mv-module-to-eks-app.sh`.
 
 ### 2. Deployment & CI/CD (git-driven promotion)
 
@@ -54,7 +90,7 @@ State note: if a prior commit used `module.k8s_app`, run once per env from `infr
 | Dev → nightly QA → UAT → Prod | **Implemented** — [`promotion.yml`](.github/workflows/promotion.yml) (dev on push to `main`; QA on schedule + manual; **UAT on PR merged to `main` (same repo) or `RC` in commit message**; prod on `v*` tags + manual) |
 | Dev/QA → UAT (Conventional Commits / PR merge) | **Implemented** — Merging an in-repo PR into `main` promotes to UAT. Optional **`RC` token** in the tip merge commit subject/body still works for direct pushes. Fork PR merges are skipped (deploy via `workflow_dispatch` → UAT instead). |
 | UAT → Prod via tags (no console deploy) | **Implemented (initial)** — `v*` tags + `workflow_dispatch` prod |
-| Documented choice: blue/green **or** canary | **Done (written)** — Canary-style rolling strategy above; maps to `RollingUpdate` + probes in `app-bluegreen` module |
+| Documented rollout strategy (rubric) | **Done (written)** — Progressive **hosted-service canary** above (UAT/Prod `maxSurge: 1` + `minReadySeconds` soak); code in [`infra/modules/eks-app`](infra/modules/eks-app) |
 | Zero downtime | **Partial** — rollout settings + probes gate traffic; capture workflow/Grafana evidence during a promotion |
 
 **Operational notes (recent work):**
@@ -75,7 +111,7 @@ Current automation:
 | Scenario | Status |
 | -------- | ------ |
 | **Schema migrations** | **Implemented** — `cmd/migrate` + Kubernetes `migrate` Job before app Deployments; you still need a **clear demo/explanation** for graders |
-| **Node OS / AMI patching** without interrupting service | **Not documented / not demonstrated** — EKS managed node group + launch template exist; add process (drain / roll nodegroup / AMI release version) and narrate it |
+| **Node OS / AMI patching** without interrupting service | **Runbook + scripts** — [docs/day2-os-node-patching.md](docs/day2-os-node-patching.md), [`infra/scripts/eks-node-patch-evidence.sh`](infra/scripts/eks-node-patch-evidence.sh); you still **capture Console/CLI proof** (**P1–P3**) when a patch is available |
 
 ### 4. Observability & logging
 
@@ -93,9 +129,9 @@ Current automation:
 See **[REQUIREMENTS_CHECKLIST.md](REQUIREMENTS_CHECKLIST.md)** and unchecked items in **[REQUIREMENTS.md](REQUIREMENTS.md)**. Highest impact next:
 
 1. **Observability evidence (15%)** — Screenshots/recording: Grafana OAuth, dashboards, Loki queries; run **alert drill** and save **email/Slack proof**.
-2. **Day 2 OS patching (10%)** — Document and **demo** rolling EKS node updates (AMI / nodegroup version) **without** killing traffic (drain, surge, verification).
+2. **Day 2 OS patching (10%)** — Follow [docs/day2-os-node-patching.md](docs/day2-os-node-patching.md): run nodegroup AMI/release update **or** narrate readiness; grab **before/after** + **`http-availability-during-rollout.sh`** transcript if possible.
 3. **Day 2 schema change (10%)** — You have migrate; prepare a **graded narrative**: show a schema change, how it ships, and how rollback / safety works.
-4. **Zero-downtime evidence** — Short clip or logs from a promotion showing healthy rollouts / no sustained 5xx.
+4. **Zero-downtime evidence** — Use [docs/zero-downtime-promotion-evidence.md](docs/zero-downtime-promotion-evidence.md) + [`infra/scripts/http-availability-during-rollout.sh`](infra/scripts/http-availability-during-rollout.sh); refresh **`C6`** clip or log snippet.
 5. **Presentation & chaos defense** — Silent video allowed for long runs; **live narration**; practice using metrics/logs to find a failure in 1–2 minutes.
 
 **Cost tip:** Tear down **`qa` / `uat` / `prod`** when not demoing (`./infra/scripts/terraform-destroy-nonprod.sh` or per-env destroy). NAT + second RDS + second EKS add up quickly.

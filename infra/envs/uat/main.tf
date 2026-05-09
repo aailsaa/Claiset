@@ -81,14 +81,18 @@ module "platform" {
   alertmanager_smtp_password     = var.alertmanager_smtp_password
 }
 
-module "app_bluegreen" {
-  source  = "../../modules/app-bluegreen"
+module "eks_app" {
+  source  = "../../modules/eks-app"
   project = var.project
   env     = var.env
   tags    = local.tags
 
   enable_kubernetes_app = var.enable_kubernetes_app
   depends_on            = [module.platform]
+
+  # Canary-style stepping: multi-replica UAT exposes at most one extra Pod per wave; soak before RS advances.
+  rolling_update_max_surge  = "1"
+  rollout_min_ready_seconds = 20
 
   aws_region               = var.aws_region
   domain_root              = var.domain_root

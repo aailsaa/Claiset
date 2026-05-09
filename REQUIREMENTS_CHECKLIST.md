@@ -3,9 +3,11 @@
 **Back to project overview:** [README.md](README.md)  
 **Source requirements (unaltered):** [REQUIREMENTS.md](REQUIREMENTS.md)
 
-Use this as your final grading evidence matrix: each row maps to a concrete screenshot, log snippet, URL, or workflow run.
+**Screenshots / recordings bundle:** curated list with embedded media → **[docs/evidence-media-checklist.md](docs/evidence-media-checklist.md)** · files under **`docs/evidence-media/`** · rename map → **`docs/evidence-media/MEDIA_MAPPING.txt`**
 
-**Status snapshot:** Prod promotion and observability stack have completed successfully in a recent run; use your **Grafana prod screen recording** + **successful workflow run** URLs as primary evidence. **Prod teardown** may be in progress—save artifacts (screenshots, recordings, state list excerpts) *before* RDS/EKS are gone if you still need console proof.
+Use this file as the **requirements matrix** (status + what to capture + short notes). Use **`docs/evidence-media-checklist.md`** when you need the detailed media walkthrough.
+
+**Status snapshot:** Dev + UAT have been green with recent fixes on **`main`**. Embed new captures in **`docs/evidence-media-checklist.md`** first, then summarize filenames or links in the fourth column below.
 
 ---
 
@@ -13,12 +15,12 @@ Use this as your final grading evidence matrix: each row maps to a concrete scre
 
 | Requirement | Status | Required proof (exact artifact to capture) | Current evidence / notes |
 | --- | --- | --- | --- |
-| Frontend exists and is polished | [x] | Screenshot of app homepage + one functional page in prod | Implemented; capture from prod URL or archival clip if stack is torn down |
-| Database is AWS RDS only | [x] | AWS console screenshot of prod RDS instance + `terraform state list` showing RDS resources | Terraform-managed; screenshot **before** destroy if you are deleting prod RDS |
-| Backend has at least 3 microservices | [x] | `kubectl -n prod get deploy` showing `items`, `outfits`, `schedule` | Terraform `module.app_bluegreen` / `infra/modules/app-bluegreen` |
-| Frontend on custom DNS with HTTPS | [x] | Browser screenshot of `https://app-prod.<domain>` lock icon + ALB/Ingress hostname mapping | `app-prod.claiset.xyz` path verified in successful runs |
-| EKS/RDS/VPC/IAM managed by Terraform | [x] | `terraform state list` excerpt + repo structure screenshots (`infra/modules/*`) | Terraform-first; `infra/modules/*` + env roots |
-| Day 1 + Day 2 automated | [x] | GitHub Actions workflow run screenshots + Terraform apply logs | `promotion.yml` + apply logs from prod run |
+| Frontend exists and is polished | [x] | App homepage **and** one other functional page; rubric cites prod — in defense note **dev**/prod parity. | **`A1-app-home.png`**, **`A1-app-inner.png`** + extras — see **`### A1`** in [docs/evidence-media-checklist.md](docs/evidence-media-checklist.md). |
+| Database is AWS RDS only | [x] | AWS console RDS **Available** + `terraform state list` showing RDS. | Add **`A2-rds-console.png`** when graded; **`A3-terraform-state.png`** helps both DB + infra rows. |
+| Backend has at least 3 microservices | [x] | `kubectl get deploy` **`items`**, **`outfits`**, **`schedule`**. | **`A4-kubectl-deploy.png`** (also shows **`web`**) — see **`### A4`** in [docs/evidence-media-checklist.md](docs/evidence-media-checklist.md). |
+| Frontend on custom DNS with HTTPS | [x] | Browser HTTPS lock + Ingress/ALB mapping. | **`A5-kubectl-ingress.png`**; HTTPS extras under **`### A1`** in [docs/evidence-media-checklist.md](docs/evidence-media-checklist.md). |
+| EKS / RDS / VPC / IAM managed by Terraform | [x] | `terraform state list` excerpt + **`infra/modules/`** tree or file samples. | Partial: Ingress shot ties to ACM; add **`A3-terraform-state.png`**, **`A6-infra-modules.png`**. |
+| Day 1 + Day 2 automated | [x] | GitHub Actions runs + Terraform apply logs. | Silent slice: **`S1-terraform-apply-or-infra-recording.mov`**; **`C1`–`C4`** placeholders for workflow stills/links in checklist. |
 
 ---
 
@@ -26,11 +28,11 @@ Use this as your final grading evidence matrix: each row maps to a concrete scre
 
 | Requirement | Status | Required proof (exact artifact to capture) | Current evidence / notes |
 | --- | --- | --- | --- |
-| Dev -> Nightly QA -> UAT -> Prod flow | [x] | Screenshot of workflow graph showing stages and successful transitions | Implemented in `.github/workflows/promotion.yml` |
-| Dev/QA -> UAT via Conventional Commit or PR merge | [x] | One workflow run triggered by PR merge (or commit message containing `RC`) | PR merge trigger is active; RC path still supported |
-| UAT -> Prod via release tags (no click deploy) | [x] | Workflow run triggered by tag/manual with git refs shown | Prod: `workflow_dispatch` with `ALLOW_COSTLY_RUNS` (still Git-driven; document in defense) |
-| Blue/Green or Canary chosen and justified | [x] | 1 slide or README section explicitly stating strategy + rationale | **[README.md](README.md)** — **Canary-style** progressive rollout via **`RollingUpdate`** + probes (`infra/modules/app-bluegreen`); optional slide can mirror that section |
-| Zero downtime during promotion | [ ] | Short video/log stream proving no 5xx during rollout + successful rollout status | `maxUnavailable=0` / `maxSurge=25%` + probes; attach **workflow** + health evidence during a rollout |
+| Dev → nightly QA → UAT → Prod flow | [x] | Workflow graph with successful transitions. | Capture **`C1-actions-promotion-graph.png`** or paste green Actions URL — **`### C1`** in [docs/evidence-media-checklist.md](docs/evidence-media-checklist.md). |
+| Dev/QA → UAT via conventional commit / PR merge | [x] | Run from merged PR **`or`** `RC` in commit message. | **`C2-…`** or Actions URL — **`### C2`** in [docs/evidence-media-checklist.md](docs/evidence-media-checklist.md). |
+| UAT → Prod via tags / gated dispatch (no console deploy) | [x] | Tag or **`workflow_dispatch`** prod with refs visible. | **`C3-…`** — **`### C3`** in [docs/evidence-media-checklist.md](docs/evidence-media-checklist.md). |
+| Blue/Green **or** Canary chosen and justified | [x] | README / slide + strategy reflected in infra code. | **Justification:** [docs/partial-canary-justification.md](docs/partial-canary-justification.md) · **Overview + table:** [README — progressive rollout](README.md#progressive-rollout-strategy-eks) · Code: **`infra/modules/eks-app`**, **`maxSurge: 1`** + **`minReadySeconds`** soak in **UAT/Prod**. *(Rubric: “Blue/Green or Canary”; we document progressive rolling canary, not dual-stack BG or HTTP % split.)* |
+| Zero downtime during promotion | [ ] | Short video/log: no elevated 5xx during rollout + rollout succeeded. | **How-to:** **[docs/zero-downtime-promotion-evidence.md](docs/zero-downtime-promotion-evidence.md)** · **`infra/scripts/http-availability-during-rollout.sh`**. Artifact: **`C6-rollout-or-deployment-recording.mov`** + optional **`S1-…`**; verify vs **[docs/evidence-media/MEDIA_MAPPING.txt](docs/evidence-media/MEDIA_MAPPING.txt)**. |
 
 ---
 
@@ -38,8 +40,8 @@ Use this as your final grading evidence matrix: each row maps to a concrete scre
 
 | Requirement | Status | Required proof (exact artifact to capture) | Current evidence / notes |
 | --- | --- | --- | --- |
-| OS/security patching of worker nodes without outage | [ ] | Before/after node AMI or node version + rollout/smoke success during rotation | Runbook exists; final demo evidence still needed |
-| Schema change deployment with explanation | [x] | `kubectl -n prod get jobs` + `describe job migrate` + app/API behavior after migration | `migrate` job path exists and has completed in runs |
+| OS/security patching of worker nodes without outage | [ ] | Before/after AMI or nodegroup + smoke during rotation. | **Runbook:** **[docs/day2-os-node-patching.md](docs/day2-os-node-patching.md)** · **`infra/scripts/eks-node-patch-evidence.sh`**. Evidence filenames: **`P1`** / **`P2`** / **`P3`** section in **[docs/evidence-media-checklist.md](docs/evidence-media-checklist.md)**. |
+| Schema change deployment (migrate job) + explanation | [x] | `kubectl get jobs` migrate **Complete** + `describe job migrate`. | **`D1-migrate-job.png`**, **`D2-migrate-describe.png`** — **`### D1` / `D2`** in [docs/evidence-media-checklist.md](docs/evidence-media-checklist.md). |
 
 ---
 
@@ -47,13 +49,13 @@ Use this as your final grading evidence matrix: each row maps to a concrete scre
 
 | Requirement | Status | Required proof (exact artifact to capture) | Current evidence / notes |
 | --- | --- | --- | --- |
-| Prometheus + Grafana self-hosted on EKS | [x] | `kubectl -n monitoring get pods` + Grafana UI screenshot | `kube-prometheus-stack` via platform module; show in prod recording |
-| Dashboard includes CPU/memory/disk node metrics | [x] | Grafana dashboard screenshots of node CPU, memory, disk panels | Include **CPU, memory, and disk** in prod Explore/dashboards clip |
-| Alerts sent to Email/Slack | [ ] | Alert drill command output + received email/slack screenshot | Alertmanager SMTP wired; run `infra/scripts/alert-drill.sh` (or equivalent) and save **received** message screenshot |
-| Grafana externally reachable | [x] | Browser screenshot of `https://grafana-prod.<domain>` reachable from outside AWS | `grafana-prod.claiset.xyz` + ALB; show URL bar in recording |
-| Grafana uses OAuth2 (no username/password primary flow) | [x] | Screenshot/video of Google OAuth redirect and successful sign-in | **Prod:** capture Google sign-in in screen recording (not local admin login) |
-| Centralized logging stack on EKS (Loki/ELK/Sentry) | [x] | Screenshot of Loki datasource + query result panel | Loki single-binary + Grafana datasource `uid=loki`; show Explore → Loki |
-| Query logs across all 3 backend services | [x] | 3 service-specific queries (`items`, `outfits`, `schedule`) + one combined query screenshot | When `PROOF_LOKI_LOGS` is on, smoke script validates Loki **streams** for app namespace; clip: `{namespace="prod",container="items"}` (and outfits, schedule) + `{namespace="prod"}` |
+| Prometheus + Grafana self-hosted on EKS | [x] | `kubectl -n monitoring get pods` + Grafana in UI/recording. | **`O1-monitoring-pods.png`**, **`EXTRA-O1-…`**; tour **`O2-O6-grafana-and-observability.mov`**. |
+| Dashboard: node CPU / memory / **disk** | [x] | Panels or Explore proving all three. | **`EXTRA-O5-grafana-node-exporter-cpu-mem.png`**, **`EXTRA-O5-grafana-dashboard-disk-io-disk-space-empty.png`**, **`O5-disk-capacity-explore.png`**. |
+| Alerts to Email / Slack | [ ] | Alert drill output + **received** notification. | Run **`infra/scripts/alert-drill.sh`**; add **`O7-…`** — **`### O7`** in [docs/evidence-media-checklist.md](docs/evidence-media-checklist.md). |
+| Grafana externally reachable | [x] | `https://grafana-<env>.<domain>` from outside AWS. | URL bar + flow in **`O2-O6-…`** (e.g. **grafana-dev**); narrate env in defense. |
+| Grafana OAuth2 (no password-primary login) | [x] | Google OAuth path into Grafana. | **`EXTRA-app-dev-login-google.png`** + **`O2-O6-…`**. |
+| Centralized logging (Loki stack) | [x] | Datasource / Explore path to Loki. | **`loki`** pod in **`O1`** ; queries in **`O2-O6-…`** — see **Observability** section headers in [docs/evidence-media-checklist.md](docs/evidence-media-checklist.md). |
+| Query logs across all three backends | [x] | **`items`** / **`outfits`** / **`schedule`** filters + broader query. | Demonstrated in **`O2-O6-…`** — **`### O6`** in [docs/evidence-media-checklist.md](docs/evidence-media-checklist.md). |
 
 ---
 
@@ -61,19 +63,17 @@ Use this as your final grading evidence matrix: each row maps to a concrete scre
 
 | Requirement | Status | Required proof (exact artifact to capture) | Current evidence / notes |
 | --- | --- | --- | --- |
-| Silent video for long-running parts | [ ] | Submitted silent clip (provision/deploy) | Record/export pending |
-| Live narration over video/demo | [ ] | Final narrated recording or live demo notes | Script exists in `docs/final-defense-script.md` |
-| Live chaos defense in ~1-2 min | [ ] | Timed practice capture (issue -> diagnosis -> mitigation) | Incident story is ready; rehearse once with timer |
+| Silent video — long-running parts | [ ] | Submitted silent provision/deploy/destruct excerpt. | **`S1-terraform-apply-or-infra-recording.mov`** (verify content). |
+| Live narration over video / demo | [ ] | You speak live over silent clips during grading. | Talking points: **[docs/final-defense-script.md](docs/final-defense-script.md)**. |
+| Live chaos defense (~1–2 min) | [ ] | Timed practice — failure → diagnosis → mitigation with metrics/logs. | Bookmarks/queries only; rehearsal, not a second recording. |
 
 ---
 
-## Final Evidence Bundle (create before submission)
+## Final Evidence Bundle (before submission)
 
-- Architecture screenshots (frontend, DNS/HTTPS, RDS, microservices)—**grab RDS/console before prod destroy** if needed
-- CI/CD workflow screenshots for Dev/QA/UAT/Prod promotion (include green prod job link)
-- Day-2 evidence (schema migration, node patching flow)—patching row still open
-- Observability: **silent or narrated screen recording** of prod Grafana (OAuth → Prometheus sample → **node CPU/memory/disk** → Loki queries for three backends)
-- Alert receipt screenshot + chaos-defense practice clip or timestamped run notes
+- **Media index (with embeds):** [docs/evidence-media-checklist.md](docs/evidence-media-checklist.md)
+- **Plain files:** `docs/evidence-media/*.png`, `*.mov`
+- Still **recommended** if graders ask: RDS console (**A2**), **`terraform state list`** (**A3**), **`infra/modules`** tree (**A6**), Actions graph / dispatch shots (**C1–C4**), alert inbox (**O7**); **§3 patching** runbook **[docs/day2-os-node-patching.md](docs/day2-os-node-patching.md)**; **zero downtime** **[docs/zero-downtime-promotion-evidence.md](docs/zero-downtime-promotion-evidence.md)**
 
 ---
 
@@ -82,7 +82,7 @@ Use this as your final grading evidence matrix: each row maps to a concrete scre
 | Category | Weight | Maps to sections |
 | --- | ---: | --- |
 | Infrastructure (Terraform) | 20% | Section 1 |
-| Application & networking | 15% | Sections 1-2 |
+| Application & networking | 15% | Sections 1–2 |
 | CI/CD & GitOps logic | 15% | Section 2 |
 | Day 2: OS patching | 10% | Section 3 |
 | Day 2: Schema | 10% | Section 3 |

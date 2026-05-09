@@ -12,12 +12,12 @@ Everything in cloud infrastructure is Terraform-managed: VPC, EKS, RDS, IAM, ing
 UAT is triggered by PR merge or RC-style commit flow. Prod is tag-driven with `v*` release tags, not console click deploys.  
 The workflow uses staged Terraform applies, image retagging across environments, readiness checks, and smoke tests.
 
-For the EKS deployment strategy rubric, I use **Canary-style progressive rollout**: Terraform-defined **RollingUpdate** with `maxUnavailable` zero and readiness probes, so new pods only receive traffic when healthy and risk is stepped down—without maintaining two full parallel stacks (classical Blue/Green)."
+For the EKS deployment strategy rubric, I use a **hosted-service canary**: **RollingUpdate** with `maxUnavailable` zero, **readiness** gates, and in UAT/prod a **bounded surge** plus **`minReadySeconds` soak** after health checks so the controller does not retire old pods until the new revision has stayed healthy—progressive risk reduction without a separate blue stack or traffic-percentage controller."
 
 ## 0:50 - 1:25 | Day-2 operations
 
 "For schema change management, migrations run through the dedicated `migrate` job/image in Kubernetes before app traffic is validated.  
-For OS/security patching, nodegroup rolling replacement is used with readiness gates and post-rollout smoke checks so service health is verified after node updates."
+For OS/security patching, **EKS managed node groups** roll with a **capped max-unavailable percentage** in Terraform alongside **HTTP smoke**—I coordinate **AMI / release upgrades** via console or CLI **before-after** snapshots; details are written up in **`docs/day2-os-node-patching.md`**."
 
 ## 1:25 - 2:05 | Observability and logging
 
