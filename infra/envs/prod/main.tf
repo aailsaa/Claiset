@@ -35,6 +35,8 @@ module "eks" {
 
   create_iam_roles = true
 
+  node_group_kubernetes_version = var.eks_node_group_kubernetes_version
+
   node_instance_types     = var.node_instance_types
   node_group_desired_size = var.node_group_desired_size
   node_group_min_size     = var.node_group_min_size

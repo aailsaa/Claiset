@@ -178,7 +178,7 @@ resource "aws_security_group_rule" "cluster_to_nodes_pods_1025_65535" {
 }
 
 resource "aws_launch_template" "nodes" {
-  name_prefix   = "${local.name}-nodes-"
+  name_prefix = "${local.name}-nodes-"
 
   vpc_security_group_ids = [aws_security_group.node.id]
 
@@ -207,8 +207,11 @@ resource "aws_eks_node_group" "default" {
   node_group_name = "${local.name}-default"
   node_role_arn   = local.resolved_node_role_arn
   subnet_ids      = var.subnet_ids
-  # Pin to control plane so node AMIs/kubelet stay aligned; avoids ambiguous "version update" states.
-  version = aws_eks_cluster.this.version
+  # Omit `version` unless explicitly pinned (see variable `node_group_kubernetes_version`).
+  # Pinning to `aws_eks_cluster.this.version` forces UpdateNodegroupVersion whenever the
+  # control plane version changes, often in the same apply as launch template revisions.
+  # AWS then frequently fails with InvalidParameterException about launch template instance types.
+  version = var.node_group_kubernetes_version
 
   # Allow EKS/ASG to pick from multiple types for capacity. This significantly reduces
   # NodeCreationFailure during nodegroup updates when one type/AZ is temporarily out of capacity.

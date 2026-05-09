@@ -28,6 +28,13 @@ variable "eks_cluster_version" {
   default     = "1.31"
 }
 
+variable "eks_node_group_kubernetes_version" {
+  type        = string
+  default     = null
+  nullable    = true
+  description = "Optional. Pin managed node group kubelet to this version; leave null so LT-only updates are not bundled with UpdateNodegroupVersion (avoids AWS launch-template instance-type errors)."
+}
+
 variable "node_instance_types" {
   type        = list(string)
   description = "EKS node instance types (passed to infra/modules/eks). t3.small avoids ~4-pod/node cap on t3.micro (VPC CNI)."

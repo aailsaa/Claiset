@@ -33,6 +33,8 @@ module "eks" {
   cluster_version = var.eks_cluster_version
   tags            = local.tags
 
+  node_group_kubernetes_version = var.eks_node_group_kubernetes_version
+
   # IAM user / own account: Terraform creates cluster + node IAM roles.
   # AWS Academy (LabRole): set create_iam_roles=false and set cluster_role_arn / node_role_arn.
   create_iam_roles = true
