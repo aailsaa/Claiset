@@ -78,8 +78,8 @@ variable "create_hosted_zone" {
 
 variable "frontend_subdomain" {
   type        = string
-  description = "Subdomain for the frontend (e.g. app). Full name becomes app.<domain_root>."
-  default     = "app"
+  description = "Subdomain for the frontend; must match Ingress/smoke (e.g. app-prod for https://app-prod.<domain_root>). QA/UAT use app-qa / app-uat."
+  default     = "app-prod"
 }
 
 variable "wait_for_acm_validation" {
