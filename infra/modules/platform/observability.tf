@@ -36,10 +36,10 @@ locals {
     {
       smtp_smarthost = var.alertmanager_smtp_smarthost
       smtp_from      = var.alertmanager_smtp_from != "" ? var.alertmanager_smtp_from : "alerts@${var.domain_root}"
+      smtp_require_tls = true
     },
     trimspace(var.alertmanager_smtp_user) != "" ? {
       smtp_auth_username = var.alertmanager_smtp_user
-      smtp_auth_password = nonsensitive(var.alertmanager_smtp_password)
     } : {}
   )
 }
@@ -119,7 +119,9 @@ resource "helm_release" "kube_prometheus_stack" {
   version    = "59.1.0"
   namespace  = kubernetes_namespace.monitoring[0].metadata[0].name
 
-  timeout         = 1800
+  # First installs on micro-node clusters can exceed 30m (CRDs + many pods/webhooks).
+  # Keep atomic+cleanup behavior, but allow more time before Helm gives up.
+  timeout         = 5400
   atomic          = true
   cleanup_on_fail = true
   replace         = true
@@ -283,6 +285,15 @@ resource "helm_release" "kube_prometheus_stack" {
       ]
     }
   })]
+
+  # Keep SMTP auth password out of the main Helm values/state where possible.
+  dynamic "set_sensitive" {
+    for_each = local.observability_enabled && local.alertmanager_enabled && trimspace(var.alertmanager_smtp_user) != "" && trimspace(var.alertmanager_smtp_password) != "" ? [1] : []
+    content {
+      name  = "alertmanager.config.global.smtp_auth_password"
+      value = var.alertmanager_smtp_password
+    }
+  }
 }
 
 resource "helm_release" "loki" {

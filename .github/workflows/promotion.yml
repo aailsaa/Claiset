@@ -46,6 +46,11 @@ env:
   TF_VAR_grafana_google_client_id: ${{ secrets.GRAFANA_GOOGLE_CLIENT_ID }}
   TF_VAR_grafana_google_client_secret: ${{ secrets.GRAFANA_GOOGLE_CLIENT_SECRET }}
   TF_VAR_grafana_google_allowed_domains: ${{ vars.GRAFANA_GOOGLE_ALLOWED_DOMAINS }}
+  TF_VAR_alertmanager_email_to: ${{ secrets.ALERTMANAGER_EMAIL_TO }}
+  TF_VAR_alertmanager_smtp_smarthost: ${{ secrets.ALERTMANAGER_SMTP_SMARTHOST }}
+  TF_VAR_alertmanager_smtp_from: ${{ secrets.ALERTMANAGER_SMTP_FROM }}
+  TF_VAR_alertmanager_smtp_user: ${{ secrets.ALERTMANAGER_SMTP_USER }}
+  TF_VAR_alertmanager_smtp_password: ${{ secrets.ALERTMANAGER_SMTP_PASSWORD }}
   # Single canonical ECR namespace (provisioned in infra/envs/dev; qa+ reference URLs only).
   ECR_ITEMS_REPO: claiset-items
   ECR_OUTFITS_REPO: claiset-outfits
