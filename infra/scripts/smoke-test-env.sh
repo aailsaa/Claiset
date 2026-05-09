@@ -39,6 +39,7 @@ FRONTEND_HOST="${FRONTEND_HOST:-}"
 RDS_ID="${RDS_INSTANCE_ID:-${PROJECT}-${NAMESPACE}-postgres}"
 GRAFANA_HOST="${GRAFANA_HOST:-}"
 EXPECT_OBSERVABILITY_SMOKE="${EXPECT_OBSERVABILITY_SMOKE:-}"
+EXPECT_OBSERVABILITY_DAEMONSETS="${EXPECT_OBSERVABILITY_DAEMONSETS:-}"
 EXPECT_APP_OAUTH_SMOKE="${EXPECT_APP_OAUTH_SMOKE:-true}"
 ROLLOUT_TIMEOUT="${ROLLOUT_TIMEOUT:-8m}"
 
@@ -74,6 +75,14 @@ observability_smoke_enabled() {
     return
   fi
   [[ "${TF_VAR_enable_observability_stack:-false}" == "true" ]]
+}
+
+observability_daemonsets_enabled() {
+  if [[ -n "${EXPECT_OBSERVABILITY_DAEMONSETS}" ]]; then
+    [[ "${EXPECT_OBSERVABILITY_DAEMONSETS}" == "1" || "${EXPECT_OBSERVABILITY_DAEMONSETS}" == "true" ]]
+    return
+  fi
+  [[ "${TF_VAR_enable_observability_daemonsets:-false}" == "true" ]]
 }
 
 app_oauth_smoke_enabled() {
@@ -122,6 +131,34 @@ print_cluster_scheduling_diagnostics() {
   kubectl get pods -A -o wide --no-headers 2>/dev/null | awk '$8!="" {c[$8]++} END{for (n in c) print n " pods=" c[n]}' || true
   echo "aws-node CNI env (prefix delegation/warm targets):"
   kubectl -n kube-system get ds aws-node -o jsonpath='{range .spec.template.spec.containers[0].env[*]}{.name}{"="}{.value}{"\n"}{end}' 2>/dev/null | awk '/ENABLE_PREFIX_DELEGATION|WARM_PREFIX_TARGET|WARM_IP_TARGET|MINIMUM_IP_TARGET/' || true
+}
+
+check_promtail_daemonset_ready() {
+  echo "Observability guard: validating promtail DaemonSet readiness..."
+  if ! kubectl -n monitoring get ds promtail >/dev/null 2>&1; then
+    echo "Observability guard failed: DaemonSet monitoring/promtail not found while daemonsets are enabled." >&2
+    kubectl -n monitoring get ds -o wide || true
+    return 1
+  fi
+
+  local desired ready unavailable
+  desired="$(kubectl -n monitoring get ds promtail -o jsonpath='{.status.desiredNumberScheduled}' 2>/dev/null || true)"
+  ready="$(kubectl -n monitoring get ds promtail -o jsonpath='{.status.numberReady}' 2>/dev/null || true)"
+  unavailable="$(kubectl -n monitoring get ds promtail -o jsonpath='{.status.numberUnavailable}' 2>/dev/null || true)"
+
+  desired="${desired:-0}"
+  ready="${ready:-0}"
+  unavailable="${unavailable:-0}"
+
+  if [[ "${desired}" -eq 0 || "${ready}" -lt "${desired}" || "${unavailable}" -gt 0 ]]; then
+    echo "Observability guard failed: monitoring/promtail not Ready (desired=${desired}, ready=${ready}, unavailable=${unavailable})." >&2
+    kubectl -n monitoring get ds promtail -o wide || true
+    kubectl -n monitoring get pods -l app.kubernetes.io/name=promtail -o wide || true
+    kubectl -n monitoring get events --sort-by='.lastTimestamp' | tail -40 || true
+    return 1
+  fi
+
+  echo "Observability guard OK: monitoring/promtail Ready (${ready}/${desired})."
 }
 
 prod_rollout_recovery_bump() {
@@ -487,6 +524,9 @@ check_app_oauth() {
 }
 
 if [[ "${MODE}" == "wait-only" ]]; then
+  if observability_smoke_enabled && observability_daemonsets_enabled; then
+    check_promtail_daemonset_ready
+  fi
   if observability_smoke_enabled; then
     check_grafana
   fi
@@ -495,6 +535,9 @@ if [[ "${MODE}" == "wait-only" ]]; then
 fi
 
 if observability_smoke_enabled; then
+  if observability_daemonsets_enabled; then
+    check_promtail_daemonset_ready
+  fi
   check_grafana
 fi
 
