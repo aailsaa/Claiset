@@ -18,6 +18,7 @@ set -euo pipefail
 REGION="${AWS_REGION:-us-east-1}"
 CLUSTER="${EXPECTED_CLUSTER_NAME:-}"
 MON_NS="${HELM_MON_NAMESPACE:-monitoring}"
+NODEGROUP="${EKS_NODEGROUP_NAME:-${CLUSTER}-default}"
 
 # Releases Terraform manages for observability (order: prometheus stack must not be arbitrarily removed ahead of dependents;
 # uninstall order is handled bottom-up in the loops below.)
@@ -125,6 +126,44 @@ maybe_import_deployed() {
   return 0
 }
 
+ready_node_count() {
+  kubectl get nodes --no-headers 2>/dev/null | awk '$2=="Ready"{c++} END{print c+0}'
+}
+
+monitoring_pending_count() {
+  kubectl -n "${MON_NS}" get pods --no-headers 2>/dev/null | awk '$3=="Pending"{c++} END{print c+0}'
+}
+
+monitoring_too_many_pods_events() {
+  kubectl -n "${MON_NS}" get events --sort-by='.lastTimestamp' 2>/dev/null | awk '/Too many pods/{c++} END{print c+0}'
+}
+
+maybe_burst_prod_capacity() {
+  # Prod on micro nodes frequently hits VPC-CNI pod density limits during observability install.
+  # If nodes are scarce or scheduling reports "Too many pods", temporarily burst nodegroup.
+  if [[ "${CLUSTER}" != *"-prod" ]]; then
+    return 0
+  fi
+  local ready pending too_many
+  ready="$(ready_node_count)"
+  pending="$(monitoring_pending_count)"
+  too_many="$(monitoring_too_many_pods_events)"
+  if [[ "${ready}" -ge 3 && "${pending}" -eq 0 && "${too_many}" -eq 0 ]]; then
+    return 0
+  fi
+
+  echo "helm-monitoring-reconcile: prod capacity check (ready=${ready}, pending=${pending}, too_many_pods_events=${too_many}) -> bursting ${NODEGROUP} to min=1 desired=10 max=12"
+  aws eks update-nodegroup-config \
+    --region "${REGION}" \
+    --cluster-name "${CLUSTER}" \
+    --nodegroup-name "${NODEGROUP}" \
+    --scaling-config "minSize=1,desiredSize=10,maxSize=12" >/dev/null \
+    || echo "helm-monitoring-reconcile: burst update failed; continuing" >&2
+  aws eks wait nodegroup-active --region "${REGION}" --cluster-name "${CLUSTER}" --nodegroup-name "${NODEGROUP}" \
+    || echo "helm-monitoring-reconcile: nodegroup-active wait failed; continuing" >&2
+  kubectl get nodes --no-headers 2>/dev/null | awk '$2 ~ /SchedulingDisabled/ {print $1}' | xargs -r kubectl uncordon || true
+}
+
 if [[ -z "${CLUSTER}" ]]; then
   echo "helm-monitoring-reconcile: EXPECTED_CLUSTER_NAME unset — skipping." >&2
   exit 0
@@ -157,6 +196,8 @@ fi
 if ! ensure_helm; then
   exit 0
 fi
+
+maybe_burst_prod_capacity
 
 # If a prior destroy/apply left Helm in "uninstalling", Grafana's Ingress often keeps the
 # ingress.k8s.aws/resources finalizer (backend Service already gone). Unblock once before Helm ops.

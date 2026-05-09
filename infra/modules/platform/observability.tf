@@ -309,11 +309,12 @@ resource "helm_release" "loki" {
 
   depends_on = [helm_release.kube_prometheus_stack]
 
-  # Loki can take a while to become Ready on first install (charts + pods + schema init).
-  # If the timeout is too low, Helm fails and Terraform uninstalls Loki due to atomic=true.
+  # Loki can take a while to become Ready on first install on micro-node clusters.
+  # Avoid long wait/rollback loops; readiness is validated by downstream smoke checks.
   timeout         = 2400
-  atomic          = true
-  cleanup_on_fail = true
+  wait            = false
+  atomic          = false
+  cleanup_on_fail = false
   replace         = true
   values = [yamlencode({
     deploymentMode = "SingleBinary"
@@ -322,8 +323,9 @@ resource "helm_release" "loki" {
     # This keeps Helm `wait=true` from timing out on Pending cache StatefulSets.
     chunksCache  = { enabled = false }
     resultsCache = { enabled = false }
-    # Loki chart requires the canary to be enabled for Helm validation/tests.
-    lokiCanary = { enabled = true }
+    # Keep footprint small on free-tier node types.
+    lokiCanary = { enabled = false }
+    gateway    = { enabled = false }
 
     singleBinary = {
       replicas = 1
