@@ -119,11 +119,13 @@ resource "helm_release" "kube_prometheus_stack" {
   version    = "59.1.0"
   namespace  = kubernetes_namespace.monitoring[0].metadata[0].name
 
-  # First installs on micro-node clusters can exceed 30m (CRDs + many pods/webhooks).
-  # Keep atomic+cleanup behavior, but allow more time before Helm gives up.
+  # First installs on micro-node clusters can exceed 30m and frequently trigger Helm
+  # timeout/uninstall loops with atomic=true. Let Terraform continue and rely on the
+  # downstream readiness/smoke checks for convergence validation.
   timeout         = 5400
-  atomic          = true
-  cleanup_on_fail = true
+  wait            = false
+  atomic          = false
+  cleanup_on_fail = false
   replace         = true
   depends_on = [
     helm_release.aws_load_balancer_controller,
