@@ -16,7 +16,8 @@
 #   DEV_NAMESPACE=dev
 #   DEV_FRONTEND_HOST=app-dev.claiset.xyz
 #   DEV_RDS_ID=claiset-dev-postgres
-#   DEV_NODE_MIN=1 DEV_NODE_DESIRED=1 DEV_NODE_MAX=2
+#   DEV_NODE_MIN=2 DEV_NODE_DESIRED=3 DEV_NODE_MAX=6 (default; matches Terraform dev node group)
+#   DEV_NODE_MIN=1 DEV_NODE_DESIRED=1 DEV_NODE_MAX=2 — ultra-cheap; run eks-burst-scale 2 3 6 before terraform apply
 #   DEV_SCALE_SCHEDULE=0   # set to 1 if you want schedule deployment running
 
 set -euo pipefail
@@ -28,9 +29,9 @@ NODEGROUP="${DEV_NODEGROUP_NAME:-${CLUSTER}-default}"
 NAMESPACE="${DEV_NAMESPACE:-dev}"
 FRONTEND_HOST="${DEV_FRONTEND_HOST:-app-dev.claiset.xyz}"
 RDS_ID="${DEV_RDS_ID:-claiset-dev-postgres}"
-NODE_MIN="${DEV_NODE_MIN:-1}"
-NODE_DESIRED="${DEV_NODE_DESIRED:-1}"
-NODE_MAX="${DEV_NODE_MAX:-2}"
+NODE_MIN="${DEV_NODE_MIN:-2}"
+NODE_DESIRED="${DEV_NODE_DESIRED:-3}"
+NODE_MAX="${DEV_NODE_MAX:-6}"
 SCALE_SCHEDULE="${DEV_SCALE_SCHEDULE:-0}"
 
 echo "Resuming low-cost dev: cluster=${CLUSTER} namespace=${NAMESPACE} region=${REGION}"
