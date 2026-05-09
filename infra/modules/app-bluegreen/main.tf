@@ -87,6 +87,10 @@ resource "kubernetes_secret" "app_env" {
 
 resource "kubernetes_job" "migrate" {
   count = local.enabled ? 1 : 0
+  # Do not block Terraform apply on Job completion. Under EKS micro-node pod-density pressure
+  # the migrate pod can sit Pending for long periods, which aborts the whole promotion even when
+  # schema is already up to date. We validate app readiness in smoke checks separately.
+  wait_for_completion = false
 
   metadata {
     name      = "migrate"
