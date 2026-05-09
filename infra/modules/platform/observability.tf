@@ -326,6 +326,7 @@ resource "helm_release" "loki" {
     # Keep footprint small on free-tier node types.
     lokiCanary = { enabled = false }
     gateway    = { enabled = false }
+    test       = { enabled = false }
 
     singleBinary = {
       replicas = 1
