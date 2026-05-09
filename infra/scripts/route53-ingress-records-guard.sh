@@ -7,7 +7,9 @@
 # Expected env (fallbacks provided where possible):
 # - AWS_REGION (default us-east-1)
 # - DOMAIN_ROOT or TF_VAR_domain_root
-# - FRONTEND_SUBDOMAIN or TF_VAR_frontend_subdomain (empty means apex is canonical)
+# - FRONTEND_SUBDOMAIN or TF_VAR_frontend_subdomain (empty means apex is canonical for that env)
+# - UPDATE_APEX_DNS=true only for prod: upsert claiset.xyz + www to this ALB. Default false so
+#   dev/qa/uat runs do not steal the apex from production.
 # - ROUTE53_HOSTED_ZONE_ID or TF_VAR_route53_hosted_zone_id (optional; looked up if unset)
 # - K8S_APP_NAMESPACE (default TF_VAR_env or dev)
 # - K8S_INGRESS_NAME (default TF_VAR_project or claiset)
@@ -19,7 +21,11 @@ REGION="${AWS_REGION:-us-east-1}"
 NAMESPACE="${K8S_APP_NAMESPACE:-${TF_VAR_env:-dev}}"
 INGRESS_NAME="${K8S_INGRESS_NAME:-${TF_VAR_project:-claiset}}"
 DOMAIN_ROOT="${DOMAIN_ROOT:-${TF_VAR_domain_root:-}}"
-FRONTEND_SUBDOMAIN="${FRONTEND_SUBDOMAIN:-${TF_VAR_frontend_subdomain:-app}}"
+# Preserve intentionally empty FRONTEND_SUBDOMAIN (apex as frontend). Use -v so "" from the caller is not replaced.
+if [[ ! -v FRONTEND_SUBDOMAIN ]]; then
+  FRONTEND_SUBDOMAIN="${TF_VAR_frontend_subdomain:-app}"
+fi
+UPDATE_APEX_DNS="${UPDATE_APEX_DNS:-false}"
 HOSTED_ZONE_ID="${ROUTE53_HOSTED_ZONE_ID:-${TF_VAR_route53_hosted_zone_id:-}}"
 CLUSTER_NAME="${EXPECTED_CLUSTER_NAME:-}"
 
@@ -34,7 +40,7 @@ else
   FRONTEND_HOST="${DOMAIN_ROOT}"
 fi
 
-echo "Route53 guard: namespace=${NAMESPACE} ingress=${INGRESS_NAME} domain=${DOMAIN_ROOT} frontend=${FRONTEND_HOST} region=${REGION}"
+echo "Route53 guard: namespace=${NAMESPACE} ingress=${INGRESS_NAME} domain=${DOMAIN_ROOT} frontend=${FRONTEND_HOST} update_apex_dns=${UPDATE_APEX_DNS} region=${REGION}"
 
 ALB_DNS=""
 if command -v kubectl >/dev/null 2>&1; then
@@ -96,12 +102,17 @@ upsert_alias() {
     }" >/dev/null
 }
 
-# Canonical + convenience hostnames
+# Canonical hostname for this environment (always).
 upsert_alias "${FRONTEND_HOST}" "A"
 upsert_alias "${FRONTEND_HOST}" "AAAA"
-upsert_alias "${DOMAIN_ROOT}" "A"
-upsert_alias "${DOMAIN_ROOT}" "AAAA"
-upsert_alias "www.${DOMAIN_ROOT}" "A"
-upsert_alias "www.${DOMAIN_ROOT}" "AAAA"
 
-echo "Route53 guard OK: upserted A/AAAA alias records in zone ${HOSTED_ZONE_ID} -> ${ALB_DNS}."
+# Apex + www only when deploying prod (or other primary env); avoids non-prod CI stealing root DNS.
+if [[ "${UPDATE_APEX_DNS}" == "true" ]]; then
+  upsert_alias "${DOMAIN_ROOT}" "A"
+  upsert_alias "${DOMAIN_ROOT}" "AAAA"
+  upsert_alias "www.${DOMAIN_ROOT}" "A"
+  upsert_alias "www.${DOMAIN_ROOT}" "AAAA"
+  echo "Route53 guard OK: upserted frontend + apex + www in zone ${HOSTED_ZONE_ID} -> ${ALB_DNS}."
+else
+  echo "Route53 guard OK: upserted frontend host only (apex/www unchanged) in zone ${HOSTED_ZONE_ID} -> ${ALB_DNS}."
+fi

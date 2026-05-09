@@ -178,8 +178,7 @@ resource "aws_security_group_rule" "cluster_to_nodes_pods_1025_65535" {
 }
 
 resource "aws_launch_template" "nodes" {
-  name_prefix   = "${local.name}-nodes-"
-  instance_type = var.node_instance_types[0]
+  name_prefix = "${local.name}-nodes-"
 
   vpc_security_group_ids = [aws_security_group.node.id]
 
@@ -208,6 +207,15 @@ resource "aws_eks_node_group" "default" {
   node_group_name = "${local.name}-default"
   node_role_arn   = local.resolved_node_role_arn
   subnet_ids      = var.subnet_ids
+  # Omit `version` unless explicitly pinned (see variable `node_group_kubernetes_version`).
+  # Pinning to `aws_eks_cluster.this.version` forces UpdateNodegroupVersion whenever the
+  # control plane version changes, often in the same apply as launch template revisions.
+  # AWS then frequently fails with InvalidParameterException about launch template instance types.
+  version = var.node_group_kubernetes_version
+
+  # Allow EKS/ASG to pick from multiple types for capacity. This significantly reduces
+  # NodeCreationFailure during nodegroup updates when one type/AZ is temporarily out of capacity.
+  instance_types = var.node_instance_types
 
   scaling_config {
     desired_size = var.node_group_desired_size
@@ -215,9 +223,25 @@ resource "aws_eks_node_group" "default" {
     min_size     = var.node_group_min_size
   }
 
+  # Pin concrete LT version so the node group never applies an older template revision while AWS
+  # rolls instances (reduces NodeCreationFailure from template/instance-type drift).
   launch_template {
     id      = aws_launch_template.nodes.id
-    version = "$Latest"
+    version = tostring(aws_launch_template.nodes.latest_version)
+  }
+
+  # Lets EKS replace more than one old node at a time when LT/instance type changes (within ASG limits).
+  update_config {
+    max_unavailable_percentage = 33
+  }
+
+  lifecycle {
+    # CI intentionally bursts nodegroup desired_size during rollouts/smoke.
+    # Ignoring desired_size drift prevents Terraform apply from scaling back down
+    # mid-run and starving critical pods/jobs (e.g., prod migrate + observability).
+    ignore_changes = [
+      scaling_config[0].desired_size,
+    ]
   }
 
   depends_on = [
@@ -229,7 +253,7 @@ resource "aws_eks_node_group" "default" {
   # Tags required for Cluster Autoscaler ASG auto-discovery.
   # These propagate to the underlying Auto Scaling Group created by the managed node group.
   tags = merge(var.tags, {
-    "k8s.io/cluster-autoscaler/enabled"             = "true"
+    "k8s.io/cluster-autoscaler/enabled"                      = "true"
     "k8s.io/cluster-autoscaler/${aws_eks_cluster.this.name}" = "owned"
   })
 }

@@ -40,6 +40,29 @@ env:
   TF_LOCK_TABLE: ${{ secrets.TF_LOCK_TABLE }}
   # Passed to Terraform as var.route53_hosted_zone_id (see infra/envs/*/variables.tf).
   TF_VAR_route53_hosted_zone_id: ${{ secrets.ROUTE53_HOSTED_ZONE_ID }}
+  # Self-hosted Grafana/Prometheus/Loki (all env Terraform jobs inherit these).
+  # Repository variable ENABLE_OBSERVABILITY = true to turn on; requires secrets below.
+  TF_VAR_enable_observability_stack: ${{ (vars.ENABLE_OBSERVABILITY == 'true' && vars.ALLOW_COSTLY_RUNS == 'true') && 'true' || 'false' }}
+  # Proof toggles (repo variables): enable independently for metrics/logging evidence runs.
+  PROOF_NODE_EXPORTER: ${{ vars.PROOF_NODE_EXPORTER == 'true' && 'true' || 'false' }}
+  PROOF_LOKI_LOGS: ${{ vars.PROOF_LOKI_LOGS == 'true' && 'true' || 'false' }}
+  # Enable DaemonSet collectors when either proof mode needs them.
+  TF_VAR_enable_observability_daemonsets: ${{ ((vars.PROOF_NODE_EXPORTER == 'true' || vars.PROOF_LOKI_LOGS == 'true') && vars.ALLOW_COSTLY_RUNS == 'true') && 'true' || 'false' }}
+  TF_VAR_enable_node_exporter: ${{ (vars.PROOF_NODE_EXPORTER == 'true' && vars.ALLOW_COSTLY_RUNS == 'true') && 'true' || 'false' }}
+  TF_VAR_enable_promtail: ${{ (vars.PROOF_LOKI_LOGS == 'true' && vars.ALLOW_COSTLY_RUNS == 'true') && 'true' || 'false' }}
+  TF_VAR_grafana_google_client_id: ${{ secrets.GRAFANA_GOOGLE_CLIENT_ID }}
+  TF_VAR_grafana_google_client_secret: ${{ secrets.GRAFANA_GOOGLE_CLIENT_SECRET }}
+  TF_VAR_grafana_google_allowed_domains: ${{ vars.GRAFANA_GOOGLE_ALLOWED_DOMAINS }}
+  TF_VAR_alertmanager_email_to: ${{ secrets.ALERTMANAGER_EMAIL_TO }}
+  TF_VAR_alertmanager_smtp_smarthost: ${{ secrets.ALERTMANAGER_SMTP_SMARTHOST }}
+  TF_VAR_alertmanager_smtp_from: ${{ secrets.ALERTMANAGER_SMTP_FROM }}
+  TF_VAR_alertmanager_smtp_user: ${{ secrets.ALERTMANAGER_SMTP_USER }}
+  TF_VAR_alertmanager_smtp_password: ${{ secrets.ALERTMANAGER_SMTP_PASSWORD }}
+  # Keep prod nodegroup warm through the whole pipeline unless explicitly opted-in.
+  # Repo variable toggle: set PROD_SCALE_DOWN_AFTER_SMOKE=true/false in GitHub Variables.
+  # Defaults to true when unset.
+  PROD_SCALE_DOWN_AFTER_SMOKE: ${{ vars.PROD_SCALE_DOWN_AFTER_SMOKE == 'false' && 'false' || 'true' }}
+  ALLOW_COSTLY_RUNS: ${{ vars.ALLOW_COSTLY_RUNS == 'true' && 'true' || 'false' }}
   # Single canonical ECR namespace (provisioned in infra/envs/dev; qa+ reference URLs only).
   ECR_ITEMS_REPO: claiset-items
   ECR_OUTFITS_REPO: claiset-outfits
@@ -71,6 +94,23 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
+
+      - name: Observability OAuth preflight (dev)
+        run: |
+          set -euo pipefail
+          if [[ "${TF_VAR_enable_observability_stack:-false}" == "true" ]]; then
+            id_trimmed="$(printf '%s' "${TF_VAR_grafana_google_client_id:-}" | tr -d '[:space:]')"
+            secret_trimmed="$(printf '%s' "${TF_VAR_grafana_google_client_secret:-}" | tr -d '[:space:]')"
+            if [[ -z "${id_trimmed}" || -z "${secret_trimmed}" ]]; then
+              echo "Observability enabled but Grafana Google OAuth secrets are empty." >&2
+              echo "Set repository secrets GRAFANA_GOOGLE_CLIENT_ID and GRAFANA_GOOGLE_CLIENT_SECRET." >&2
+              exit 1
+            fi
+            echo "::add-mask::${TF_VAR_grafana_google_client_secret}"
+            echo "Observability OAuth preflight OK (dev)."
+          else
+            echo "Observability disabled; skipping OAuth preflight."
+          fi
 
       - name: Set ECR registry from AWS account
         run: |
@@ -180,23 +220,39 @@ jobs:
             -target=module.rds \
             -target=module.ecr
 
-          # Burst node capacity for Phase 2 rollout, then scale down again for cost.
-          # This prevents "Too many pods" from stalling Deployments on tiny nodes.
+          # Burst node capacity for Phase 2 rollout. Scale-down runs AFTER smoke tests (separate step)
+          # so Grafana/monitoring checks are not racing cluster autoscaler right after apply.
           BASE_MIN=2
           BASE_DESIRED=3
           BASE_MAX=6
-          BURST_DESIRED=5
+          BURST_DESIRED=6
           CLUSTER="${EXPECTED_CLUSTER_NAME}"
           NODEGROUP="${EXPECTED_CLUSTER_NAME}-default"
-          trap 'echo "Scaling nodegroup back down"; AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" "${BASE_MIN}" "${BASE_DESIRED}" "${BASE_MAX}" || true' EXIT
           AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" "${BASE_MIN}" "${BURST_DESIRED}" "${BASE_MAX}"
+          aws eks update-kubeconfig --region "${AWS_REGION}" --name "${CLUSTER}"
+          K8S_NAMESPACES="prod monitoring platform kube-system" bash ../../scripts/k8s-gc-pods.sh
+          echo "Waiting for burst node count to be Ready before Phase 2..."
+          for i in {1..30}; do
+            ready_nodes="$(kubectl get nodes --no-headers 2>/dev/null | awk '$2=="Ready"{c++} END{print c+0}')"
+            echo "Ready nodes: ${ready_nodes}/${BURST_DESIRED} (attempt ${i}/30)"
+            if [[ "${ready_nodes}" -ge "${BURST_DESIRED}" ]]; then
+              break
+            fi
+            sleep 10
+          done
+          # Clear accidental SchedulingDisabled state that can linger after interrupted runs.
+          kubectl get nodes --no-headers 2>/dev/null | awk '$2 ~ /SchedulingDisabled/ {print $1}' | xargs -r kubectl uncordon || true
 
           # If a previous apply was cancelled, K8s objects may already exist but not be in state.
           # Import them so Phase 2 can converge (avoids "already exists" errors).
           bash ../../scripts/terraform-k8s-import-guard.sh
+          # Stuck ALB controller / external-dns / cluster-autoscaler releases block Helm apply.
+          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" bash ../../scripts/helm-platform-reconcile.sh
+          # Orphaned / stuck observability Helm releases (pending-install, failed) block Terraform.
+          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" bash ../../scripts/helm-monitoring-reconcile.sh
           # Phase 2: platform (ACM, controllers) + app_bluegreen and the rest.
           terraform apply -auto-approve
-          DOMAIN_ROOT=claiset.xyz FRONTEND_SUBDOMAIN= K8S_APP_NAMESPACE=dev bash ../../scripts/route53-ingress-records-guard.sh
+          DOMAIN_ROOT=claiset.xyz FRONTEND_SUBDOMAIN=app-dev UPDATE_APEX_DNS=false K8S_APP_NAMESPACE=dev bash ../../scripts/route53-ingress-records-guard.sh
 
       - name: Wait for readiness
         working-directory: infra/envs/dev
@@ -212,14 +268,23 @@ jobs:
           aws rds wait db-instance-available --region "${AWS_REGION}" --db-instance-identifier "${RDS_ID}"
 
           # Reconcile Route53 alias each run (covers cases after manual scale-down/teardown).
-          DOMAIN_ROOT=claiset.xyz FRONTEND_SUBDOMAIN= K8S_APP_NAMESPACE=dev bash ../../scripts/route53-ingress-records-guard.sh
+          DOMAIN_ROOT=claiset.xyz FRONTEND_SUBDOMAIN=app-dev UPDATE_APEX_DNS=false K8S_APP_NAMESPACE=dev bash ../../scripts/route53-ingress-records-guard.sh
 
-          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=dev FRONTEND_HOST=claiset.xyz bash ../../scripts/smoke-test-env.sh --wait-only
+          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=dev FRONTEND_HOST=app-dev.claiset.xyz EXPECT_OBSERVABILITY_SMOKE="${TF_VAR_enable_observability_stack:-false}" EXPECT_APP_OAUTH_SMOKE=true GRAFANA_HOST=grafana-dev.claiset.xyz bash ../../scripts/smoke-test-env.sh --wait-only
 
       - name: Smoke tests
         working-directory: infra/envs/dev
         run: |
-          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=dev FRONTEND_HOST=claiset.xyz bash ../../scripts/smoke-test-env.sh --skip-wait
+          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=dev FRONTEND_HOST=app-dev.claiset.xyz EXPECT_OBSERVABILITY_SMOKE="${TF_VAR_enable_observability_stack:-false}" EXPECT_APP_OAUTH_SMOKE=true GRAFANA_HOST=grafana-dev.claiset.xyz bash ../../scripts/smoke-test-env.sh --skip-wait
+
+      # Post-smoke: warmer baseline than min=1/desired=3 — avoids single-node pinch (app + observability).
+      - name: Scale dev nodegroup down (post-smoke)
+        if: always()
+        working-directory: infra/envs/dev
+        run: |
+          CLUSTER="${EXPECTED_CLUSTER_NAME}"
+          NODEGROUP="${EXPECTED_CLUSTER_NAME}-default"
+          AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" 2 4 6
 
   qa:
     name: Promote to QA (nightly)
@@ -241,6 +306,23 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
+
+      - name: Observability OAuth preflight (qa)
+        run: |
+          set -euo pipefail
+          if [[ "${TF_VAR_enable_observability_stack:-false}" == "true" ]]; then
+            id_trimmed="$(printf '%s' "${TF_VAR_grafana_google_client_id:-}" | tr -d '[:space:]')"
+            secret_trimmed="$(printf '%s' "${TF_VAR_grafana_google_client_secret:-}" | tr -d '[:space:]')"
+            if [[ -z "${id_trimmed}" || -z "${secret_trimmed}" ]]; then
+              echo "Observability enabled but Grafana Google OAuth secrets are empty." >&2
+              echo "Set repository secrets GRAFANA_GOOGLE_CLIENT_ID and GRAFANA_GOOGLE_CLIENT_SECRET." >&2
+              exit 1
+            fi
+            echo "::add-mask::${TF_VAR_grafana_google_client_secret}"
+            echo "Observability OAuth preflight OK (qa)."
+          else
+            echo "Observability disabled; skipping OAuth preflight."
+          fi
 
       - name: Set ECR registry from AWS account
         run: |
@@ -311,40 +393,57 @@ jobs:
             -target=module.eks \
             -target=module.rds
 
-          # Burst node capacity for Phase 2 rollout, then scale down again for cost.
-          # Align with env defaults (desired=2, max=6): burst so Helm/controllers always have slots on t3.small.
+          # Burst for Phase 2; scale-down after smoke tests (do not EXIT-trap before smoke — hurts Grafana).
           BASE_MIN=1
-          BASE_DESIRED=2
+          BASE_DESIRED=3
           BASE_MAX=6
-          BURST_DESIRED=5
+          BURST_DESIRED=6
           CLUSTER="${EXPECTED_CLUSTER_NAME}"
           NODEGROUP="${EXPECTED_CLUSTER_NAME}-default"
-          trap 'echo "Scaling nodegroup back down"; AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" "${BASE_MIN}" "${BASE_DESIRED}" "${BASE_MAX}" || true' EXIT
           AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" "${BASE_MIN}" "${BURST_DESIRED}" "${BASE_MAX}"
 
-          # Post-controller health gate: fail early with useful logs before Phase 2 Helm installs.
+          # ALB controller is created by module.platform in Phase 2 below.
+          # Skip pre-checks in Phase 1 to avoid false failures on fresh clusters.
           aws eks update-kubeconfig --region "${AWS_REGION}" --name "${CLUSTER}"
-          if ! kubectl -n kube-system rollout status deployment/aws-load-balancer-controller --timeout=5m; then
-            echo "aws-load-balancer-controller not healthy; printing diagnostics" >&2
-            kubectl -n kube-system get pods -l app.kubernetes.io/name=aws-load-balancer-controller -o wide || true
-            kubectl -n kube-system describe deployment aws-load-balancer-controller || true
-            kubectl -n kube-system logs -l app.kubernetes.io/name=aws-load-balancer-controller --tail=120 || true
-            exit 1
+          echo "Waiting for burst node count to be Ready before Phase 2..."
+          for i in {1..30}; do
+            ready_nodes="$(kubectl get nodes --no-headers 2>/dev/null | awk '$2=="Ready"{c++} END{print c+0}')"
+            echo "Ready nodes: ${ready_nodes}/${BURST_DESIRED} (attempt ${i}/30)"
+            if [[ "${ready_nodes}" -ge "${BURST_DESIRED}" ]]; then
+              break
+            fi
+            sleep 10
+          done
+          # Clear accidental SchedulingDisabled state that can linger after interrupted runs.
+          kubectl get nodes --no-headers 2>/dev/null | awk '$2 ~ /SchedulingDisabled/ {print $1}' | xargs -r kubectl uncordon || true
+          ready_nodes="$(kubectl get nodes --no-headers 2>/dev/null | awk '$2=="Ready"{c++} END{print c+0}')"
+          if [[ "${ready_nodes}" -lt "${BURST_DESIRED}" ]]; then
+            echo "Burst capacity not reached (Ready nodes=${ready_nodes}, expected=${BURST_DESIRED}); continuing anyway." >&2
           fi
 
           K8S_APP_NAMESPACE=qa bash ../../scripts/terraform-k8s-import-guard.sh
+          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" bash ../../scripts/helm-platform-reconcile.sh
+          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" bash ../../scripts/helm-monitoring-reconcile.sh
           terraform apply -auto-approve
-          DOMAIN_ROOT=claiset.xyz K8S_APP_NAMESPACE=qa FRONTEND_SUBDOMAIN=app-qa bash ../../scripts/route53-ingress-records-guard.sh
+          DOMAIN_ROOT=claiset.xyz K8S_APP_NAMESPACE=qa FRONTEND_SUBDOMAIN=app-qa UPDATE_APEX_DNS=false bash ../../scripts/route53-ingress-records-guard.sh
 
       - name: Wait for readiness (qa)
         working-directory: infra/envs/qa
         run: |
-          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=qa FRONTEND_HOST=app-qa.claiset.xyz bash ../../scripts/smoke-test-env.sh --wait-only
+          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=qa FRONTEND_HOST=app-qa.claiset.xyz EXPECT_OBSERVABILITY_SMOKE="${TF_VAR_enable_observability_stack:-false}" EXPECT_APP_OAUTH_SMOKE=true GRAFANA_HOST=grafana-qa.claiset.xyz bash ../../scripts/smoke-test-env.sh --wait-only
 
       - name: Smoke checks (qa)
         working-directory: infra/envs/qa
         run: |
-          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=qa FRONTEND_HOST=app-qa.claiset.xyz bash ../../scripts/smoke-test-env.sh --skip-wait
+          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=qa FRONTEND_HOST=app-qa.claiset.xyz EXPECT_OBSERVABILITY_SMOKE="${TF_VAR_enable_observability_stack:-false}" EXPECT_APP_OAUTH_SMOKE=true GRAFANA_HOST=grafana-qa.claiset.xyz bash ../../scripts/smoke-test-env.sh --skip-wait
+
+      - name: Scale qa nodegroup down (post-smoke)
+        if: always()
+        working-directory: infra/envs/qa
+        run: |
+          CLUSTER="${EXPECTED_CLUSTER_NAME}"
+          NODEGROUP="${EXPECTED_CLUSTER_NAME}-default"
+          AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" 2 4 6
 
   uat:
     name: Promote to UAT (PR merge or RC commits)
@@ -394,6 +493,23 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
+
+      - name: Observability OAuth preflight (uat)
+        run: |
+          set -euo pipefail
+          if [[ "${TF_VAR_enable_observability_stack:-false}" == "true" ]]; then
+            id_trimmed="$(printf '%s' "${TF_VAR_grafana_google_client_id:-}" | tr -d '[:space:]')"
+            secret_trimmed="$(printf '%s' "${TF_VAR_grafana_google_client_secret:-}" | tr -d '[:space:]')"
+            if [[ -z "${id_trimmed}" || -z "${secret_trimmed}" ]]; then
+              echo "Observability enabled but Grafana Google OAuth secrets are empty." >&2
+              echo "Set repository secrets GRAFANA_GOOGLE_CLIENT_ID and GRAFANA_GOOGLE_CLIENT_SECRET." >&2
+              exit 1
+            fi
+            echo "::add-mask::${TF_VAR_grafana_google_client_secret}"
+            echo "Observability OAuth preflight OK (uat)."
+          else
+            echo "Observability disabled; skipping OAuth preflight."
+          fi
 
       - name: Set ECR registry from AWS account
         run: |
@@ -478,29 +594,68 @@ jobs:
             -target=module.eks \
             -target=module.rds
 
-          # Same as dev: UAT had no burst and hit "Too many pods" on platform Helm (external-dns Pending).
+          # Same as dev: burst for Phase 2; scale-down after smoke only.
           BASE_MIN=1
-          BASE_DESIRED=2
+          BASE_DESIRED=3
           BASE_MAX=6
-          BURST_DESIRED=5
+          BURST_DESIRED=6
           CLUSTER="${EXPECTED_CLUSTER_NAME}"
           NODEGROUP="${EXPECTED_CLUSTER_NAME}-default"
-          trap 'echo "Scaling nodegroup back down"; AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" "${BASE_MIN}" "${BASE_DESIRED}" "${BASE_MAX}" || true' EXIT
           AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" "${BASE_MIN}" "${BURST_DESIRED}" "${BASE_MAX}"
+          aws eks update-kubeconfig --region "${AWS_REGION}" --name "${CLUSTER}"
+          echo "Waiting for burst node count to be Ready before Phase 2..."
+          for i in {1..30}; do
+            ready_nodes="$(kubectl get nodes --no-headers 2>/dev/null | awk '$2=="Ready"{c++} END{print c+0}')"
+            echo "Ready nodes: ${ready_nodes}/${BURST_DESIRED} (attempt ${i}/30)"
+            if [[ "${ready_nodes}" -ge "${BURST_DESIRED}" ]]; then
+              break
+            fi
+            sleep 10
+          done
+          # Guardrail: do not continue into platform/observability reconcile if burst never materializes.
+          ready_nodes="$(kubectl get nodes --no-headers 2>/dev/null | awk '$2=="Ready"{c++} END{print c+0}')"
+          if [[ "${ready_nodes}" -lt 10 ]]; then
+            echo "Prod guardrail: Ready nodes (${ready_nodes}) below safe threshold (10). Re-applying burst and waiting once more..." >&2
+            AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" "${BASE_MIN}" "${BURST_DESIRED}" "${BASE_MAX}" || true
+            for i in {1..24}; do
+              ready_nodes="$(kubectl get nodes --no-headers 2>/dev/null | awk '$2=="Ready"{c++} END{print c+0}')"
+              echo "Ready nodes after retry: ${ready_nodes}/${BURST_DESIRED} (attempt ${i}/24)"
+              if [[ "${ready_nodes}" -ge 10 ]]; then
+                break
+              fi
+              sleep 10
+            done
+            ready_nodes="$(kubectl get nodes --no-headers 2>/dev/null | awk '$2=="Ready"{c++} END{print c+0}')"
+            if [[ "${ready_nodes}" -lt 10 ]]; then
+              echo "Prod guardrail failed: only ${ready_nodes} Ready nodes; aborting before Helm reconcile to avoid cascading pod-density failures." >&2
+              exit 1
+            fi
+          fi
+          kubectl get nodes --no-headers 2>/dev/null | awk '$2 ~ /SchedulingDisabled/ {print $1}' | xargs -r kubectl uncordon || true
 
           K8S_APP_NAMESPACE=uat bash ../../scripts/terraform-k8s-import-guard.sh
+          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" bash ../../scripts/helm-platform-reconcile.sh
+          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" bash ../../scripts/helm-monitoring-reconcile.sh
           terraform apply -auto-approve
-          DOMAIN_ROOT=claiset.xyz K8S_APP_NAMESPACE=uat FRONTEND_SUBDOMAIN=app-uat bash ../../scripts/route53-ingress-records-guard.sh
+          DOMAIN_ROOT=claiset.xyz K8S_APP_NAMESPACE=uat FRONTEND_SUBDOMAIN=app-uat UPDATE_APEX_DNS=false bash ../../scripts/route53-ingress-records-guard.sh
 
       - name: Wait for readiness (uat)
         working-directory: infra/envs/uat
         run: |
-          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=uat FRONTEND_HOST=app-uat.claiset.xyz bash ../../scripts/smoke-test-env.sh --wait-only
+          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=uat FRONTEND_HOST=app-uat.claiset.xyz EXPECT_OBSERVABILITY_SMOKE="${TF_VAR_enable_observability_stack:-false}" EXPECT_APP_OAUTH_SMOKE=true GRAFANA_HOST=grafana-uat.claiset.xyz bash ../../scripts/smoke-test-env.sh --wait-only
 
       - name: Smoke checks (uat)
         working-directory: infra/envs/uat
         run: |
-          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=uat FRONTEND_HOST=app-uat.claiset.xyz bash ../../scripts/smoke-test-env.sh --skip-wait
+          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=uat FRONTEND_HOST=app-uat.claiset.xyz EXPECT_OBSERVABILITY_SMOKE="${TF_VAR_enable_observability_stack:-false}" EXPECT_APP_OAUTH_SMOKE=true GRAFANA_HOST=grafana-uat.claiset.xyz bash ../../scripts/smoke-test-env.sh --skip-wait
+
+      - name: Scale uat nodegroup down (post-smoke)
+        if: always()
+        working-directory: infra/envs/uat
+        run: |
+          CLUSTER="${EXPECTED_CLUSTER_NAME}"
+          NODEGROUP="${EXPECTED_CLUSTER_NAME}-default"
+          AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" 2 4 6
 
   prod:
     name: Promote to production (tags)
@@ -511,7 +666,7 @@ jobs:
     concurrency:
       group: tf-prod-${{ github.repository }}
       cancel-in-progress: false
-    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'prod')
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'prod' && vars.ALLOW_COSTLY_RUNS == 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -522,6 +677,23 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
+
+      - name: Observability OAuth preflight (prod)
+        run: |
+          set -euo pipefail
+          if [[ "${TF_VAR_enable_observability_stack:-false}" == "true" ]]; then
+            id_trimmed="$(printf '%s' "${TF_VAR_grafana_google_client_id:-}" | tr -d '[:space:]')"
+            secret_trimmed="$(printf '%s' "${TF_VAR_grafana_google_client_secret:-}" | tr -d '[:space:]')"
+            if [[ -z "${id_trimmed}" || -z "${secret_trimmed}" ]]; then
+              echo "Observability enabled but Grafana Google OAuth secrets are empty." >&2
+              echo "Set repository secrets GRAFANA_GOOGLE_CLIENT_ID and GRAFANA_GOOGLE_CLIENT_SECRET." >&2
+              exit 1
+            fi
+            echo "::add-mask::${TF_VAR_grafana_google_client_secret}"
+            echo "Observability OAuth preflight OK (prod)."
+          else
+            echo "Observability disabled; skipping OAuth preflight."
+          fi
 
       - name: Set ECR registry from AWS account
         run: |
@@ -587,24 +759,114 @@ jobs:
         working-directory: infra/envs/prod
         run: bash ../../scripts/terraform-eks-import-guard.sh
 
+      # When using external hosted zone secret, stop managing any previously-created
+      # duplicate zone in state so re-runs from partial applies don't fail on zone drift.
+      - name: Route53 state rm (external hosted zone secret)
+        working-directory: infra/envs/prod
+        run: |
+          set -euo pipefail
+          if [[ -n "${TF_VAR_route53_hosted_zone_id:-}" ]]; then
+            terraform state rm 'module.platform.aws_route53_zone.this[0]' 2>/dev/null || true
+          fi
+
       - name: Terraform apply (prod)
         working-directory: infra/envs/prod
         run: |
+          # When both proof modes are enabled, micro nodes often cannot host app + both DS collectors.
+          # Switch to t3.small and use a lower node count for better pod density at lower cost.
+          if [[ "${PROOF_NODE_EXPORTER}" == "true" && "${PROOF_LOKI_LOGS}" == "true" ]]; then
+            export TF_VAR_node_instance_types='["t3.small"]'
+            echo "Both proof toggles enabled -> using node types: ${TF_VAR_node_instance_types}"
+          else
+            export TF_VAR_node_instance_types='["t3.micro","t2.micro"]'
+            echo "Single/no proof toggle -> using default free-tier node types: ${TF_VAR_node_instance_types}"
+          fi
+
           terraform apply -auto-approve \
             -target=module.network \
             -target=module.eks \
             -target=module.rds
 
-          BASE_MIN=1
-          BASE_DESIRED=2
-          BASE_MAX=6
-          BURST_DESIRED=5
+          # Guardrail: keep prod nodegroup fixed high through apply+smoke to avoid repeated
+          # pod-density churn while observability and app pods converge.
+          # Keep prior stable baseline for micro runs; use cost-effective t3.small profile when both proofs are enabled.
+          if [[ "${PROOF_NODE_EXPORTER}" == "true" && "${PROOF_LOKI_LOGS}" == "true" ]]; then
+            BASE_MIN=8
+            BASE_DESIRED=8
+            BASE_MAX=10
+            BURST_DESIRED=8
+            READY_FLOOR=7
+          else
+            BASE_MIN=16
+            BASE_DESIRED=16
+            BASE_MAX=16
+            BURST_DESIRED=16
+            READY_FLOOR=14
+          fi
           CLUSTER="${EXPECTED_CLUSTER_NAME}"
           NODEGROUP="${EXPECTED_CLUSTER_NAME}-default"
-          trap 'echo "Scaling nodegroup back down"; AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" "${BASE_MIN}" "${BASE_DESIRED}" "${BASE_MAX}" || true' EXIT
+          # Raise pod density on micro nodes before scheduling observability + app pods.
+          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-enable-prefix-delegation.sh
           AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" "${BASE_MIN}" "${BURST_DESIRED}" "${BASE_MAX}"
+          aws eks update-kubeconfig --region "${AWS_REGION}" --name "${CLUSTER}"
+          echo "Waiting for burst node count to be Ready before Phase 2..."
+          for i in {1..30}; do
+            ready_nodes="$(kubectl get nodes --no-headers 2>/dev/null | awk '$2=="Ready"{c++} END{print c+0}')"
+            echo "Ready nodes: ${ready_nodes}/${BURST_DESIRED} (attempt ${i}/30)"
+            if [[ "${ready_nodes}" -ge "${BURST_DESIRED}" ]]; then
+              break
+            fi
+            sleep 10
+          done
+          # Guardrail: keep a high-enough floor before rollout/smoke tests.
+          ready_nodes="$(kubectl get nodes --no-headers 2>/dev/null | awk '$2=="Ready"{c++} END{print c+0}')"
+          if [[ "${ready_nodes}" -lt "${READY_FLOOR}" ]]; then
+            echo "Prod guardrail failed post-apply: only ${ready_nodes} Ready nodes; aborting before readiness/smoke." >&2
+            exit 1
+          fi
+          kubectl get nodes --no-headers 2>/dev/null | awk '$2 ~ /SchedulingDisabled/ {print $1}' | xargs -r kubectl uncordon || true
 
           K8S_APP_NAMESPACE=prod bash ../../scripts/terraform-k8s-import-guard.sh
+          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" bash ../../scripts/helm-platform-reconcile.sh
+          PROD_MON_BURST_MIN_SIZE="${BASE_MIN}" PROD_MON_BURST_DESIRED_SIZE="${BURST_DESIRED}" PROD_MON_BURST_MAX_SIZE="${BASE_MAX}" EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" bash ../../scripts/helm-monitoring-reconcile.sh
           terraform apply -auto-approve
-          DOMAIN_ROOT=claiset.xyz K8S_APP_NAMESPACE=prod FRONTEND_SUBDOMAIN=app-prod bash ../../scripts/route53-ingress-records-guard.sh
+          # Second full apply can reset nodegroup desired_size to Terraform defaults.
+          # Re-burst before readiness checks so rollout/smoke do not run on an under-capacity cluster.
+          AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" "${BASE_MIN}" "${BURST_DESIRED}" "${BASE_MAX}"
+          K8S_NAMESPACES="prod monitoring platform kube-system" bash ../../scripts/k8s-gc-pods.sh
+          echo "Waiting for post-apply burst node count to be Ready..."
+          for i in {1..30}; do
+            ready_nodes="$(kubectl get nodes --no-headers 2>/dev/null | awk '$2=="Ready"{c++} END{print c+0}')"
+            echo "Ready nodes: ${ready_nodes}/${BURST_DESIRED} (attempt ${i}/30)"
+            if [[ "${ready_nodes}" -ge "${BURST_DESIRED}" ]]; then
+              break
+            fi
+            sleep 10
+          done
+          kubectl get nodes --no-headers 2>/dev/null | awk '$2 ~ /SchedulingDisabled/ {print $1}' | xargs -r kubectl uncordon || true
+          DOMAIN_ROOT=claiset.xyz K8S_APP_NAMESPACE=prod FRONTEND_SUBDOMAIN=app-prod UPDATE_APEX_DNS=true bash ../../scripts/route53-ingress-records-guard.sh
+
+      - name: Wait for readiness (prod)
+        working-directory: infra/envs/prod
+        run: |
+          if [[ "${PROOF_NODE_EXPORTER}" == "true" && "${PROOF_LOKI_LOGS}" == "true" ]]; then
+            REC_MIN=8; REC_DESIRED=8; REC_MAX=10; REC_FLOOR=7
+          else
+            REC_MIN=16; REC_DESIRED=16; REC_MAX=16; REC_FLOOR=14
+          fi
+          PROD_RECOVERY_MIN_SIZE="${REC_MIN}" PROD_RECOVERY_DESIRED_SIZE="${REC_DESIRED}" PROD_RECOVERY_MAX_SIZE="${REC_MAX}" PROD_RECOVERY_READY_FLOOR="${REC_FLOOR}" EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=prod FRONTEND_HOST=app-prod.claiset.xyz EXPECT_OBSERVABILITY_SMOKE="${TF_VAR_enable_observability_stack:-false}" EXPECT_OBSERVABILITY_DAEMONSETS="${TF_VAR_enable_observability_daemonsets:-false}" EXPECT_PROMTAIL="${TF_VAR_enable_promtail:-false}" EXPECT_APP_OAUTH_SMOKE=true GRAFANA_HOST=grafana-prod.claiset.xyz ROLLOUT_TIMEOUT=12m bash ../../scripts/smoke-test-env.sh --wait-only
+
+      - name: Smoke checks (prod)
+        working-directory: infra/envs/prod
+        run: |
+          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=prod FRONTEND_HOST=app-prod.claiset.xyz EXPECT_OBSERVABILITY_SMOKE="${TF_VAR_enable_observability_stack:-false}" EXPECT_OBSERVABILITY_DAEMONSETS="${TF_VAR_enable_observability_daemonsets:-false}" EXPECT_PROMTAIL="${TF_VAR_enable_promtail:-false}" EXPECT_APP_OAUTH_SMOKE=true GRAFANA_HOST=grafana-prod.claiset.xyz bash ../../scripts/smoke-test-env.sh --skip-wait
+
+      - name: Scale prod nodegroup down (post-smoke)
+        if: success() && env.PROD_SCALE_DOWN_AFTER_SMOKE == 'true'
+        working-directory: infra/envs/prod
+        run: |
+          CLUSTER="${EXPECTED_CLUSTER_NAME}"
+          NODEGROUP="${EXPECTED_CLUSTER_NAME}-default"
+          # Do not fail the whole workflow if nodegroup is not ACTIVE after an earlier apply failure.
+          AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" 2 4 16 || true
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Destroy promotion environments (qa, uat, prod) to cut most recurring cost,
-# while keeping dev up.
+# Destroy non-prod promotion environments (qa, uat) to cut recurring cost,
+# while keeping dev and prod unchanged unless explicitly destroyed elsewhere.
 #
 # Usage (from repo root):
 #   export TF_STATE_BUCKET=your-bootstrap-bucket
@@ -32,8 +32,8 @@ if [[ -z "${TF_STATE_BUCKET}" || -z "${TF_LOCK_TABLE}" ]]; then
   exit 1
 fi
 
-echo "Destroying non-dev environments (qa/uat/prod) to eliminate major cost drivers (NAT, extra RDS/EKS)."
-"${ROOT_DIR}/infra/scripts/terraform-destroy-all.sh" qa uat prod
+echo "Destroying non-prod environments (qa/uat) to eliminate major cost drivers while preserving prod."
+"${ROOT_DIR}/infra/scripts/terraform-destroy-all.sh" qa uat
 
 # Between short work sessions, keep dev but scale nodes down to reduce EC2 spend.
 if [[ "${PAUSE_DEV_NODES:-0}" == "1" ]]; then

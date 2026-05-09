@@ -28,6 +28,13 @@ variable "eks_cluster_version" {
   default     = "1.31"
 }
 
+variable "eks_node_group_kubernetes_version" {
+  type        = string
+  default     = null
+  nullable    = true
+  description = "Optional. Pin managed node group kubelet to this version; leave null so LT-only updates are not bundled with UpdateNodegroupVersion (avoids AWS launch-template instance-type errors)."
+}
+
 variable "node_instance_types" {
   type        = list(string)
   description = "EKS node instance types (passed to infra/modules/eks). t3.small avoids ~4-pod/node cap on t3.micro (VPC CNI)."
@@ -92,5 +99,54 @@ variable "enable_kubernetes_app" {
   type        = bool
   default     = true
   description = "Set false only for targeted terraform import when app inputs may be unknown."
+}
+
+variable "enable_observability_stack" {
+  type        = bool
+  default     = false
+  description = "Self-hosted Prometheus, Grafana (Google OAuth), Alertmanager optional email, Loki, Promtail. CI sets TF_VAR_enable_observability_stack from repo variable ENABLE_OBSERVABILITY."
+}
+
+variable "grafana_google_client_id" {
+  type        = string
+  default     = ""
+  description = "Grafana OAuth (Google) Web client ID. Add redirect https://grafana-qa.<domain>/login/google (per env)."
+}
+
+variable "grafana_google_client_secret" {
+  type      = string
+  default   = ""
+  sensitive = true
+}
+
+variable "grafana_google_allowed_domains" {
+  type    = string
+  default = ""
+}
+
+variable "alertmanager_email_to" {
+  type    = string
+  default = ""
+}
+
+variable "alertmanager_smtp_smarthost" {
+  type    = string
+  default = ""
+}
+
+variable "alertmanager_smtp_from" {
+  type    = string
+  default = ""
+}
+
+variable "alertmanager_smtp_user" {
+  type    = string
+  default = ""
+}
+
+variable "alertmanager_smtp_password" {
+  type      = string
+  default   = ""
+  sensitive = true
 }
 

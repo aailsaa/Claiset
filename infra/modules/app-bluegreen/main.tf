@@ -7,6 +7,13 @@ locals {
   )
   apex_host = var.domain_root
   www_host  = var.domain_root != "" ? "www.${var.domain_root}" : ""
+  # Non-prod must not publish apex/www to external-dns or the last deploy steals claiset.xyz from prod.
+  external_dns_hostnames = (
+    var.domain_root == "" ? "" :
+    var.include_apex_and_www_in_external_dns ?
+    "${local.frontend_host},${local.apex_host},${local.www_host}" :
+    local.frontend_host
+  )
   # Keep count decisions based only on root input variables, not on values computed from
   # other modules during the same plan (e.g. RDS address/password, ACM ARN). Those can be
   # unknown at plan time and would make count invalid.
@@ -80,6 +87,10 @@ resource "kubernetes_secret" "app_env" {
 
 resource "kubernetes_job" "migrate" {
   count = local.enabled ? 1 : 0
+  # Do not block Terraform apply on Job completion. Under EKS micro-node pod-density pressure
+  # the migrate pod can sit Pending for long periods, which aborts the whole promotion even when
+  # schema is already up to date. We validate app readiness in smoke checks separately.
+  wait_for_completion = false
 
   metadata {
     name      = "migrate"
@@ -122,6 +133,9 @@ resource "kubernetes_job" "migrate" {
 
 resource "kubernetes_deployment" "items" {
   count = local.enabled ? 1 : 0
+  # CI performs explicit rollout checks in smoke scripts; avoid Terraform failing
+  # early on transient scheduler pressure during cluster scale events.
+  wait_for_rollout = false
 
   metadata {
     name      = "items"
@@ -139,6 +153,23 @@ resource "kubernetes_deployment" "items" {
         labels = { app = "items" }
       }
       spec {
+        affinity {
+          pod_anti_affinity {
+            preferred_during_scheduling_ignored_during_execution {
+              weight = 100
+              pod_affinity_term {
+                topology_key = "kubernetes.io/hostname"
+                label_selector {
+                  match_expressions {
+                    key      = "app"
+                    operator = "In"
+                    values   = ["web", "items", "outfits", "schedule"]
+                  }
+                }
+              }
+            }
+          }
+        }
         image_pull_secrets {
           name = kubernetes_secret.ecr_pull[0].metadata[0].name
         }
@@ -208,6 +239,7 @@ resource "kubernetes_service" "items" {
 
 resource "kubernetes_deployment" "outfits" {
   count = local.enabled ? 1 : 0
+  wait_for_rollout = false
 
   metadata {
     name      = "outfits"
@@ -221,6 +253,23 @@ resource "kubernetes_deployment" "outfits" {
     template {
       metadata { labels = { app = "outfits" } }
       spec {
+        affinity {
+          pod_anti_affinity {
+            preferred_during_scheduling_ignored_during_execution {
+              weight = 100
+              pod_affinity_term {
+                topology_key = "kubernetes.io/hostname"
+                label_selector {
+                  match_expressions {
+                    key      = "app"
+                    operator = "In"
+                    values   = ["web", "items", "outfits", "schedule"]
+                  }
+                }
+              }
+            }
+          }
+        }
         image_pull_secrets {
           name = kubernetes_secret.ecr_pull[0].metadata[0].name
         }
@@ -290,6 +339,7 @@ resource "kubernetes_service" "outfits" {
 
 resource "kubernetes_deployment" "schedule" {
   count = local.enabled ? 1 : 0
+  wait_for_rollout = false
 
   metadata {
     name      = "schedule"
@@ -303,6 +353,23 @@ resource "kubernetes_deployment" "schedule" {
     template {
       metadata { labels = { app = "schedule" } }
       spec {
+        affinity {
+          pod_anti_affinity {
+            preferred_during_scheduling_ignored_during_execution {
+              weight = 100
+              pod_affinity_term {
+                topology_key = "kubernetes.io/hostname"
+                label_selector {
+                  match_expressions {
+                    key      = "app"
+                    operator = "In"
+                    values   = ["web", "items", "outfits", "schedule"]
+                  }
+                }
+              }
+            }
+          }
+        }
         image_pull_secrets {
           name = kubernetes_secret.ecr_pull[0].metadata[0].name
         }
@@ -372,6 +439,7 @@ resource "kubernetes_service" "schedule" {
 
 resource "kubernetes_deployment" "web" {
   count = local.enabled ? 1 : 0
+  wait_for_rollout = false
 
   metadata {
     name      = "web"
@@ -385,6 +453,23 @@ resource "kubernetes_deployment" "web" {
     template {
       metadata { labels = { app = "web" } }
       spec {
+        affinity {
+          pod_anti_affinity {
+            preferred_during_scheduling_ignored_during_execution {
+              weight = 100
+              pod_affinity_term {
+                topology_key = "kubernetes.io/hostname"
+                label_selector {
+                  match_expressions {
+                    key      = "app"
+                    operator = "In"
+                    values   = ["web", "items", "outfits", "schedule"]
+                  }
+                }
+              }
+            }
+          }
+        }
         image_pull_secrets {
           name = kubernetes_secret.ecr_pull[0].metadata[0].name
         }
@@ -459,7 +544,7 @@ resource "kubernetes_ingress_v1" "app" {
       "alb.ingress.kubernetes.io/listen-ports"    = "[{\"HTTP\":80},{\"HTTPS\":443}]"
       "alb.ingress.kubernetes.io/ssl-redirect"    = "443"
       "alb.ingress.kubernetes.io/certificate-arn" = var.frontend_certificate_arn
-      "external-dns.alpha.kubernetes.io/hostname" = "${local.frontend_host},${local.apex_host},${local.www_host}"
+      "external-dns.alpha.kubernetes.io/hostname" = local.external_dns_hostnames
 
       # Redirect apex/www → canonical frontend host (https://app.<domain>/)
       "alb.ingress.kubernetes.io/actions.redirect-to-frontend" = jsonencode({

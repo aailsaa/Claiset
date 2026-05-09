@@ -43,6 +43,18 @@ locals {
     local.frontend_host != var.domain_root ? var.domain_root : null,
     local.www_host != "" && local.frontend_host != local.www_host ? local.www_host : null,
   ]))
+  # Keep for_each keys static so plan works in one pass.
+  cert_validation_domains = var.domain_root == "" ? [] : distinct(concat(
+    [local.frontend_host],
+    local.frontend_cert_sans,
+  ))
+  cert_validation_records_by_domain = var.domain_root != "" ? {
+    for dvo in aws_acm_certificate.frontend[0].domain_validation_options : dvo.domain_name => {
+      name   = dvo.resource_record_name
+      type   = dvo.resource_record_type
+      values = [dvo.resource_record_value]
+    }
+  } : {}
 }
 
 # ACM certificate for the frontend hostname (DNS validated in Route53).
@@ -52,11 +64,11 @@ locals {
 # into the wrong zone_id), or your registrar still points at different nameservers
 # than the hosted zone in `route53_hosted_zone_id`. Fix public NS/DNS, then re-apply.
 resource "aws_acm_certificate" "frontend" {
-  count             = var.domain_root != "" ? 1 : 0
-  domain_name       = local.frontend_host
+  count                     = var.domain_root != "" ? 1 : 0
+  domain_name               = local.frontend_host
   subject_alternative_names = length(local.frontend_cert_sans) > 0 ? local.frontend_cert_sans : null
-  validation_method = "DNS"
-  tags              = var.tags
+  validation_method         = "DNS"
+  tags                      = var.tags
 
   # When hostnames/cert fields change, replace cert by creating the new one first.
   # Prevents "ResourceInUseException" from deleting a cert still attached to ALB listeners.
@@ -66,18 +78,12 @@ resource "aws_acm_certificate" "frontend" {
 }
 
 resource "aws_route53_record" "frontend_cert_validation" {
-  for_each = var.domain_root != "" ? {
-    for dvo in aws_acm_certificate.frontend[0].domain_validation_options : dvo.domain_name => {
-      name   = dvo.resource_record_name
-      type   = dvo.resource_record_type
-      values = [dvo.resource_record_value]
-    }
-  } : {}
+  for_each = var.domain_root != "" ? toset(local.cert_validation_domains) : toset([])
 
   zone_id         = local.zone_id
-  name            = each.value.name
-  type            = each.value.type
-  records         = each.value.values
+  name            = local.cert_validation_records_by_domain[each.value].name
+  type            = local.cert_validation_records_by_domain[each.value].type
+  records         = local.cert_validation_records_by_domain[each.value].values
   ttl             = 60
   allow_overwrite = true
 }
@@ -116,9 +122,9 @@ resource "kubernetes_namespace" "platform" {
 # Note: AWS Academy accounts often restrict IAM role creation (IRSA). This install
 # relies on the node IAM role (LabRole) having permission.
 #
-# Recovery: "cannot re-use a name that is still in use" → a failed prior release.
-#   helm uninstall aws-load-balancer-controller -n kube-system
-# or import: terraform import 'module.platform.helm_release.aws_load_balancer_controller' 'kube-system/aws-load-balancer-controller'
+# Recovery: "cannot re-use a name that is still in use" → stuck prior release; CI runs
+# ../../scripts/helm-platform-reconcile.sh before apply. Manual: helm uninstall … or terraform import
+# 'module.platform.helm_release.aws_load_balancer_controller' 'kube-system/aws-load-balancer-controller'
 resource "helm_release" "aws_load_balancer_controller" {
   name       = "aws-load-balancer-controller"
   repository = "https://aws.github.io/eks-charts"
@@ -129,7 +135,6 @@ resource "helm_release" "aws_load_balancer_controller" {
   atomic          = true
   cleanup_on_fail = true
   replace         = true
-
   # With hostNetwork enabled this chart binds fixed host ports; running >1 replica can
   # fail to schedule on small node groups ("didn't have free ports"). One replica is
   # enough for this project and keeps costs low.
@@ -186,6 +191,69 @@ resource "helm_release" "aws_load_balancer_controller" {
 }
 
 # ExternalDNS to create Route53 records from Ingress/Service annotations.
+locals {
+  # Keep count/for_each decisions based on stable inputs so destroy/apply planning
+  # doesn't fail when OIDC outputs are temporarily unknown in graph evaluation.
+  enable_external_dns_irsa = var.domain_root != "" && var.cluster_name != ""
+}
+
+data "aws_iam_policy_document" "external_dns_assume" {
+  count = local.enable_external_dns_irsa ? 1 : 0
+
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+    principals {
+      type        = "Federated"
+      identifiers = [var.oidc_provider_arn]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "${replace(var.oidc_issuer_url, "https://", "")}:sub"
+      values   = ["system:serviceaccount:platform:external-dns"]
+    }
+  }
+}
+
+data "aws_iam_policy_document" "external_dns" {
+  count = local.enable_external_dns_irsa ? 1 : 0
+
+  statement {
+    effect = "Allow"
+    actions = [
+      "route53:ChangeResourceRecordSets",
+      "route53:ListResourceRecordSets",
+      "route53:GetHostedZone",
+    ]
+    resources = ["arn:aws:route53:::hostedzone/*"]
+  }
+
+  statement {
+    effect = "Allow"
+    actions = [
+      "route53:ListHostedZones",
+      "route53:ListHostedZonesByName",
+      "route53:GetChange",
+    ]
+    resources = ["*"]
+  }
+}
+
+resource "aws_iam_role" "external_dns" {
+  count              = local.enable_external_dns_irsa ? 1 : 0
+  name               = "${local.name}-external-dns"
+  assume_role_policy = data.aws_iam_policy_document.external_dns_assume[0].json
+  tags               = var.tags
+}
+
+resource "aws_iam_role_policy" "external_dns" {
+  count  = local.enable_external_dns_irsa ? 1 : 0
+  name   = "${local.name}-external-dns"
+  role   = aws_iam_role.external_dns[0].id
+  policy = data.aws_iam_policy_document.external_dns[0].json
+}
+
 resource "helm_release" "external_dns" {
   count      = var.domain_root != "" ? 1 : 0
   name       = "external-dns"
@@ -200,7 +268,6 @@ resource "helm_release" "external_dns" {
   atomic          = true
   cleanup_on_fail = true
   replace         = true
-
   set {
     name  = "replicaCount"
     value = "1"
@@ -258,12 +325,21 @@ resource "helm_release" "external_dns" {
     name  = "serviceAccount.name"
     value = "external-dns"
   }
+
+  dynamic "set" {
+    for_each = local.enable_external_dns_irsa ? [1] : []
+    content {
+      name  = "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
+      value = aws_iam_role.external_dns[0].arn
+    }
+  }
 }
 
 # Cluster Autoscaler (scales managed nodegroup up/down automatically).
 # This prevents "Too many pods" hangs on tiny nodes by adding capacity only when required.
 locals {
-  enable_cluster_autoscaler = var.oidc_provider_arn != "" && var.oidc_issuer_url != ""
+  # Same rationale as external-dns IRSA: avoid unknown-dependent count expressions.
+  enable_cluster_autoscaler = var.cluster_name != ""
 }
 
 data "aws_iam_policy_document" "cluster_autoscaler_assume" {
@@ -328,7 +404,6 @@ resource "helm_release" "cluster_autoscaler" {
   atomic          = true
   cleanup_on_fail = true
   replace         = true
-
   set {
     name  = "autoDiscovery.clusterName"
     value = var.cluster_name

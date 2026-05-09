@@ -11,8 +11,9 @@ terraform {
       version = "~> 2.0"
     }
     helm = {
-      source  = "hashicorp/helm"
-      version = "~> 2.0"
+      source = "hashicorp/helm"
+      # 2.17: last 2.x line with familiar set { } blocks on helm_release.
+      version = "~> 2.17"
     }
   }
 }

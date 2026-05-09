@@ -28,28 +28,35 @@ variable "eks_cluster_version" {
   default     = "1.31"
 }
 
+variable "eks_node_group_kubernetes_version" {
+  type        = string
+  default     = null
+  nullable    = true
+  description = "Optional. Pin managed node group kubelet to this version; leave null so LT-only updates are not bundled with UpdateNodegroupVersion (avoids AWS launch-template instance-type errors)."
+}
+
 variable "node_instance_types" {
   type        = list(string)
-  description = "EKS node instance types (passed to infra/modules/eks). t3.small avoids ~4-pod/node cap on t3.micro (VPC CNI)."
-  default     = ["t3.small"]
+  description = "EKS node instance types. This account currently enforces free-tier-eligible node types, so keep this list to free-tier options only."
+  default     = ["t3.micro", "t2.micro"]
 }
 
 variable "node_group_desired_size" {
   type        = number
   description = "EKS managed node group desired capacity."
-  default     = 2
+  default     = 4
 }
 
 variable "node_group_min_size" {
   type        = number
-  description = "EKS managed node group minimum capacity."
-  default     = 1
+  description = "EKS managed node group minimum capacity. Keep high enough that monitoring + apps fit without exhausting VPC-CNI pod density."
+  default     = 2
 }
 
 variable "node_group_max_size" {
   type        = number
   description = "EKS managed node group maximum capacity."
-  default     = 6
+  default     = 16
 }
 
 variable "google_client_id" {
@@ -78,8 +85,8 @@ variable "create_hosted_zone" {
 
 variable "frontend_subdomain" {
   type        = string
-  description = "Subdomain for the frontend (e.g. app). Full name becomes app.<domain_root>."
-  default     = "app"
+  description = "Subdomain for the frontend; must match Ingress/smoke (e.g. app-prod for https://app-prod.<domain_root>). QA/UAT use app-qa / app-uat."
+  default     = "app-prod"
 }
 
 variable "wait_for_acm_validation" {
@@ -92,5 +99,78 @@ variable "enable_kubernetes_app" {
   type        = bool
   default     = true
   description = "Set false only for targeted terraform import when app inputs may be unknown."
+}
+
+variable "enable_observability_stack" {
+  type        = bool
+  default     = false
+  description = <<-EOT
+    Self-hosted Prometheus, Grafana (Google OAuth), Loki, Promtail. CI sets true via repository variable ENABLE_OBSERVABILITY and Grafana TF_VAR_* secrets.
+    Defaults false locally so plans work without OAuth; for local terraform import of monitoring resources, set true plus grafana_google_client_id/secret (same as CI). See docs/failure-playbook.md §9.
+  EOT
+}
+
+variable "enable_observability_daemonsets" {
+  type        = bool
+  default     = false
+  description = <<-EOT
+    Keep false on free-tier micro nodes: node-exporter/promtail DaemonSets consume scarce pod slots
+    and can block app scheduling (Too many pods). Set true only when node size/capacity is increased.
+  EOT
+}
+
+variable "enable_node_exporter" {
+  type        = bool
+  default     = true
+  description = "Set false for logs-first evidence runs to free DaemonSet pod slots for promtail."
+}
+
+variable "enable_promtail" {
+  type        = bool
+  default     = false
+  description = "Set true for Loki/multi-service logs proof runs."
+}
+
+variable "grafana_google_client_id" {
+  type        = string
+  default     = ""
+  description = "Grafana OAuth (Google) Web client ID. Add redirect https://grafana-prod.<domain>/login/google."
+}
+
+variable "grafana_google_client_secret" {
+  type      = string
+  default   = ""
+  sensitive = true
+}
+
+variable "grafana_google_allowed_domains" {
+  type    = string
+  default = ""
+}
+
+variable "alertmanager_email_to" {
+  type    = string
+  default = ""
+}
+
+variable "alertmanager_smtp_smarthost" {
+  type    = string
+  default = ""
+}
+
+variable "alertmanager_smtp_from" {
+  type    = string
+  default = ""
+}
+
+variable "alertmanager_smtp_user" {
+  type    = string
+  default = ""
+}
+
+variable "alertmanager_smtp_password" {
+  type      = string
+  default   = ""
+  sensitive = true
 }
 

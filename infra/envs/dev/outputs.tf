@@ -23,3 +23,8 @@ output "ecr_repository_urls" {
   description = "ECR repo URLs for app images."
 }
 
+output "grafana_url" {
+  value       = module.platform.grafana_url
+  description = "Grafana (Prometheus/Loki) URL when observability stack is enabled."
+}
+

@@ -35,6 +35,8 @@ module "eks" {
 
   create_iam_roles = true
 
+  node_group_kubernetes_version = var.eks_node_group_kubernetes_version
+
   node_instance_types     = var.node_instance_types
   node_group_desired_size = var.node_group_desired_size
   node_group_min_size     = var.node_group_min_size
@@ -52,13 +54,13 @@ module "rds" {
 }
 
 module "platform" {
-  source       = "../../modules/platform"
-  project      = var.project
-  env          = var.env
-  tags         = local.tags
-  region       = var.aws_region
-  cluster_name = module.eks.cluster_name
-  vpc_id       = module.network.vpc_id
+  source            = "../../modules/platform"
+  project           = var.project
+  env               = var.env
+  tags              = local.tags
+  region            = var.aws_region
+  cluster_name      = module.eks.cluster_name
+  vpc_id            = module.network.vpc_id
   oidc_provider_arn = module.eks.oidc_provider_arn
   oidc_issuer_url   = module.eks.oidc_issuer_url
 
@@ -67,6 +69,16 @@ module "platform" {
   frontend_subdomain      = var.frontend_subdomain
   wait_for_acm_validation = var.wait_for_acm_validation
   create_hosted_zone      = var.create_hosted_zone
+
+  enable_observability_stack     = var.enable_observability_stack
+  grafana_google_client_id       = var.grafana_google_client_id
+  grafana_google_client_secret   = var.grafana_google_client_secret
+  grafana_google_allowed_domains = var.grafana_google_allowed_domains
+  alertmanager_email_to          = var.alertmanager_email_to
+  alertmanager_smtp_smarthost    = var.alertmanager_smtp_smarthost
+  alertmanager_smtp_from         = var.alertmanager_smtp_from
+  alertmanager_smtp_user         = var.alertmanager_smtp_user
+  alertmanager_smtp_password     = var.alertmanager_smtp_password
 }
 
 module "app_bluegreen" {

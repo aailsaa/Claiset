@@ -26,3 +26,8 @@ output "frontend_certificate_arn" {
   description = "ACM certificate ARN (ISSUED after validation, or pending ARN if wait_for_acm_validation is false)."
 }
 
+output "grafana_url" {
+  value       = local.observability_enabled ? "https://${local.grafana_host}" : null
+  description = "Public Grafana URL when the self-hosted observability stack is enabled."
+}
+

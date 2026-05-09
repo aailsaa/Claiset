@@ -67,3 +67,82 @@ variable "wait_for_acm_validation" {
   description = "When false, Terraform does not wait for aws_acm_certificate_validation (use if DNS/delegation is not ready yet). Ingress TLS may stay pending until you validate and re-apply."
 }
 
+variable "enable_observability_stack" {
+  type        = bool
+  default     = false
+  description = "Self-hosted metrics/logging: kube-prometheus-stack (Prometheus, Grafana, Alertmanager), Loki, Promtail. Requires domain, ACM wait, and Grafana Google OAuth credentials."
+
+  validation {
+    condition = !var.enable_observability_stack || (
+      trimspace(var.grafana_google_client_id) != "" &&
+      length(trimspace(var.grafana_google_client_secret)) > 0
+    )
+    error_message = "When enable_observability_stack is true, set non-empty grafana_google_client_id and grafana_google_client_secret."
+  }
+}
+
+variable "enable_observability_daemonsets" {
+  type        = bool
+  default     = true
+  description = "When false, disables DaemonSet-based observability collectors (node-exporter, promtail). Useful on micro nodes with very low pod-per-node limits."
+}
+
+variable "enable_node_exporter" {
+  type        = bool
+  default     = true
+  description = "When false, disables node-exporter while keeping other observability components. Useful when prioritizing promtail scheduling on very small nodes."
+}
+
+variable "enable_promtail" {
+  type        = bool
+  default     = true
+  description = "When false, disables promtail while keeping metrics stack components. Useful for metrics-only proof runs."
+}
+
+variable "grafana_google_client_id" {
+  type        = string
+  default     = ""
+  description = "Google OAuth Web client ID for Grafana. Add authorized redirect: https://grafana-<env>.<domain_root>/login/google"
+}
+
+variable "grafana_google_client_secret" {
+  type        = string
+  default     = ""
+  sensitive   = true
+  description = "Google OAuth client secret for Grafana."
+}
+
+variable "grafana_google_allowed_domains" {
+  type        = string
+  default     = ""
+  description = "Optional comma-separated Google allowed domains for Grafana sign-in (empty = any account allowed by your OAuth client configuration)."
+}
+
+variable "alertmanager_email_to" {
+  type        = string
+  default     = ""
+  description = "Optional alert email recipient; set with SMTP fields below."
+}
+
+variable "alertmanager_smtp_smarthost" {
+  type        = string
+  default     = ""
+  description = "SMTP relay host:port, e.g. smtp.gmail.com:587"
+}
+
+variable "alertmanager_smtp_from" {
+  type    = string
+  default = ""
+}
+
+variable "alertmanager_smtp_user" {
+  type    = string
+  default = ""
+}
+
+variable "alertmanager_smtp_password" {
+  type      = string
+  default   = ""
+  sensitive = true
+}
+

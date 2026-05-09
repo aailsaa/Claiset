@@ -28,6 +28,13 @@ variable "eks_cluster_version" {
   default     = "1.31"
 }
 
+variable "eks_node_group_kubernetes_version" {
+  type        = string
+  default     = null
+  nullable    = true
+  description = "Optional. Pin managed node group kubelet to this version; leave null so LT-only updates are not bundled with UpdateNodegroupVersion (avoids AWS launch-template instance-type errors)."
+}
+
 variable "node_instance_types" {
   type        = list(string)
   description = "EKS node instance types (passed to infra/modules/eks). Dev uses t3.small to keep enough pod/IP capacity for always-on web availability between deploys."
@@ -38,14 +45,14 @@ variable "node_group_desired_size" {
   type        = number
   description = "EKS managed node group desired capacity."
   # Raise baseline for reliability during normal dev access; manual scale-down can be used to save cost.
-  default     = 3
+  default = 3
 }
 
 variable "node_group_min_size" {
   type        = number
   description = "EKS managed node group minimum capacity."
   # Keep at least 2 nodes so core platform + app pods avoid frequent Pending states.
-  default     = 2
+  default = 2
 }
 
 variable "node_group_max_size" {
@@ -80,8 +87,8 @@ variable "create_hosted_zone" {
 
 variable "frontend_subdomain" {
   type        = string
-  description = "Subdomain for the frontend (e.g. app). Full name becomes app.<domain_root>."
-  default     = ""
+  description = "Subdomain for the frontend. Use app-dev so apex (claiset.xyz) can stay on prod; empty uses apex as canonical (not recommended with shared zone)."
+  default     = "app-dev"
 }
 
 variable "wait_for_acm_validation" {
@@ -94,5 +101,54 @@ variable "enable_kubernetes_app" {
   type        = bool
   default     = true
   description = "Set false only for targeted terraform import when app inputs may be unknown."
+}
+
+variable "enable_observability_stack" {
+  type        = bool
+  default     = false
+  description = "Self-hosted Prometheus, Grafana (Google OAuth), Alertmanager optional email, Loki, Promtail. Set true plus OAuth client + secret to deploy."
+}
+
+variable "grafana_google_client_id" {
+  type        = string
+  default     = ""
+  description = "Grafana OAuth (Google) client ID — add redirect https://grafana-dev.<your-domain>/login/google"
+}
+
+variable "grafana_google_client_secret" {
+  type      = string
+  default   = ""
+  sensitive = true
+}
+
+variable "grafana_google_allowed_domains" {
+  type    = string
+  default = ""
+}
+
+variable "alertmanager_email_to" {
+  type    = string
+  default = ""
+}
+
+variable "alertmanager_smtp_smarthost" {
+  type    = string
+  default = ""
+}
+
+variable "alertmanager_smtp_from" {
+  type    = string
+  default = ""
+}
+
+variable "alertmanager_smtp_user" {
+  type    = string
+  default = ""
+}
+
+variable "alertmanager_smtp_password" {
+  type      = string
+  default   = ""
+  sensitive = true
 }
 

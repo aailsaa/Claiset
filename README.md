@@ -180,6 +180,8 @@ Detailed layout and conventions: **`infra/README.md`**.
 
 EKS control planes, NAT gateways, RDS, and ALBs are the main cost drivers. Use these scripts to shut things down when you’re not using them:
 
+`terraform-destroy-all.sh` best-effort deletes **app Ingress** in the **`dev`/`qa`/`uat`/`prod`** namespace and **every Ingress (and LB Services) in `monitoring`** before Terraform destroys `module.platform` — that includes Grafana’s observability ALB so VPC teardown is less likely to stick on ENIs.
+
 ### Destroy all environments (dev, qa, uat, prod)
 
 From the repo root:
@@ -222,8 +224,6 @@ If the **tip commit message** on `main` contains **`[skip-dev]`**, the **dev** j
 ---
 
 ## Operations docs
-
-To keep this README shorter, runbooks are in dedicated docs:
 
 - Day 2 runbook (node patching + schema change): [`docs/day2-runbook.md`](docs/day2-runbook.md)
 - Failure playbook (common incidents + fixes): [`docs/failure-playbook.md`](docs/failure-playbook.md)
