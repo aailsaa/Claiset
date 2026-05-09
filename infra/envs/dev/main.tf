@@ -96,8 +96,8 @@ module "platform" {
   alertmanager_smtp_password     = var.alertmanager_smtp_password
 }
 
-module "app_bluegreen" {
-  source  = "../../modules/app-bluegreen"
+module "eks_app" {
+  source  = "../../modules/eks-app"
   project = var.project
   env     = var.env
   tags    = local.tags

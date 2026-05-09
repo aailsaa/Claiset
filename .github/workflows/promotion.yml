@@ -249,7 +249,7 @@ jobs:
           EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" bash ../../scripts/helm-platform-reconcile.sh
           # Orphaned / stuck observability Helm releases (pending-install, failed) block Terraform.
           EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" bash ../../scripts/helm-monitoring-reconcile.sh
-          # Phase 2: platform (ACM, controllers) + app_bluegreen and the rest.
+          # Phase 2: platform (ACM, controllers) + workloads (Ingress + app Deployments, migrate Job) + remainder of stack.
           terraform apply -auto-approve
           DOMAIN_ROOT=claiset.xyz FRONTEND_SUBDOMAIN=app-dev UPDATE_APEX_DNS=false K8S_APP_NAMESPACE=dev bash ../../scripts/route53-ingress-records-guard.sh
 

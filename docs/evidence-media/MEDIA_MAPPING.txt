@@ -1,0 +1,20 @@
+EXTRA-A1-app-prod-all-items.png	<- Screenshot 2026-05-09 at 10.50.02 AM.png
+EXTRA-app-dev-login-google.png	<- Screenshot 2026-05-09 at 11.54.30 AM.png
+EXTRA-app-dev-HTTPS-connection-details.png	<- Screenshot 2026-05-09 at 11.57.02 AM.png
+A1-app-home.png	<- Screenshot 2026-05-09 at 11.57.40 AM.png
+EXTRA-app-dev-new-item-modal.png	<- Screenshot 2026-05-09 at 11.58.53 AM.png
+EXTRA-app-dev-outfits.png	<- Screenshot 2026-05-09 at 12.01.55 PM.png
+A1-app-inner.png	<- Screenshot 2026-05-09 at 12.02.10 PM.png
+EXTRA-app-dev-stats.png	<- Screenshot 2026-05-09 at 12.02.33 PM.png
+A4-kubectl-deploy.png	<- Screenshot 2026-05-09 at 12.06.07 PM.png
+A5-kubectl-ingress.png	<- Screenshot 2026-05-09 at 12.06.54 PM.png
+D1-migrate-job.png	<- Screenshot 2026-05-09 at 12.07.16 PM.png
+D2-migrate-describe.png	<- Screenshot 2026-05-09 at 12.07.33 PM.png
+O1-monitoring-pods.png	<- Screenshot 2026-05-09 at 12.07.48 PM.png
+EXTRA-O1-monitoring-pods-wide.png	<- Screenshot 2026-05-09 at 12.07.51 PM.png
+EXTRA-O5-grafana-node-exporter-cpu-mem.png	<- Screenshot 2026-05-09 at 12.10.12 PM.png
+EXTRA-O5-grafana-dashboard-disk-io-disk-space-empty.png	<- Screenshot 2026-05-09 at 12.10.32 PM.png
+O5-disk-capacity-explore.png	<- Screenshot 2026-05-09 at 12.12.09 PM.png
+O2-O6-grafana-and-observability.mov	<- Screen Recording 2026-05-09 at 10.47.39 AM.mov
+S1-terraform-apply-or-infra-recording.mov	<- Screen Recording 2026-05-09 at 8.35.26 AM.mov
+C6-rollout-or-deployment-recording.mov	<- Screen Recording 2026-05-09 at 12.13.43 PM.mov

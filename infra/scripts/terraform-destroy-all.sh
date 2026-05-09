@@ -158,7 +158,7 @@ for ENV in "${ENVS[@]}"; do
     # If these modules are already gone, continue to full destroy.
     echo "Phase 1 destroy (${ENV}): app/platform resources"
     terraform destroy "${DESTROY_OPTS[@]}" \
-      -target=module.app_bluegreen \
+      -target=module.eks_app \
       -target=module.platform || true
 
     # Phase 2: full environment destroy.

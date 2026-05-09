@@ -84,8 +84,8 @@ module "platform" {
   alertmanager_smtp_password      = var.alertmanager_smtp_password
 }
 
-module "app_bluegreen" {
-  source  = "../../modules/app-bluegreen"
+module "eks_app" {
+  source  = "../../modules/eks-app"
   project = var.project
   env     = var.env
   tags    = local.tags
@@ -94,6 +94,10 @@ module "app_bluegreen" {
   depends_on            = [module.platform]
   # Free-tier node constraints are tight; keep one replica per service in prod for deterministic scheduling.
   replicas = 1
+
+  # Same pattern as UAT: single-Pod surge + post-readiness soak so a bad build fails the rollout before full cutover.
+  rolling_update_max_surge  = "1"
+  rollout_min_ready_seconds = 30
 
   aws_region               = var.aws_region
   domain_root              = var.domain_root

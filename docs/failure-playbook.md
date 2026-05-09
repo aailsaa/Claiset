@@ -136,7 +136,7 @@ Symptoms: `kubernetes_job.migrate` fails on **refresh** during apply (`Refreshin
 
 **Cause:** The one-shot migrate Job finished and was **removed** from the cluster (or never created) while **Terraform state** still tracks it. Apply tries to refresh a missing object and errors.
 
-**Fix:** The **k8s import guard** removes that address from state when the job is missing so the next apply **recreates** it. If you need to do it manually: `terraform state rm 'module.app_bluegreen.kubernetes_job.migrate[0]'` from `infra/envs/<env>` (then re-apply). The guard’s **“Skipping Job … import failed”** line when the job does not exist yet is normal and not a failed step by itself.
+**Fix:** The **k8s import guard** removes that address from state when the job is missing so the next apply **recreates** it. If you need to do it manually: `terraform state rm 'module.eks_app.kubernetes_job.migrate[0]'` from `infra/envs/<env>` (then re-apply). The guard’s **“Skipping Job … import failed”** line when the job does not exist yet is normal and not a failed step by itself.
 
 ## 11) EKS managed node group: `NodeCreationFailure` / new nodes not joining
 

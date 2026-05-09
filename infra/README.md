@@ -5,7 +5,7 @@ This folder is the **only place** AWS / Kubernetes infrastructure is managed. No
 ### Layout
 - `envs/dev`: first environment to stand up (us-east-1)
 - `envs/qa`, `envs/uat`, `envs/prod`: promotion environments (same modules; different image tags and hostnames)
-- `modules/*`: reusable building blocks (VPC, EKS, RDS, platform add-ons, **`app-bluegreen`** workloads + Ingress)
+- `modules/*`: reusable building blocks (VPC, EKS, RDS, platform add-ons, **`eks-app`** workloads + Ingress)
 
 ### Quick start (dev)
 1. Create an AWS profile / credentials with permission to create VPC/EKS/RDS/IAM/Route53/ACM.
@@ -100,3 +100,8 @@ Grafana is exposed on **`https://grafana-<env>.<domain_root>`** via ALB Ingress;
 If `ENABLE_OBSERVABILITY` is `true` but Grafana secrets are empty, Terraform will fail validation. Register **every** Grafana redirect URI you need in Google Cloud before the first CI apply per environment.
 
 **Stuck Helm / recover before apply:** If an apply was interrupted, charts can sit in Helm `pending-install` / `failed` / `pending-upgrade` / `pending-rollback` and the next Terraform run errors with **`cannot re-use a name that is still in use`**. The workflow runs [`scripts/helm-platform-reconcile.sh`](scripts/helm-platform-reconcile.sh) (unstuck uninstall + **`terraform import`** for healthy **deployed** platform charts missing from state) then [`scripts/helm-monitoring-reconcile.sh`](scripts/helm-monitoring-reconcile.sh) (same for `kube-prometheus-stack` / `loki` / `promtail` in `monitoring`). Run the same scripts locally from `infra/envs/<env>` after `terraform init`, with `EXPECTED_CLUSTER_NAME` set, if you see that error.
+
+### Grading helpers (node patching / zero-downtime)
+
+- **`scripts/eks-node-patch-evidence.sh`** — textual **before/after** snapshot (`describe-nodegroup` + nodes). Procedure: **[../docs/day2-os-node-patching.md](../docs/day2-os-node-patching.md)**.
+- **`scripts/http-availability-during-rollout.sh`** — **`2xx`/error HTTP codes once per second** during a rollout for **C6**. Procedure: **[../docs/zero-downtime-promotion-evidence.md](../docs/zero-downtime-promotion-evidence.md)**.

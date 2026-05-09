@@ -91,24 +91,24 @@ try_import "module.platform.kubernetes_secret.grafana_google_oauth[0]" "monitori
 
 # Deployments
 for name in items outfits schedule web; do
-  addr="module.app_bluegreen.kubernetes_deployment.${name}[0]"
+  addr="module.eks_app.kubernetes_deployment.${name}[0]"
   try_import "${addr}" "${NAMESPACE}/${name}" "Deployment" deployment
 done
 
 # Services
 for name in items outfits schedule web; do
-  addr="module.app_bluegreen.kubernetes_service.${name}[0]"
+  addr="module.eks_app.kubernetes_service.${name}[0]"
   try_import "${addr}" "${NAMESPACE}/${name}" "Service" svc
 done
 
 # Ingress (name is var.project; currently claiset)
 INGRESS_NAME="${K8S_INGRESS_NAME:-${TF_VAR_project:-claiset}}"
-addr_ing="module.app_bluegreen.kubernetes_ingress_v1.app[0]"
+addr_ing="module.eks_app.kubernetes_ingress_v1.app[0]"
 try_import "${addr_ing}" "${NAMESPACE}/${INGRESS_NAME}" "Ingress" ingress
 
 # Migrate Job — often absent after a successful run (manual cleanup, TTL policies) while state
 # still references it; apply then fails refreshing this address. Drop stale state so apply recreates.
-addr_job="module.app_bluegreen.kubernetes_job.migrate[0]"
+addr_job="module.eks_app.kubernetes_job.migrate[0]"
 job_present() {
   kubectl get job.batch -n "${NAMESPACE}" migrate >/dev/null 2>&1 \
     || kubectl get job -n "${NAMESPACE}" migrate >/dev/null 2>&1
