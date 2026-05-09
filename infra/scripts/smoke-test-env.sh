@@ -428,12 +428,59 @@ if [[ -z "${LB_HOST}" ]]; then
 fi
 echo "Ingress LB: ${LB_HOST}"
 
+# GitHub-hosted runners occasionally use stub resolvers that fail *.elb.amazonaws.com or fresh
+# Route53 names (curl exit 6). Query 1.1.1.1 / 8.8.8.8 and use curl --resolve so HTTPS still
+# uses FRONTEND_HOST for SNI/ACM without relying on runner DNS for the LB hostname.
+ipv4_first_from_public_dns() {
+  local name="$1"
+  local dns cand
+  [[ -z "${name}" ]] && return 1
+  if ! command -v dig >/dev/null 2>&1; then
+    return 1
+  fi
+  for dns in 1.1.1.1 8.8.8.8; do
+    cand="$(dig +timeout=6 +tries=2 +short "${name}" A @"${dns}" 2>/dev/null \
+      | awk '/^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/ {print; exit}')"
+    if [[ -n "${cand}" ]]; then
+      printf '%s\n' "${cand}"
+      return 0
+    fi
+  done
+  return 1
+}
+
+SMOKE_LB_IPV4=""
+echo "Resolving Ingress LB (${LB_HOST}) via public recursive DNS (1.1.1.1 / 8.8.8.8)..."
+for _albwait in {1..36}; do
+  if SMOKE_LB_IPV4="$(ipv4_first_from_public_dns "${LB_HOST}")" && [[ -n "${SMOKE_LB_IPV4}" ]]; then
+    echo "Ingress LB IPv4 ${SMOKE_LB_IPV4} (resolver ok, attempt ${_albwait}/36; curl uses --resolve ${FRONTEND_HOST}:443)."
+    break
+  fi
+  echo "LB hostname not in public DNS yet (${_albwait}/36); sleep 5s (new ALB / propagation)..."
+  sleep 5
+done
+if [[ -z "${SMOKE_LB_IPV4}" ]]; then
+  echo "::warning::Could not resolve ${LB_HOST} via 1.1.1.1/8.8.8.8 — frontend curl falls back to runner DNS only (install dnsutils if dig is missing)." >&2
+fi
+
 SMOKE_BASE_HOST="${FRONTEND_HOST}"
 SMOKE_CONNECT_TO=()
 
 curl_code() {
   local url="$1"
-  curl -sS "${SMOKE_CONNECT_TO[@]}" -o /dev/null -w '%{http_code}' "${url}" || true
+  local c="000"
+  if [[ -n "${SMOKE_LB_IPV4:-}" ]]; then
+    c="$(curl -sS --resolve "${FRONTEND_HOST}:443:${SMOKE_LB_IPV4}" \
+      --connect-timeout 30 -o /dev/null -w '%{http_code}' "${url}" 2>/dev/null || printf '000')"
+  fi
+  if [[ ! "${c}" =~ ^[0-9]{3}$ ]]; then
+    c="000"
+  fi
+  if [[ "${c}" == "000" ]] || [[ "${c}" =~ ^5 ]]; then
+    c="$(curl -sS "${SMOKE_CONNECT_TO[@]}" --connect-timeout 30 \
+      -o /dev/null -w '%{http_code}' "${url}" 2>/dev/null || printf '000')"
+  fi
+  printf '%s' "${c}"
 }
 
 check_frontend() {
@@ -455,6 +502,7 @@ check_frontend() {
 }
 
 front_code="000"
+FRONTEND_REACH_MODE="hostname-dns"
 if ! check_frontend 12 5; then
   echo "Primary frontend host check failed: https://${SMOKE_BASE_HOST} returned ${front_code}" >&2
   echo "Retrying via ALB using SNI host ${FRONTEND_HOST} -> ${LB_HOST}"
@@ -462,13 +510,14 @@ if ! check_frontend 12 5; then
   # but connect network path directly to the ALB hostname.
   SMOKE_BASE_HOST="${FRONTEND_HOST}"
   SMOKE_CONNECT_TO=(--connect-to "${FRONTEND_HOST}:443:${LB_HOST}:443")
+  FRONTEND_REACH_MODE="alb-direct-connect-to"
   check_frontend 12 5 || true
 fi
 if ! http_2xx_or_3xx "${front_code}"; then
   echo "Frontend smoke failed: https://${SMOKE_BASE_HOST} returned ${front_code}" >&2
   exit 1
 fi
-echo "Frontend smoke OK (${front_code}) via ${SMOKE_BASE_HOST}"
+echo "Frontend smoke OK (${front_code}) via ${SMOKE_BASE_HOST} (curl path: ${FRONTEND_REACH_MODE})"
 
 check_grafana() {
   if [[ -z "${GRAFANA_HOST}" ]]; then
@@ -488,18 +537,52 @@ check_grafana() {
     exit 1
   fi
 
-  GRAFANA_CONNECT_TO=()
+  GRAFANA_LB_IPV4=""
+  echo "Resolving Grafana ALB (${GRAFANA_LB_HOST}) via public DNS..."
+  for _gw in {1..24}; do
+    if GRAFANA_LB_IPV4="$(ipv4_first_from_public_dns "${GRAFANA_LB_HOST}")" && [[ -n "${GRAFANA_LB_IPV4}" ]]; then
+      echo "Grafana LB IPv4 ${GRAFANA_LB_IPV4} (curl --resolve ${GRAFANA_HOST}:443)."
+      break
+    fi
+    sleep 5
+  done
+
+  # Same runner DNS caveat as frontend: --resolve after public dig avoids NXDOMAIN *.elb.amazonaws.com.
+  GRAFANA_CONNECT_TO=(--connect-to "${GRAFANA_HOST}:443:${GRAFANA_LB_HOST}:443")
+  grafana_curl_code() {
+    local url="$1"
+    local c="000"
+    if [[ -n "${GRAFANA_LB_IPV4:-}" ]]; then
+      c="$(curl -sS --resolve "${GRAFANA_HOST}:443:${GRAFANA_LB_IPV4}" --connect-timeout 30 \
+        -o /dev/null -w '%{http_code}' "${url}" 2>/dev/null || printf '000')"
+    fi
+    [[ ! "${c}" =~ ^[0-9]{3}$ ]] && c="000"
+    if [[ "${c}" == "000" ]] || [[ "${c}" =~ ^5[0-9][0-9]$ ]]; then
+      c="$(curl -sS "${GRAFANA_CONNECT_TO[@]}" --connect-timeout 30 \
+        -o /dev/null -w '%{http_code}' "${url}" 2>/dev/null || printf '000')"
+    fi
+    printf '%s' "${c}"
+  }
+  grafana_curl_headers() {
+    local url="$1"
+    local out=""
+    if [[ -n "${GRAFANA_LB_IPV4:-}" ]]; then
+      out="$(curl -sS --resolve "${GRAFANA_HOST}:443:${GRAFANA_LB_IPV4}" --connect-timeout 30 \
+        -D - -o /dev/null "${url}" 2>/dev/null || true)"
+    fi
+    if [[ -z "${out}" ]]; then
+      out="$(curl -sS "${GRAFANA_CONNECT_TO[@]}" --connect-timeout 30 -D - -o /dev/null "${url}" 2>/dev/null || true)"
+    fi
+    printf '%s' "${out}"
+  }
+
   grafana_code="000"
   attempts=24
   sleep_s=5
   for ((i=1; i<=attempts; i++)); do
-    grafana_code="$(curl -sS "${GRAFANA_CONNECT_TO[@]}" -o /dev/null -w '%{http_code}' "https://${GRAFANA_HOST}" || true)"
+    grafana_code="$(grafana_curl_code "https://${GRAFANA_HOST}")"
     if http_2xx_or_3xx "${grafana_code}"; then
       break
-    fi
-    if [[ "${i}" == "1" ]]; then
-      # If DNS isn't propagated yet, go directly to ALB while preserving SNI/Host.
-      GRAFANA_CONNECT_TO=(--connect-to "${GRAFANA_HOST}:443:${GRAFANA_LB_HOST}:443")
     fi
     echo "Grafana not ready yet: https://${GRAFANA_HOST} -> ${grafana_code} (attempt ${i}/${attempts})"
     sleep "${sleep_s}"
@@ -514,7 +597,7 @@ check_grafana() {
   # OAuth entrypoint must redirect to Google accounts for auth code flow.
   local oauth_headers=""
   local oauth_location=""
-  oauth_headers="$(curl -sS -D - -o /dev/null "${GRAFANA_CONNECT_TO[@]}" "https://${GRAFANA_HOST}/login/google" || true)"
+  oauth_headers="$(grafana_curl_headers "https://${GRAFANA_HOST}/login/google")"
   oauth_location="$(printf '%s\n' "${oauth_headers}" | awk 'BEGIN{IGNORECASE=1} /^location:/ {print $2; exit}' | tr -d '\r')"
   if [[ "${oauth_location}" != https://accounts.google.com/* ]]; then
     echo "Grafana OAuth smoke failed: /login/google did not redirect to Google. location=${oauth_location:-<empty>}" >&2
