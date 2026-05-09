@@ -768,10 +768,10 @@ jobs:
 
           # Guardrail: keep prod nodegroup fixed high through apply+smoke to avoid repeated
           # pod-density churn while observability and app pods converge.
-          BASE_MIN=12
-          BASE_DESIRED=12
-          BASE_MAX=12
-          BURST_DESIRED=12
+          BASE_MIN=16
+          BASE_DESIRED=16
+          BASE_MAX=20
+          BURST_DESIRED=16
           CLUSTER="${EXPECTED_CLUSTER_NAME}"
           NODEGROUP="${EXPECTED_CLUSTER_NAME}-default"
           AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" "${BASE_MIN}" "${BURST_DESIRED}" "${BASE_MAX}"
@@ -787,7 +787,7 @@ jobs:
           done
           # Guardrail: keep a high-enough floor before rollout/smoke tests.
           ready_nodes="$(kubectl get nodes --no-headers 2>/dev/null | awk '$2=="Ready"{c++} END{print c+0}')"
-          if [[ "${ready_nodes}" -lt 10 ]]; then
+          if [[ "${ready_nodes}" -lt 14 ]]; then
             echo "Prod guardrail failed post-apply: only ${ready_nodes} Ready nodes; aborting before readiness/smoke." >&2
             exit 1
           fi
@@ -829,5 +829,5 @@ jobs:
           CLUSTER="${EXPECTED_CLUSTER_NAME}"
           NODEGROUP="${EXPECTED_CLUSTER_NAME}-default"
           # Do not fail the whole workflow if nodegroup is not ACTIVE after an earlier apply failure.
-          AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" 2 4 12 || true
+          AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" 2 4 20 || true
 
