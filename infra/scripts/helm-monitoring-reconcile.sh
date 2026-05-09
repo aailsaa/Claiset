@@ -75,6 +75,12 @@ maybe_uninstall() {
   if [[ "${status}" == "" ]]; then
     return 0
   fi
+  if [[ "${status}" == "uninstalling" ]]; then
+    echo "helm-monitoring-reconcile: nudging Helm to finish uninstall of '${release}' in ${MON_NS}"
+    helm uninstall "${release}" -n "${MON_NS}" --wait=false 2>/dev/null \
+      || echo "helm-monitoring-reconcile: uninstall nudge for ${release} returned non-zero; continuing anyway" >&2
+    return 0
+  fi
   if [[ "${status}" != "pending-install" && "${status}" != "failed" && "${status}" != "pending-upgrade" && "${status}" != "pending-rollback" ]]; then
     return 0
   fi
@@ -150,6 +156,22 @@ fi
 
 if ! ensure_helm; then
   exit 0
+fi
+
+# If a prior destroy/apply left Helm in "uninstalling", Grafana's Ingress often keeps the
+# ingress.k8s.aws/resources finalizer (backend Service already gone). Unblock once before Helm ops.
+any_uninstalling=""
+for rel in "${STACK_RELS[@]}"; do
+  st="$(helm_release_status "${rel}" || true)"
+  if [[ "${st}" == "uninstalling" ]]; then
+    any_uninstalling="1"
+    break
+  fi
+done
+if [[ -n "${any_uninstalling}" ]]; then
+  echo "helm-monitoring-reconcile: release stuck in uninstalling; deleting monitoring TargetGroupBindings + Ingress (async) so ALB finalizers can clear"
+  kubectl delete targetgroupbindings --all -n "${MON_NS}" --ignore-not-found=true --wait=false 2>/dev/null || true
+  kubectl delete ingress --all -n "${MON_NS}" --ignore-not-found=true --wait=false 2>/dev/null || true
 fi
 
 # Uninstall dependents first when stack is wedged so CRDs/subcharts do not deadlock.

@@ -743,8 +743,8 @@ jobs:
           # This AWS account enforces free-tier-eligible node types (micro); keep prod burst moderate.
           BASE_MIN=1
           BASE_DESIRED=2
-          BASE_MAX=6
-          BURST_DESIRED=6
+          BASE_MAX=12
+          BURST_DESIRED=10
           CLUSTER="${EXPECTED_CLUSTER_NAME}"
           NODEGROUP="${EXPECTED_CLUSTER_NAME}-default"
           AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" "${BASE_MIN}" "${BURST_DESIRED}" "${BASE_MAX}"
@@ -796,5 +796,5 @@ jobs:
           CLUSTER="${EXPECTED_CLUSTER_NAME}"
           NODEGROUP="${EXPECTED_CLUSTER_NAME}-default"
           # Do not fail the whole workflow if nodegroup is not ACTIVE after an earlier apply failure.
-          AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" 1 2 6 || true
+          AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" 1 2 12 || true
 

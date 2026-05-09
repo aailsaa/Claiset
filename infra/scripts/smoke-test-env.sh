@@ -115,17 +115,17 @@ print_rollout_diagnostics() {
 
 prod_rollout_recovery_bump() {
   local nodegroup="${CLUSTER}-default"
-  echo "Prod rollout recovery: scaling nodegroup ${nodegroup} to min=1 desired=6 max=6 before retry."
+  echo "Prod rollout recovery: scaling nodegroup ${nodegroup} to min=1 desired=10 max=12 before retry."
   aws eks update-nodegroup-config \
     --region "${REGION}" \
     --cluster-name "${CLUSTER}" \
     --nodegroup-name "${nodegroup}" \
-    --scaling-config "minSize=1,desiredSize=6,maxSize=6" >/dev/null || return 1
+    --scaling-config "minSize=1,desiredSize=10,maxSize=12" >/dev/null || return 1
   aws eks wait nodegroup-active --region "${REGION}" --cluster-name "${CLUSTER}" --nodegroup-name "${nodegroup}" || return 1
   for i in {1..24}; do
     ready_nodes="$(kubectl get nodes --no-headers 2>/dev/null | awk '$2=="Ready"{c++} END{print c+0}')"
-    echo "Prod rollout recovery: Ready nodes ${ready_nodes}/6 (attempt ${i}/24)"
-    if [[ "${ready_nodes}" -ge 4 ]]; then
+    echo "Prod rollout recovery: Ready nodes ${ready_nodes}/10 (attempt ${i}/24)"
+    if [[ "${ready_nodes}" -ge 8 ]]; then
       break
     fi
     sleep 10
@@ -144,8 +144,11 @@ rollout_with_recovery() {
   if [[ "${NAMESPACE}" == "prod" ]]; then
     echo "Prod rollout did not complete within ${ROLLOUT_TIMEOUT}; attempting one capacity recovery + retry."
     prod_rollout_recovery_bump || true
-    kubectl -n "${NAMESPACE}" rollout status "deployment/${deployment}" --timeout="${ROLLOUT_TIMEOUT}"
-    return 0
+    if kubectl -n "${NAMESPACE}" rollout status "deployment/${deployment}" --timeout="${ROLLOUT_TIMEOUT}"; then
+      return 0
+    fi
+    print_rollout_diagnostics "${deployment}"
+    return 1
   fi
 
   return 1

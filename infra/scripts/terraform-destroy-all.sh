@@ -114,8 +114,28 @@ for ENV in "${ENVS[@]}"; do
       kubectl wait --for=delete ingress/claiset -n "${ENV}" --timeout=120s 2>/dev/null || true
 
       # Self-hosted Grafana (kube-prometheus-stack) Ingress is in monitoring, not env namespace — release ALBs early.
+      # ALB controller TargetGroupBindings must go before Ingress finalizers clear; otherwise Helm/Terraform can sit on
+      # `helm_release.kube_prometheus_stack` destroy for 45m+ with Ingress backends pointing at a deleted Service.
       if kubectl get ns monitoring >/dev/null 2>&1; then
-        kubectl delete ingress --all -n monitoring --ignore-not-found=true --wait=true --timeout=180s || true
+        kubectl delete targetgroupbindings --all -n monitoring --ignore-not-found=true --wait=false 2>/dev/null || true
+        kubectl delete ingress --all -n monitoring --ignore-not-found=true --wait=false || true
+        # Wait for Ingress objects and ALB teardown (often >3m).
+        for _ in $(seq 1 40); do
+          rem="$(kubectl get ingress -n monitoring --no-headers 2>/dev/null | wc -l | tr -d ' ')"
+          if [[ "${rem}" == "0" ]]; then
+            break
+          fi
+          sleep 15
+        done
+        rem="$(kubectl get ingress -n monitoring --no-headers 2>/dev/null | wc -l | tr -d ' ')"
+        if [[ "${rem}" != "0" ]]; then
+          echo "WARN: ${rem} Ingress object(s) still in namespace monitoring after pre-cleanup wait (~10m)." >&2
+          echo "      Terraform can hang on helm_release.kube_prometheus_stack destroy. From another shell:" >&2
+          echo "        kubectl delete targetgroupbindings --all -n monitoring --wait=false" >&2
+          echo "        kubectl delete ingress --all -n monitoring --wait=false" >&2
+          echo "      Then confirm: kubectl get ingress -n monitoring" >&2
+          kubectl get ingress -n monitoring -o wide >&2 || true
+        fi
         kubectl get svc -n monitoring -o jsonpath='{range .items[?(@.spec.type=="LoadBalancer")]}{.metadata.name}{"\n"}{end}' 2>/dev/null \
           | while IFS= read -r svc; do
               [[ -n "${svc}" ]] || continue
