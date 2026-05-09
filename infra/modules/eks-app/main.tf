@@ -276,7 +276,7 @@ resource "kubernetes_deployment" "outfits" {
   }
 
   spec {
-    replicas = var.replicas
+    replicas                  = var.replicas
     progress_deadline_seconds = var.rollout_progress_deadline_seconds
     min_ready_seconds         = var.rollout_min_ready_seconds
     strategy {
@@ -385,7 +385,7 @@ resource "kubernetes_deployment" "schedule" {
   }
 
   spec {
-    replicas = var.replicas
+    replicas                  = var.replicas
     progress_deadline_seconds = var.rollout_progress_deadline_seconds
     min_ready_seconds         = var.rollout_min_ready_seconds
     strategy {
@@ -494,7 +494,7 @@ resource "kubernetes_deployment" "web" {
   }
 
   spec {
-    replicas = var.replicas
+    replicas                  = var.replicas
     progress_deadline_seconds = var.rollout_progress_deadline_seconds
     min_ready_seconds         = var.rollout_min_ready_seconds
     strategy {
@@ -529,6 +529,8 @@ resource "kubernetes_deployment" "web" {
           name = kubernetes_secret.ecr_pull[0].metadata[0].name
         }
 
+        termination_grace_period_seconds = var.web_pod_termination_grace_seconds
+
         container {
           name              = "web"
           image             = var.images.web
@@ -543,6 +545,8 @@ resource "kubernetes_deployment" "web" {
             }
             initial_delay_seconds = 3
             period_seconds        = 5
+            success_threshold     = 2
+            timeout_seconds       = 2
           }
 
           liveness_probe {
@@ -552,6 +556,14 @@ resource "kubernetes_deployment" "web" {
             }
             initial_delay_seconds = 10
             period_seconds        = 10
+          }
+
+          lifecycle {
+            pre_stop {
+              exec {
+                command = ["/bin/sh", "-c", "sleep ${var.web_rollout_prestop_sleep_seconds}"]
+              }
+            }
           }
         }
       }

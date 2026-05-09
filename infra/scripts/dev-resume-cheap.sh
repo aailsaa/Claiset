@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Bring dev back to a low-cost but usable state.
+# Companion to park workloads: infra/scripts/dev-scale-down-cheap.sh
 # - Keeps EKS nodegroup small
 # - Starts dev RDS and waits for availability
 # - Scales core app deployments up
@@ -66,7 +67,9 @@ kubectl -n "${NAMESPACE}" scale deployment schedule --replicas="${SCALE_SCHEDULE
 
 echo "Step 5/5: Reconcile Route53 alias from current Ingress"
 pushd "${ROOT_DIR}/infra/envs/dev" >/dev/null
-DOMAIN_ROOT=claiset.xyz FRONTEND_SUBDOMAIN=app-dev UPDATE_APEX_DNS=false K8S_APP_NAMESPACE="${NAMESPACE}" bash ../../scripts/route53-ingress-records-guard.sh
+EXPECTED_CLUSTER_NAME="${DEV_CLUSTER_NAME:-${CLUSTER}}" \
+  DOMAIN_ROOT=claiset.xyz FRONTEND_SUBDOMAIN=app-dev UPDATE_APEX_DNS=false K8S_APP_NAMESPACE="${NAMESPACE}" \
+  bash ../../scripts/route53-ingress-records-guard.sh
 popd >/dev/null
 
 echo "Dev resume complete."

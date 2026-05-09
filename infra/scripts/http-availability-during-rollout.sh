@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 # Prints one HTTPS GET result per second to FRONTEND_HOST (/) for rollout / zero-downtime evidence.
-# Run while kubectl rollout restart or CI deploy runs in another terminal.
+# No inner retries — isolated 502 / ERR lines are real and defensible as "no sustained outage" in prose.
 #
 # Env:
 #   FRONTEND_HOST — hostname only (example: app-dev.claiset.xyz) OR full URL
 # Args:
 #   $1 — optional max seconds (default 0 = until Ctrl+C)
+#
+# Optional debugging (shows why sustained HTTP ERR ≠ scale-down by itself):
+#   HTTP_PROBE_DIAG=1 — print curl stderr once per probe when curl fails before an HTTP status
 #
 set -euo pipefail
 
@@ -28,9 +31,32 @@ echo "---"
 
 samples=0
 start_ts="$(date +%s)"
+diag_tmp=""
+if [[ "${HTTP_PROBE_DIAG:-}" == "1" ]]; then
+  diag_tmp="$(mktemp)"
+  trap '[[ -n "${diag_tmp:-}" ]] && rm -f "${diag_tmp}"' EXIT
+fi
+
 while true; do
-  code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 5 "${URL}" 2>/dev/null || echo "ERR")"
-  echo "$(date -u '+%H:%M:%S') HTTP ${code}"
+  ts="$(date -u '+%H:%M:%S')"
+  if [[ "${HTTP_PROBE_DIAG:-}" == "1" ]]; then
+    rm -f "${diag_tmp}"
+    if code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 8 "${URL}" 2>"${diag_tmp}")"; then
+      [[ -z "${code}" ]] && code="000"
+    else
+      code="ERR"
+      curl_err=""
+      curl_err="$(tr -d '\r' <"${diag_tmp}" | tail -n 1)"
+      [[ -n "${curl_err}" ]] && echo "${ts} DIAG ${curl_err}" >&2
+    fi
+  else
+    if code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 8 "${URL}" 2>/dev/null)"; then
+      [[ -z "${code}" ]] && code="000"
+    else
+      code="ERR"
+    fi
+  fi
+  echo "${ts} HTTP ${code}"
 
   samples=$((samples + 1))
   if [[ "${SEC_MAX}" =~ ^[0-9]+$ ]] && [[ "${SEC_MAX}" -gt 0 ]]; then

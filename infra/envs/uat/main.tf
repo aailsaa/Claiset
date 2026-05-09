@@ -91,8 +91,11 @@ module "eks_app" {
   depends_on            = [module.platform]
 
   # Canary-style stepping: multi-replica UAT exposes at most one extra Pod per wave; soak before RS advances.
-  rolling_update_max_surge  = "1"
-  rollout_min_ready_seconds = 20
+  replicas                          = 2
+  rolling_update_max_surge          = "1"
+  rollout_min_ready_seconds         = 20
+  web_rollout_prestop_sleep_seconds = 45
+  web_pod_termination_grace_seconds = 120
 
   aws_region               = var.aws_region
   domain_root              = var.domain_root

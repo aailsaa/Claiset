@@ -25,7 +25,7 @@ Trigger a harmless deploy (tiny image tag churn or **`kubectl rollout restart`**
    ```
 3. Redirect the curl loop to **`docs/evidence-media/C6-rollout-http-log.txt`** and screen-record (**silent**) or include in slide as **snippet**.
 
-**Interpretation:** If HTTP codes stay **`2xx`/`301`/`302`** (anything but hung **5xx** streams), narrative **“zero dropped requests meaningful to users.”**
+**Interpretation:** The script logs **one** status per second (no inner retries)—**isolated `502`** or **`ERR`** lines are legitimate blips during reload; cite **no long run** of failures and **`rollout status` success**. Heavy **`2xx`** with rare errors supports **“no sustained outage.”**
 
 ---
 
@@ -44,7 +44,7 @@ If the video **`C6-rollout-or-deployment-recording.mov`** already aligns, **rena
 10–45 s is fine:
 
 - Left: **`rollout status` advancing**
-- Right: **`http-availability-during-rollout.sh`** (**no prolonged `503`/`502`**)
+- Right: **`http-availability-during-rollout.sh`** (**no sustained streak** of **`503`/`502`/`ERR`**— scattered lines are OK)
 
 If **`replicas == 1`**, micropauses can occur—explain **RollingUpdate keeps old Pod until Ready new Pod** aligns with syllabus **intent**.
 

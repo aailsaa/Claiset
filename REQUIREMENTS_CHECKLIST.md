@@ -9,6 +9,28 @@ Use this file as the **requirements matrix** (status + what to capture + short n
 
 **Status snapshot:** Dev + UAT have been green with recent fixes on **`main`**. Embed new captures in **`docs/evidence-media-checklist.md`** first, then summarize filenames or links in the fourth column below.
 
+### Code & infrastructure vs evidence (full `%` HTTP canary intentionally out)
+
+The following maps **syllabus implementation** (what ships in **`main`**) to **what you still owe for grading**. **Presentation (§5)** and **capturing screenshots/video** are separate from “is it built?” **Full traffic-weighted canary** is **not** implemented; **progressive RollingUpdate canary** is—see **`docs/partial-canary-justification.md`**.
+
+| Syllabus topic | Implemented in repo | Still on you for a complete grade |
+| --- | --- | --- |
+| **§1 App + RDS + 3µs + HTTPS** | `web/`, `infra/modules/{rds,eks-app,platform}`, Ingress/ACM | Optional polish: **`A2`/`A3`/`A6`** media if graders dig into IaC screenshots |
+| **§1 IaC + Day 1/Day 2 automation** | All AWS/K8s in **`infra/`**; **`promotion.yml`** | **`C1`–`C4`** URLs/stills optional but strong |
+| **§2 Git promotion** | **dev**: push **`main`**; **qa**: schedule + **`workflow_dispatch`**; **uat**: merged same-repo **`pull_request`** to **`main`** or RC path + manual `uat`; **prod**: **`v*`** tags + **`workflow_dispatch`** (**requires** repo variable **`ALLOW_COSTLY_RUNS=true`** for prod dispatch) | Point graders at green runs |
+| **§2 Canary (not dual-stack BG, not `%` HTTP)** | **`infra/modules/eks-app`** `RollingUpdate`, **`maxUnavailable` 0**, UAT/Prod **`maxSurge` 1** + **`minReadySeconds` soak**, PDB when **`replicas>1`**; **`docs/partial-canary-justification.md`** | Slide pointer + oral defense |
+| **§2 Zero downtime** *(behavior)* | Probes + rollout strategy above + CI smoke **`smoke-test-env.sh`** | **Artifact:** **`C6`** recording or HTTP log (**`docs/zero-downtime-promotion-evidence.md`**) |
+| **§3 OS patching** *(mechanism)* | **`aws_eks_node_group`** rolling **`max_unavailable_percentage`**; **`docs/day2-os-node-patching.md`**, **`eks-node-patch-evidence.sh`** | **Live/console proof** when AMI update exists (**P1–P3**) |
+| **§3 Schema change** | **`cmd/migrate`**, **`schema.sql`**, K8s **`migrate` Job** before app Deployments | Explain narrative; optionally ship a trivial **`schema.sql`** addition so a future deploy visibly “did a migration” |
+| **§4 Self-hosted Prometheus+Grafana** | **`infra/modules/platform/observability.tf`** `kube-prometheus-stack` when **`enable_observability_stack`** (+ CI **`ENABLE_OBSERVABILITY`** + secrets) | Keep observability **`true`** for demo env used in defense |
+| **§4 Dashboards CPU / mem / disk** | Node exporter (when daemonset flags + **`ALLOW_COSTLY_RUNS`**), bundled rules/dashboards | Your existing **`O5`** captures |
+| **§4 Alerts → email *(and/or Slack)*** | **Email:** Alertmanager + SMTP (**only if** **`ALERTMANAGER_*`** secrets populated in GitHub → `TF_VAR_*`) | **`O7`:** run **`infra/scripts/alert-drill.sh`**, inbox screenshot (**Slack** path not coded—**email alone** meets “and/or”) |
+| **§4 Grafana external + OAuth only** | Google OAuth + **`disable_login_form`** in Helm Grafana values | Your **`O2–O6`** recording |
+| **§4 Central logging + multi-service queries** | Loki + Promtail Helm; Grafana Loki datasource | **`O6`** clip section |
+| **§5 Presentation / chaos** | *Not infra* | Silent video (**S1** quality check), live narration, timed chaos rehearsal |
+
+**Bottom line:** **Implementation requirements** (excluding full `%` canary and presentation) are **covered by the codebase** assuming **Observability** and **SMTP** secrets are configured where you demo. Left work is **`O7` evidence**, **`C6` evidence**, **`P1–P3` evidence**, **`S1`/chaos rehearsal**, optional **`A*`/`C*` stills**, and self-grading comments at the bottom of this file.
+
 ---
 
 ## 1) Application Architecture
