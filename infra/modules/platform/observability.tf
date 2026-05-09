@@ -284,6 +284,7 @@ resource "helm_release" "kube_prometheus_stack" {
       additionalDataSources = [
         {
           name      = "Loki"
+          uid       = "loki"
           type      = "loki"
           url       = "http://loki.monitoring.svc.cluster.local:3100"
           access    = "proxy"

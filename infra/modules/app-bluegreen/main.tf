@@ -153,6 +153,23 @@ resource "kubernetes_deployment" "items" {
         labels = { app = "items" }
       }
       spec {
+        affinity {
+          pod_anti_affinity {
+            preferred_during_scheduling_ignored_during_execution {
+              weight = 100
+              pod_affinity_term {
+                topology_key = "kubernetes.io/hostname"
+                label_selector {
+                  match_expressions {
+                    key      = "app"
+                    operator = "In"
+                    values   = ["web", "items", "outfits", "schedule"]
+                  }
+                }
+              }
+            }
+          }
+        }
         image_pull_secrets {
           name = kubernetes_secret.ecr_pull[0].metadata[0].name
         }
@@ -236,6 +253,23 @@ resource "kubernetes_deployment" "outfits" {
     template {
       metadata { labels = { app = "outfits" } }
       spec {
+        affinity {
+          pod_anti_affinity {
+            preferred_during_scheduling_ignored_during_execution {
+              weight = 100
+              pod_affinity_term {
+                topology_key = "kubernetes.io/hostname"
+                label_selector {
+                  match_expressions {
+                    key      = "app"
+                    operator = "In"
+                    values   = ["web", "items", "outfits", "schedule"]
+                  }
+                }
+              }
+            }
+          }
+        }
         image_pull_secrets {
           name = kubernetes_secret.ecr_pull[0].metadata[0].name
         }
@@ -319,6 +353,23 @@ resource "kubernetes_deployment" "schedule" {
     template {
       metadata { labels = { app = "schedule" } }
       spec {
+        affinity {
+          pod_anti_affinity {
+            preferred_during_scheduling_ignored_during_execution {
+              weight = 100
+              pod_affinity_term {
+                topology_key = "kubernetes.io/hostname"
+                label_selector {
+                  match_expressions {
+                    key      = "app"
+                    operator = "In"
+                    values   = ["web", "items", "outfits", "schedule"]
+                  }
+                }
+              }
+            }
+          }
+        }
         image_pull_secrets {
           name = kubernetes_secret.ecr_pull[0].metadata[0].name
         }
@@ -402,6 +453,23 @@ resource "kubernetes_deployment" "web" {
     template {
       metadata { labels = { app = "web" } }
       spec {
+        affinity {
+          pod_anti_affinity {
+            preferred_during_scheduling_ignored_during_execution {
+              weight = 100
+              pod_affinity_term {
+                topology_key = "kubernetes.io/hostname"
+                label_selector {
+                  match_expressions {
+                    key      = "app"
+                    operator = "In"
+                    values   = ["web", "items", "outfits", "schedule"]
+                  }
+                }
+              }
+            }
+          }
+        }
         image_pull_secrets {
           name = kubernetes_secret.ecr_pull[0].metadata[0].name
         }

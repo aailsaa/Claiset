@@ -189,6 +189,118 @@ check_promtail_daemonset_ready() {
   echo "Observability guard OK: monitoring/promtail Ready (${ready}/${desired}, min_required=${min_ready})."
 }
 
+loki_svc_name() {
+  if kubectl -n monitoring get svc loki >/dev/null 2>&1; then
+    echo "loki"
+    return 0
+  fi
+  # SingleBinary installs sometimes expose a chart-derived service name; fall back to a label lookup.
+  local named
+  named="$(kubectl -n monitoring get svc -l app.kubernetes.io/name=loki -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
+  if [[ -n "${named}" ]]; then
+    echo "${named}"
+    return 0
+  fi
+  echo ""
+  return 1
+}
+
+check_promtail_on_app_workload_nodes() {
+  echo "Observability guard: promtail must run on each node that hosts ${NAMESPACE} workloads (web/items/outfits/schedule)..."
+  local missing=""
+  local n=""
+  local running=""
+  kubectl -n "${NAMESPACE}" get pods -l 'app in (web,items,outfits,schedule)' -o wide || true
+  kubectl -n monitoring get pods -l app.kubernetes.io/name=promtail -o wide || true
+  while IFS= read -r n; do
+    [[ -z "${n}" ]] && continue
+    running="$(kubectl -n monitoring get pods -l app.kubernetes.io/name=promtail \
+      --field-selector=spec.nodeName="${n}",status.phase=Running --no-headers 2>/dev/null | wc -l | tr -d '[:space:]')"
+    running="${running:-0}"
+    if [[ "${running}" -lt 1 ]]; then
+      missing="${missing} ${n}"
+    fi
+  done < <(kubectl -n "${NAMESPACE}" get pods -l 'app in (web,items,outfits,schedule)' -o jsonpath='{range .items[*]}{.spec.nodeName}{"\n"}{end}' 2>/dev/null | sort -u)
+
+  if [[ -n "${missing// }" ]]; then
+    echo "Observability guard failed: promtail is missing on node(s):${missing}" >&2
+    echo "  (Application pods scheduled on saturated nodes frequently cannot ship logs to Loki.)" >&2
+    kubectl -n monitoring describe ds promtail 2>/dev/null | tail -60 || true
+    return 1
+  fi
+  echo "Observability guard OK: promtail present on every app-workload node."
+}
+
+check_loki_streams_for_query() {
+  local query="$1"
+  local descr="$2"
+  local loki_svc pf_pid pf_log pf_port ready end_ns start_ns streams i attempts
+  attempts=24
+
+  echo "Observability guard: Loki ingest/query must return streams for ${descr} (query=${query})..."
+  if ! loki_svc="$(loki_svc_name)" || [[ -z "${loki_svc}" ]]; then
+    echo "Observability guard failed: could not locate Loki Service in monitoring (tried svc/loki and app label)." >&2
+    kubectl -n monitoring get svc -o wide || true
+    return 1
+  fi
+
+  pf_log="$(mktemp "/tmp/smoke-loki-pf.XXXX.log")"
+  pf_port="13999"
+  kubectl -n monitoring port-forward "svc/${loki_svc}" "${pf_port}:3100" >"${pf_log}" 2>&1 &
+  pf_pid=$!
+
+  ready=0
+  for ((i = 1; i <= 30; i++)); do
+    if ! kill -0 "${pf_pid}" >/dev/null 2>&1; then
+      break
+    fi
+    if grep -Eq "Forwarding from (127\\.0\\.0\\.1|\\[::1\\]):${pf_port}" "${pf_log}" 2>/dev/null; then
+      ready=1
+      break
+    fi
+    sleep 1
+  done
+
+  if [[ "${ready}" != "1" ]]; then
+    echo "Observability guard failed: port-forward to Loki did not become ready." >&2
+    sed 's/^/  /' "${pf_log}" >&2 || true
+    kill "${pf_pid}" >/dev/null 2>&1 || true
+    wait "${pf_pid}" 2>/dev/null || true
+    rm -f "${pf_log}" || true
+    return 1
+  fi
+
+  streams=-1
+  for ((i = 1; i <= attempts; i++)); do
+    end_ns=$(( $(date +%s) * 1000000000 ))
+    start_ns=$(( end_ns - 900000000000 ))
+    streams="$(
+      curl -sS -G "http://127.0.0.1:${pf_port}/loki/api/v1/query_range" \
+        --data-urlencode "query=${query}" \
+        --data-urlencode "limit=200" \
+        --data-urlencode "start=${start_ns}" \
+        --data-urlencode "end=${end_ns}" \
+        | jq -r '(.data.result // []) | length' 2>/dev/null || echo -1
+    )"
+    if [[ "${streams}" =~ ^[0-9]+$ && "${streams}" -gt 0 ]]; then
+      break
+    fi
+    echo "Observability guard: Loki has no streams yet for ${descr} (attempt ${i}/${attempts})..."
+    sleep 5
+  done
+
+  kill "${pf_pid}" >/dev/null 2>&1 || true
+  wait "${pf_pid}" 2>/dev/null || true
+  rm -f "${pf_log}" || true
+
+  if [[ ! "${streams}" =~ ^[0-9]+$ || "${streams}" -lt 1 ]]; then
+    echo "Observability guard failed: Loki query_range returned no streams for ${descr} (streams=${streams})." >&2
+    return 1
+  fi
+
+  echo "Observability guard OK: Loki streams present for ${descr} (streams=${streams})."
+}
+
 prod_rollout_recovery_bump() {
   local nodegroup="${CLUSTER}-default"
   local min_size="${PROD_RECOVERY_MIN_SIZE:-1}"
@@ -490,17 +602,27 @@ check_grafana() {
     return 1
   fi
 
-  # Hit Loki query path via Grafana proxy API to ensure datasource query path works.
+  local loki_uid=""
+  loki_uid="$(curl -sS -u "${g_user}:${g_pass}" "http://127.0.0.1:13000/api/datasources/name/Loki" | jq -r '.uid // empty' 2>/dev/null || true)"
+  if [[ -z "${loki_uid}" ]]; then
+    echo "Grafana deep smoke failed: could not resolve Loki datasource UID (fix provisioning or datasource name)." >&2
+    kill "${pf_pid}" >/dev/null 2>&1 || true
+    wait "${pf_pid}" 2>/dev/null || true
+    rm -f "${pf_log}" || true
+    return 1
+  fi
+
+  # Hit Loki query path via Grafana proxy API to ensure datasource query path works (2xx only; 404 is not OK).
   for i in {1..12}; do
     loki_query_status="$(curl -sS -u "${g_user}:${g_pass}" -o /dev/null -w '%{http_code}' \
-      "http://127.0.0.1:13000/api/datasources/proxy/uid/loki/loki/api/v1/query?query=vector(1)" || true)"
-    if http_2xx_or_4xx "${loki_query_status}"; then
+      "http://127.0.0.1:13000/api/datasources/proxy/uid/${loki_uid}/loki/api/v1/query?query=vector(1)" || true)"
+    if http_2xx "${loki_query_status}"; then
       break
     fi
     echo "Grafana deep smoke: Loki proxy not ready yet (${loki_query_status}), retrying (${i}/12)..."
     sleep 5
   done
-  if ! http_2xx_or_4xx "${loki_query_status}"; then
+  if ! http_2xx "${loki_query_status}"; then
     echo "Grafana deep smoke failed: Loki datasource proxy query returned ${loki_query_status}" >&2
     kill "${pf_pid}" >/dev/null 2>&1 || true
     wait "${pf_pid}" 2>/dev/null || true
@@ -554,6 +676,8 @@ check_app_oauth() {
 if [[ "${MODE}" == "wait-only" ]]; then
   if observability_smoke_enabled && observability_daemonsets_enabled && promtail_expected; then
     check_promtail_daemonset_ready
+    check_promtail_on_app_workload_nodes
+    check_loki_streams_for_query '{namespace="kube-system"}' "kube-system (promtail must be functioning)"
   fi
   if observability_smoke_enabled; then
     check_grafana
@@ -596,6 +720,12 @@ check_api() {
 check_api "/api/v1/items"
 check_api "/api/v1/outfits"
 check_api "/api/v1/assignments"
+
+if observability_smoke_enabled && observability_daemonsets_enabled && promtail_expected; then
+  check_promtail_on_app_workload_nodes
+  check_loki_streams_for_query '{namespace="kube-system"}' "kube-system (sanity)"
+  check_loki_streams_for_query "{namespace=\"${NAMESPACE}\"}" "namespace=${NAMESPACE} (requires promtail + app stdout logs)"
+fi
 
 resolve_rds_id() {
   local candidate="$1"
