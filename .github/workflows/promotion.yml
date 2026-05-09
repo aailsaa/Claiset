@@ -740,10 +740,11 @@ jobs:
             -target=module.eks \
             -target=module.rds
 
-          BASE_MIN=1
-          BASE_DESIRED=3
-          BASE_MAX=6
-          BURST_DESIRED=6
+          # Prod + observability needs more pod slots per node (t3.small ENI cap) and a higher floor so CA/rollouts do not land on 2 full nodes.
+          BASE_MIN=3
+          BASE_DESIRED=5
+          BASE_MAX=8
+          BURST_DESIRED=8
           CLUSTER="${EXPECTED_CLUSTER_NAME}"
           NODEGROUP="${EXPECTED_CLUSTER_NAME}-default"
           AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" "${BASE_MIN}" "${BURST_DESIRED}" "${BASE_MAX}"
@@ -781,5 +782,5 @@ jobs:
         run: |
           CLUSTER="${EXPECTED_CLUSTER_NAME}"
           NODEGROUP="${EXPECTED_CLUSTER_NAME}-default"
-          AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" 2 4 6
+          AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" 3 5 8
 
