@@ -38,11 +38,11 @@ The following maps **syllabus implementation** (what ships in **`main`**) to **w
 | Requirement | Status | Required proof (exact artifact to capture) | Current evidence / notes |
 | --- | --- | --- | --- |
 | Frontend exists and is polished | [x] | App homepage **and** one other functional page; rubric cites prod — in defense note **dev**/prod parity. | **`A1-app-home.png`**, **`A1-app-inner.png`** + extras — see **`### A1`** in [docs/evidence-media-checklist.md](docs/evidence-media-checklist.md). |
-| Database is AWS RDS only | [x] | AWS console RDS **Available** + `terraform state list` showing RDS. | Add **`A2-rds-console.png`** when graded; **`A3-terraform-state.png`** helps both DB + infra rows. |
+| Database is AWS RDS only | [x] | AWS console RDS **Available** + `terraform state list` showing RDS. | **`A2-rds-console.png`**, **`A3-terraform-state.png`** — [evidence-media-checklist.md](docs/evidence-media-checklist.md) §A2–A3. |
 | Backend has at least 3 microservices | [x] | `kubectl get deploy` **`items`**, **`outfits`**, **`schedule`**. | **`A4-kubectl-deploy.png`** (also shows **`web`**) — see **`### A4`** in [docs/evidence-media-checklist.md](docs/evidence-media-checklist.md). |
 | Frontend on custom DNS with HTTPS | [x] | Browser HTTPS lock + Ingress/ALB mapping. | **`A5-kubectl-ingress.png`**; HTTPS extras under **`### A1`** in [docs/evidence-media-checklist.md](docs/evidence-media-checklist.md). |
-| EKS / RDS / VPC / IAM managed by Terraform | [x] | `terraform state list` excerpt + **`infra/modules/`** tree or file samples. | Partial: Ingress shot ties to ACM; add **`A3-terraform-state.png`**, **`A6-infra-modules.png`**. |
-| Day 1 + Day 2 automated | [x] | GitHub Actions runs + Terraform apply logs. | Silent slice: **`S1-terraform-apply-or-infra-recording.mov`**; **`C1`–`C4`** placeholders for workflow stills/links in checklist. |
+| EKS / RDS / VPC / IAM managed by Terraform | [x] | `terraform state list` excerpt + **`infra/modules/`** tree or file samples. | **`A3-terraform-state.png`** (+ continuation) — [evidence-media-checklist.md](docs/evidence-media-checklist.md) §A3; **A6** still optional in §A6. |
+| Day 1 + Day 2 automated | [x] | GitHub Actions runs + Terraform apply logs. | Silent slice: **`S1-terraform-apply-or-infra-recording.mov`**; **`C1`**, **`C2`**, **`C4`** stills in [evidence-media-checklist.md](docs/evidence-media-checklist.md) §C1–C4. |
 
 ---
 
@@ -50,11 +50,11 @@ The following maps **syllabus implementation** (what ships in **`main`**) to **w
 
 | Requirement | Status | Required proof (exact artifact to capture) | Current evidence / notes |
 | --- | --- | --- | --- |
-| Dev → nightly QA → UAT → Prod flow | [x] | Workflow graph with successful transitions. | Capture **`C1-actions-promotion-graph.png`** or paste green Actions URL — **`### C1`** in [docs/evidence-media-checklist.md](docs/evidence-media-checklist.md). |
-| Dev/QA → UAT via conventional commit / PR merge | [x] | Run from merged PR **`or`** `RC` in commit message. | **`C2-…`** or Actions URL — **`### C2`** in [docs/evidence-media-checklist.md](docs/evidence-media-checklist.md). |
+| Dev → nightly QA → UAT → Prod flow | [x] | Workflow graph with successful transitions. | **`C1-actions-promotion-workflow.png`** — **`### C1`** in [docs/evidence-media-checklist.md](docs/evidence-media-checklist.md). |
+| Dev/QA → UAT via conventional commit / PR merge | [x] | Run from merged PR **`or`** `RC` in commit message. | **`C2-pull-request-merged-uat-actions.png`** — **`### C2`** in [docs/evidence-media-checklist.md](docs/evidence-media-checklist.md). |
 | UAT → Prod via tags / gated dispatch (no console deploy) | [x] | Tag or **`workflow_dispatch`** prod with refs visible. | **`C3-…`** — **`### C3`** in [docs/evidence-media-checklist.md](docs/evidence-media-checklist.md). |
 | Blue/Green **or** Canary chosen and justified | [x] | README / slide + strategy reflected in infra code. | **Justification:** [docs/partial-canary-justification.md](docs/partial-canary-justification.md) · **Overview + table:** [README — progressive rollout](README.md#progressive-rollout-strategy-eks) · Code: **`infra/modules/eks-app`**, **`maxSurge: 1`** + **`minReadySeconds`** soak in **UAT/Prod**. *(Rubric: “Blue/Green or Canary”; we document progressive rolling canary, not dual-stack BG or HTTP % split.)* |
-| Zero downtime during promotion | [ ] | Short video/log: no elevated 5xx during rollout + rollout succeeded. | **How-to:** **[docs/zero-downtime-promotion-evidence.md](docs/zero-downtime-promotion-evidence.md)** · **`infra/scripts/http-availability-during-rollout.sh`**. Artifact: **`C6-rollout-or-deployment-recording.mov`** + optional **`S1-…`**; verify vs **[docs/evidence-media/MEDIA_MAPPING.txt](docs/evidence-media/MEDIA_MAPPING.txt)**. |
+| Zero downtime during promotion | [ ] | Short video/log: no elevated 5xx during rollout + rollout succeeded. | **How-to:** **[docs/zero-downtime-promotion-evidence.md](docs/zero-downtime-promotion-evidence.md)** · **`infra/scripts/http-availability-during-rollout.sh`**. Artifacts: **`C6-rollout-or-deployment-recording.mov`** (dev), **`C6-uat-*.mov`** + **`C6-http-during-rollout-uat.txt`** (UAT); verify **[docs/evidence-media/MEDIA_MAPPING.txt](docs/evidence-media/MEDIA_MAPPING.txt)**. |
 
 ---
 

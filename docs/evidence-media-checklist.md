@@ -6,7 +6,7 @@ Use this list on **dev** / **uat** / **prod** (adjust URLs). Prefer **silent** s
 
 **Files live in:** [evidence-media/](evidence-media/) · Original macOS timestamps: [evidence-media/MEDIA_MAPPING.txt](evidence-media/MEDIA_MAPPING.txt)
 
-**This bundle (applied 2026-05-09):** Mostly **`app-dev`**, **`grafana-dev`**, **`claiset-dev`** kubectl; one **`EXTRA-`** **`app-prod`** still.
+**This bundle (applied 2026-05-09):** Mostly **`app-dev`**, **`grafana-dev`**, **`claiset-dev`** kubectl; one **`EXTRA-`** **`app-prod`** still; **A2** RDS; **A3** state list (two-part scroll); **C1/C2/C4** Actions; **C6** UAT rollout + HTTP poll + **`C6-http-during-rollout-uat.txt`** log.
 
 ---
 
@@ -42,13 +42,19 @@ Prod supplement, login, HTTPS site info, more dev pages — additional proof onl
 
 **Rubric:** Screenshot — RDS **identifier**, engine, status **Available**, same region as EKS.
 
-**Submission notes:** *Not bundled yet.* Drop **`evidence-media/A2-rds-console.png`** here when captured (ideally **before** any prod teardown).
+**Submission notes:** Console list/detail capture — identifier + engine + **`Available`** visible.
+
+![A2 RDS console — instance available](evidence-media/A2-rds-console.png)
 
 ### A3: Terraform state excerpt
 
 **Rubric:** Screenshot or paste — **`terraform state list`** lines showing **RDS** + **EKS** (`module.rds.*`, `module.eks.*`, etc.).
 
-**Submission notes:** *Not bundled.* Add **`evidence-media/A3-terraform-state.png`** or paste terminal output under this section.
+**Submission notes:** `terraform state list | grep -E 'module\.(rds|eks)\.'` (or full list). Two screenshots: first frame + continuation (long list / scroll).
+
+![A3 terraform state — part 1](evidence-media/A3-terraform-state.png)
+
+![A3 terraform state — continuation](evidence-media/A3-terraform-state-continuation.png)
 
 ### A4: Microservice Deployments (`kubectl get deploy`)
 
@@ -80,13 +86,17 @@ Prod supplement, login, HTTPS site info, more dev pages — additional proof onl
 
 **Rubric:** Screenshot — **promotion.yml** workflow **graph**, at least one **successful** run (dev / UAT / prod path).
 
-**Submission notes:** *Not bundled.* Save run as **`evidence-media/C1-actions-promotion-graph.png`** or paste **Actions URL** here in notes.
+**Submission notes:** Promotion workflow graph / run list. If this grab fits **C2** better (merge context), swap filenames in **`MEDIA_MAPPING.txt`** only.
+
+![C1 Actions — promotion workflow](evidence-media/C1-actions-promotion-workflow.png)
 
 ### C2: UAT triggered by merged PR
 
 **Rubric:** Screenshot or link — run from **`pull_request` merged → UAT**, merge commit / PR visible.
 
-**Submission notes:** *Not bundled.* Add **`C2-…`** or link the green run.
+**Submission notes:** Same-repo merge → **UAT** job visible in Actions (adjust filename ↔ **C1** in **`MEDIA_MAPPING.txt`** if your capture order differs).
+
+![C2 Actions — PR merged → UAT](evidence-media/C2-pull-request-merged-uat-actions.png)
 
 ### C3: Prod / gated prod — refs + Inputs
 
@@ -98,7 +108,9 @@ Prod supplement, login, HTTPS site info, more dev pages — additional proof onl
 
 **Rubric:** Screenshot/snippet — **apply** succeeding in Actions or terminal.
 
-**Submission notes:** *Not bundled.* Add **`C4-…`** snippet.
+**Submission notes:** Green run / job summary (may overlap **C2** — keep clearest shot for each rubric row).
+
+![C4 Actions — successful run / job summary](evidence-media/C4-github-actions-run-success.png)
 
 ### C5: Canary / rolling strategy (README slide)
 
@@ -114,7 +126,15 @@ Prod supplement, login, HTTPS site info, more dev pages — additional proof onl
 
 **Submission notes:** **Verify file content** matches this rubric filename; remap using **MEDIA_MAPPING** if mislabeled.
 
-📹 **[C6-rollout-or-deployment-recording.mov](evidence-media/C6-rollout-or-deployment-recording.mov)**
+📹 **[C6-rollout-or-deployment-recording.mov](evidence-media/C6-rollout-or-deployment-recording.mov)** (earlier dev session)
+
+**UAT — silent screen + trimmed HTTP poll (all `200`):**
+
+📹 **[C6-uat-rollout-screen-recording.mov](evidence-media/C6-uat-rollout-screen-recording.mov)**
+
+📹 **[C6-uat-http-poll-all-200-trimmed.mov](evidence-media/C6-uat-http-poll-all-200-trimmed.mov)**
+
+**UAT poll log (one line per second):** [`C6-http-during-rollout-uat.txt`](evidence-media/C6-http-during-rollout-uat.txt)
 
 **Extra supporting clip:** 📹 **[S1-terraform-apply-or-infra-recording.mov](evidence-media/S1-terraform-apply-or-infra-recording.mov)** (_also_ supports **Presentation S1**.)
 

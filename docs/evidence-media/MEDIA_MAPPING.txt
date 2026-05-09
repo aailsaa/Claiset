@@ -1,3 +1,6 @@
+A2-rds-console.png	<- Screenshot 2026-05-09 at 3.41.53 PM.png
+A3-terraform-state.png	<- Screenshot 2026-05-09 at 4.31.11 PM.png
+A3-terraform-state-continuation.png	<- Screenshot 2026-05-09 at 4.31.20 PM.png
 EXTRA-A1-app-prod-all-items.png	<- Screenshot 2026-05-09 at 10.50.02 AM.png
 EXTRA-app-dev-login-google.png	<- Screenshot 2026-05-09 at 11.54.30 AM.png
 EXTRA-app-dev-HTTPS-connection-details.png	<- Screenshot 2026-05-09 at 11.57.02 AM.png
@@ -18,3 +21,8 @@ O5-disk-capacity-explore.png	<- Screenshot 2026-05-09 at 12.12.09 PM.png
 O2-O6-grafana-and-observability.mov	<- Screen Recording 2026-05-09 at 10.47.39 AM.mov
 S1-terraform-apply-or-infra-recording.mov	<- Screen Recording 2026-05-09 at 8.35.26 AM.mov
 C6-rollout-or-deployment-recording.mov	<- Screen Recording 2026-05-09 at 12.13.43 PM.mov
+C1-actions-promotion-workflow.png	<- Screenshot 2026-05-09 at 12.26.20 PM.png
+C2-pull-request-merged-uat-actions.png	<- Screenshot 2026-05-09 at 4.07.29 PM.png
+C4-github-actions-run-success.png	<- Screenshot 2026-05-09 at 4.18.23 PM.png
+C6-uat-rollout-screen-recording.mov	<- Screen Recording 2026-05-09 at 4.12.01 PM.mov
+C6-uat-http-poll-all-200-trimmed.mov	<- trimmed-zero-drop.mov
