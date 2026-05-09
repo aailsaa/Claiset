@@ -87,6 +87,8 @@ module "app_bluegreen" {
 
   enable_kubernetes_app = var.enable_kubernetes_app
   depends_on            = [module.platform]
+  # Free-tier node constraints are tight; keep one replica per service in prod for deterministic scheduling.
+  replicas              = 1
 
   aws_region               = var.aws_region
   domain_root              = var.domain_root

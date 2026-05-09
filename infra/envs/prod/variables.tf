@@ -30,26 +30,26 @@ variable "eks_cluster_version" {
 
 variable "node_instance_types" {
   type        = list(string)
-  description = "EKS node instance types (passed to infra/modules/eks). Prod runs the app plus self-hosted observability; t3.small (~11 pods/node) routinely hits FailedScheduling (Too many pods). Use multiple types to avoid EKS NodeCreationFailure when a single type has no capacity."
-  default     = ["t3a.medium", "t3.medium"]
+  description = "EKS node instance types. This account currently enforces free-tier-eligible node types, so keep this list to free-tier options only."
+  default     = ["t3.micro", "t2.micro"]
 }
 
 variable "node_group_desired_size" {
   type        = number
   description = "EKS managed node group desired capacity."
-  default     = 4
+  default     = 2
 }
 
 variable "node_group_min_size" {
   type        = number
   description = "EKS managed node group minimum capacity. Keep high enough that monitoring + apps fit without exhausting VPC-CNI pod density."
-  default     = 3
+  default     = 1
 }
 
 variable "node_group_max_size" {
   type        = number
   description = "EKS managed node group maximum capacity."
-  default     = 8
+  default     = 6
 }
 
 variable "google_client_id" {
