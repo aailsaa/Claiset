@@ -115,12 +115,12 @@ print_rollout_diagnostics() {
 
 prod_rollout_recovery_bump() {
   local nodegroup="${CLUSTER}-default"
-  echo "Prod rollout recovery: scaling nodegroup ${nodegroup} to min=2 desired=12 max=12 before retry."
+  echo "Prod rollout recovery: scaling nodegroup ${nodegroup} to min=12 desired=12 max=12 before retry."
   aws eks update-nodegroup-config \
     --region "${REGION}" \
     --cluster-name "${CLUSTER}" \
     --nodegroup-name "${nodegroup}" \
-    --scaling-config "minSize=2,desiredSize=12,maxSize=12" >/dev/null || return 1
+    --scaling-config "minSize=12,desiredSize=12,maxSize=12" >/dev/null || return 1
   aws eks wait nodegroup-active --region "${REGION}" --cluster-name "${CLUSTER}" --nodegroup-name "${nodegroup}" || return 1
   for i in {1..24}; do
     ready_nodes="$(kubectl get nodes --no-headers 2>/dev/null | awk '$2=="Ready"{c++} END{print c+0}')"

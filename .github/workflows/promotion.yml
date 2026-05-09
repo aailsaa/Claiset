@@ -51,6 +51,8 @@ env:
   TF_VAR_alertmanager_smtp_from: ${{ secrets.ALERTMANAGER_SMTP_FROM }}
   TF_VAR_alertmanager_smtp_user: ${{ secrets.ALERTMANAGER_SMTP_USER }}
   TF_VAR_alertmanager_smtp_password: ${{ secrets.ALERTMANAGER_SMTP_PASSWORD }}
+  # Keep prod nodegroup warm through the whole pipeline unless explicitly opted-in.
+  PROD_SCALE_DOWN_AFTER_SMOKE: "true"
   # Single canonical ECR namespace (provisioned in infra/envs/dev; qa+ reference URLs only).
   ECR_ITEMS_REPO: claiset-items
   ECR_OUTFITS_REPO: claiset-outfits
@@ -764,9 +766,10 @@ jobs:
             -target=module.eks \
             -target=module.rds
 
-          # This AWS account enforces free-tier-eligible node types (micro); keep a warmer baseline for observability.
-          BASE_MIN=2
-          BASE_DESIRED=4
+          # Guardrail: keep prod nodegroup fixed high through apply+smoke to avoid repeated
+          # pod-density churn while observability and app pods converge.
+          BASE_MIN=12
+          BASE_DESIRED=12
           BASE_MAX=12
           BURST_DESIRED=12
           CLUSTER="${EXPECTED_CLUSTER_NAME}"
@@ -820,7 +823,7 @@ jobs:
           EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=prod FRONTEND_HOST=app-prod.claiset.xyz EXPECT_OBSERVABILITY_SMOKE="${TF_VAR_enable_observability_stack:-false}" EXPECT_APP_OAUTH_SMOKE=true GRAFANA_HOST=grafana-prod.claiset.xyz bash ../../scripts/smoke-test-env.sh --skip-wait
 
       - name: Scale prod nodegroup down (post-smoke)
-        if: always()
+        if: success() && env.PROD_SCALE_DOWN_AFTER_SMOKE == 'true'
         working-directory: infra/envs/prod
         run: |
           CLUSTER="${EXPECTED_CLUSTER_NAME}"
