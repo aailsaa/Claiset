@@ -667,7 +667,8 @@ jobs:
     concurrency:
       group: tf-prod-${{ github.repository }}
       cancel-in-progress: false
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'prod' && vars.ALLOW_COSTLY_RUNS == 'true'
+    # Syllabus: release tags promote prod — matches `on.push.tags [v*]` plus manual dispatch.
+    if: ${{ vars.ALLOW_COSTLY_RUNS == 'true' && ((github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'prod') || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))) }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
