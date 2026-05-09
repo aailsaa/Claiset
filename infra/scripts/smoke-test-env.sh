@@ -62,6 +62,11 @@ derive_domain_root() {
   fi
 }
 
+# Bash [[ =~ ]] regex: ^2|3 means (^2)|(3) — the lone "3" matches any string containing 3, so 503 falsely passes.
+http_2xx_or_3xx() { [[ "$1" =~ ^[23][0-9]{2}$ ]]; }
+http_2xx() { [[ "$1" =~ ^2[0-9]{2}$ ]]; }
+http_2xx_or_4xx() { [[ "$1" =~ ^[24][0-9]{2}$ ]]; }
+
 observability_smoke_enabled() {
   if [[ -n "${EXPECT_OBSERVABILITY_SMOKE}" ]]; then
     [[ "${EXPECT_OBSERVABILITY_SMOKE}" == "1" || "${EXPECT_OBSERVABILITY_SMOKE}" == "true" ]]
@@ -150,7 +155,7 @@ check_internal_health() {
 
   for ((i=1; i<=attempts; i++)); do
     code="$(curl -sS -o /dev/null -w '%{http_code}' "http://127.0.0.1:${local_port}/health" || true)"
-    if [[ "${code}" =~ ^2|3 ]]; then
+    if http_2xx_or_3xx "${code}"; then
       echo "Internal health OK for ${svc} (${code})"
       kill "${pf_pid}" >/dev/null 2>&1 || true
       wait "${pf_pid}" 2>/dev/null || true
@@ -193,7 +198,7 @@ check_frontend() {
   local i
   for ((i=1; i<=attempts; i++)); do
     code="$(curl_code "https://${SMOKE_BASE_HOST}")"
-    if [[ "${code}" =~ ^2|3 ]]; then
+    if http_2xx_or_3xx "${code}"; then
       front_code="${code}"
       return 0
     fi
@@ -214,7 +219,7 @@ if ! check_frontend 12 5; then
   SMOKE_CONNECT_TO=(--connect-to "${FRONTEND_HOST}:443:${LB_HOST}:443")
   check_frontend 12 5 || true
 fi
-if [[ ! "${front_code}" =~ ^2|3 ]]; then
+if ! http_2xx_or_3xx "${front_code}"; then
   echo "Frontend smoke failed: https://${SMOKE_BASE_HOST} returned ${front_code}" >&2
   exit 1
 fi
@@ -240,11 +245,11 @@ check_grafana() {
 
   GRAFANA_CONNECT_TO=()
   grafana_code="000"
-  attempts=12
+  attempts=24
   sleep_s=5
   for ((i=1; i<=attempts; i++)); do
     grafana_code="$(curl -sS "${GRAFANA_CONNECT_TO[@]}" -o /dev/null -w '%{http_code}' "https://${GRAFANA_HOST}" || true)"
-    if [[ "${grafana_code}" =~ ^2|3 ]]; then
+    if http_2xx_or_3xx "${grafana_code}"; then
       break
     fi
     if [[ "${i}" == "1" ]]; then
@@ -255,7 +260,7 @@ check_grafana() {
     sleep "${sleep_s}"
   done
 
-  if [[ ! "${grafana_code}" =~ ^2|3 ]]; then
+  if ! http_2xx_or_3xx "${grafana_code}"; then
     echo "Grafana smoke failed: https://${GRAFANA_HOST} returned ${grafana_code}" >&2
     return 1
   fi
@@ -334,7 +339,7 @@ check_grafana() {
 
   # API health
   health_code="$(curl -sS -u "${g_user}:${g_pass}" -o /dev/null -w '%{http_code}' "http://127.0.0.1:13000/api/health" || true)"
-  if [[ ! "${health_code}" =~ ^2 ]]; then
+  if ! http_2xx "${health_code}"; then
     echo "Grafana deep smoke failed: /api/health returned ${health_code}" >&2
     kill "${pf_pid}" >/dev/null 2>&1 || true
     wait "${pf_pid}" 2>/dev/null || true
@@ -356,13 +361,13 @@ check_grafana() {
   for i in {1..12}; do
     loki_query_status="$(curl -sS -u "${g_user}:${g_pass}" -o /dev/null -w '%{http_code}' \
       "http://127.0.0.1:13000/api/datasources/proxy/uid/loki/loki/api/v1/query?query=vector(1)" || true)"
-    if [[ "${loki_query_status}" =~ ^2|4 ]]; then
+    if http_2xx_or_4xx "${loki_query_status}"; then
       break
     fi
     echo "Grafana deep smoke: Loki proxy not ready yet (${loki_query_status}), retrying (${i}/12)..."
     sleep 5
   done
-  if [[ ! "${loki_query_status}" =~ ^2|4 ]]; then
+  if ! http_2xx_or_4xx "${loki_query_status}"; then
     echo "Grafana deep smoke failed: Loki datasource proxy query returned ${loki_query_status}" >&2
     kill "${pf_pid}" >/dev/null 2>&1 || true
     wait "${pf_pid}" 2>/dev/null || true
@@ -382,13 +387,13 @@ check_grafana() {
   for i in {1..12}; do
     prom_query_status="$(curl -sS -u "${g_user}:${g_pass}" -o /dev/null -w '%{http_code}' \
       "http://127.0.0.1:13000/api/datasources/proxy/uid/${prom_uid}/api/v1/query?query=up" || true)"
-    if [[ "${prom_query_status}" =~ ^2 ]]; then
+    if http_2xx "${prom_query_status}"; then
       break
     fi
     echo "Grafana deep smoke: Prometheus proxy not ready yet (${prom_query_status}), retrying (${i}/12)..."
     sleep 5
   done
-  if [[ ! "${prom_query_status}" =~ ^2 ]]; then
+  if ! http_2xx "${prom_query_status}"; then
     echo "Grafana deep smoke failed: Prometheus datasource proxy query returned ${prom_query_status}" >&2
     kill "${pf_pid}" >/dev/null 2>&1 || true
     wait "${pf_pid}" 2>/dev/null || true
@@ -406,7 +411,7 @@ check_app_oauth() {
   # App uses Google Identity JS in-browser. CLI smoke can verify login route availability only.
   local login_code="000"
   login_code="$(curl_code "https://${SMOKE_BASE_HOST}/login")"
-  if [[ ! "${login_code}" =~ ^2|3 ]]; then
+  if ! http_2xx_or_3xx "${login_code}"; then
     echo "App OAuth smoke failed: /login returned ${login_code}" >&2
     return 1
   fi
