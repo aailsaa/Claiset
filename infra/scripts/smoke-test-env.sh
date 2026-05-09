@@ -40,6 +40,7 @@ RDS_ID="${RDS_INSTANCE_ID:-${PROJECT}-${NAMESPACE}-postgres}"
 GRAFANA_HOST="${GRAFANA_HOST:-}"
 EXPECT_OBSERVABILITY_SMOKE="${EXPECT_OBSERVABILITY_SMOKE:-}"
 EXPECT_OBSERVABILITY_DAEMONSETS="${EXPECT_OBSERVABILITY_DAEMONSETS:-}"
+EXPECT_PROMTAIL="${EXPECT_PROMTAIL:-}"
 EXPECT_APP_OAUTH_SMOKE="${EXPECT_APP_OAUTH_SMOKE:-true}"
 ROLLOUT_TIMEOUT="${ROLLOUT_TIMEOUT:-8m}"
 
@@ -83,6 +84,14 @@ observability_daemonsets_enabled() {
     return
   fi
   [[ "${TF_VAR_enable_observability_daemonsets:-false}" == "true" ]]
+}
+
+promtail_expected() {
+  if [[ -n "${EXPECT_PROMTAIL}" ]]; then
+    [[ "${EXPECT_PROMTAIL}" == "1" || "${EXPECT_PROMTAIL}" == "true" ]]
+    return
+  fi
+  [[ "${TF_VAR_enable_promtail:-false}" == "true" ]]
 }
 
 app_oauth_smoke_enabled() {
@@ -539,7 +548,7 @@ check_app_oauth() {
 }
 
 if [[ "${MODE}" == "wait-only" ]]; then
-  if observability_smoke_enabled && observability_daemonsets_enabled; then
+  if observability_smoke_enabled && observability_daemonsets_enabled && promtail_expected; then
     check_promtail_daemonset_ready
   fi
   if observability_smoke_enabled; then
@@ -550,7 +559,7 @@ if [[ "${MODE}" == "wait-only" ]]; then
 fi
 
 if observability_smoke_enabled; then
-  if observability_daemonsets_enabled; then
+  if observability_daemonsets_enabled && promtail_expected; then
     check_promtail_daemonset_ready
   fi
   check_grafana

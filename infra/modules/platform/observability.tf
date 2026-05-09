@@ -147,7 +147,7 @@ resource "helm_release" "kube_prometheus_stack" {
 
     kubeStateMetrics = { enabled = true }
 
-    nodeExporter = { enabled = var.enable_observability_daemonsets }
+    nodeExporter = { enabled = var.enable_observability_daemonsets && var.enable_node_exporter }
 
     defaultRules = {
       create = true
@@ -381,7 +381,7 @@ resource "helm_release" "loki" {
 }
 
 resource "helm_release" "promtail" {
-  count = local.observability_enabled && var.enable_observability_daemonsets ? 1 : 0
+  count = local.observability_enabled && var.enable_observability_daemonsets && var.enable_promtail ? 1 : 0
 
   name       = "promtail"
   repository = "https://grafana.github.io/helm-charts"

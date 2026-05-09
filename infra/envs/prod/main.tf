@@ -70,6 +70,8 @@ module "platform" {
 
   enable_observability_stack      = var.enable_observability_stack
   enable_observability_daemonsets = var.enable_observability_daemonsets
+  enable_node_exporter            = var.enable_node_exporter
+  enable_promtail                 = var.enable_promtail
   grafana_google_client_id        = var.grafana_google_client_id
   grafana_google_client_secret    = var.grafana_google_client_secret
   grafana_google_allowed_domains  = var.grafana_google_allowed_domains

@@ -43,8 +43,13 @@ env:
   # Self-hosted Grafana/Prometheus/Loki (all env Terraform jobs inherit these).
   # Repository variable ENABLE_OBSERVABILITY = true to turn on; requires secrets below.
   TF_VAR_enable_observability_stack: ${{ (vars.ENABLE_OBSERVABILITY == 'true' && vars.ALLOW_COSTLY_RUNS == 'true') && 'true' || 'false' }}
-  # Enable DaemonSet collectors (promtail/node-exporter) only when explicitly requested.
-  TF_VAR_enable_observability_daemonsets: ${{ (vars.ENABLE_OBSERVABILITY_DAEMONSETS == 'true' && vars.ALLOW_COSTLY_RUNS == 'true') && 'true' || 'false' }}
+  # Proof toggles (repo variables): enable independently for metrics/logging evidence runs.
+  PROOF_NODE_EXPORTER: ${{ vars.PROOF_NODE_EXPORTER == 'true' && 'true' || 'false' }}
+  PROOF_LOKI_LOGS: ${{ vars.PROOF_LOKI_LOGS == 'true' && 'true' || 'false' }}
+  # Enable DaemonSet collectors when either proof mode needs them.
+  TF_VAR_enable_observability_daemonsets: ${{ ((vars.PROOF_NODE_EXPORTER == 'true' || vars.PROOF_LOKI_LOGS == 'true') && vars.ALLOW_COSTLY_RUNS == 'true') && 'true' || 'false' }}
+  TF_VAR_enable_node_exporter: ${{ (vars.PROOF_NODE_EXPORTER == 'true' && vars.ALLOW_COSTLY_RUNS == 'true') && 'true' || 'false' }}
+  TF_VAR_enable_promtail: ${{ (vars.PROOF_LOKI_LOGS == 'true' && vars.ALLOW_COSTLY_RUNS == 'true') && 'true' || 'false' }}
   TF_VAR_grafana_google_client_id: ${{ secrets.GRAFANA_GOOGLE_CLIENT_ID }}
   TF_VAR_grafana_google_client_secret: ${{ secrets.GRAFANA_GOOGLE_CLIENT_SECRET }}
   TF_VAR_grafana_google_allowed_domains: ${{ vars.GRAFANA_GOOGLE_ALLOWED_DOMAINS }}
@@ -767,6 +772,16 @@ jobs:
       - name: Terraform apply (prod)
         working-directory: infra/envs/prod
         run: |
+          # When both proof modes are enabled, micro nodes often cannot host app + both DS collectors.
+          # Switch to t3.small and use a lower node count for better pod density at lower cost.
+          if [[ "${PROOF_NODE_EXPORTER}" == "true" && "${PROOF_LOKI_LOGS}" == "true" ]]; then
+            export TF_VAR_node_instance_types='["t3.small"]'
+            echo "Both proof toggles enabled -> using node types: ${TF_VAR_node_instance_types}"
+          else
+            export TF_VAR_node_instance_types='["t3.micro","t2.micro"]'
+            echo "Single/no proof toggle -> using default free-tier node types: ${TF_VAR_node_instance_types}"
+          fi
+
           terraform apply -auto-approve \
             -target=module.network \
             -target=module.eks \
@@ -774,10 +789,20 @@ jobs:
 
           # Guardrail: keep prod nodegroup fixed high through apply+smoke to avoid repeated
           # pod-density churn while observability and app pods converge.
-          BASE_MIN=16
-          BASE_DESIRED=16
-          BASE_MAX=16
-          BURST_DESIRED=16
+          # Keep prior stable baseline for micro runs; use cost-effective t3.small profile when both proofs are enabled.
+          if [[ "${PROOF_NODE_EXPORTER}" == "true" && "${PROOF_LOKI_LOGS}" == "true" ]]; then
+            BASE_MIN=6
+            BASE_DESIRED=6
+            BASE_MAX=8
+            BURST_DESIRED=6
+            READY_FLOOR=5
+          else
+            BASE_MIN=16
+            BASE_DESIRED=16
+            BASE_MAX=16
+            BURST_DESIRED=16
+            READY_FLOOR=14
+          fi
           CLUSTER="${EXPECTED_CLUSTER_NAME}"
           NODEGROUP="${EXPECTED_CLUSTER_NAME}-default"
           # Raise pod density on micro nodes before scheduling observability + app pods.
@@ -795,7 +820,7 @@ jobs:
           done
           # Guardrail: keep a high-enough floor before rollout/smoke tests.
           ready_nodes="$(kubectl get nodes --no-headers 2>/dev/null | awk '$2=="Ready"{c++} END{print c+0}')"
-          if [[ "${ready_nodes}" -lt 14 ]]; then
+          if [[ "${ready_nodes}" -lt "${READY_FLOOR}" ]]; then
             echo "Prod guardrail failed post-apply: only ${ready_nodes} Ready nodes; aborting before readiness/smoke." >&2
             exit 1
           fi
@@ -824,12 +849,17 @@ jobs:
       - name: Wait for readiness (prod)
         working-directory: infra/envs/prod
         run: |
-          PROD_RECOVERY_MIN_SIZE=16 PROD_RECOVERY_DESIRED_SIZE=16 PROD_RECOVERY_MAX_SIZE=16 PROD_RECOVERY_READY_FLOOR=14 EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=prod FRONTEND_HOST=app-prod.claiset.xyz EXPECT_OBSERVABILITY_SMOKE="${TF_VAR_enable_observability_stack:-false}" EXPECT_APP_OAUTH_SMOKE=true GRAFANA_HOST=grafana-prod.claiset.xyz ROLLOUT_TIMEOUT=12m bash ../../scripts/smoke-test-env.sh --wait-only
+          if [[ "${PROOF_NODE_EXPORTER}" == "true" && "${PROOF_LOKI_LOGS}" == "true" ]]; then
+            REC_MIN=6; REC_DESIRED=6; REC_MAX=8; REC_FLOOR=5
+          else
+            REC_MIN=16; REC_DESIRED=16; REC_MAX=16; REC_FLOOR=14
+          fi
+          PROD_RECOVERY_MIN_SIZE="${REC_MIN}" PROD_RECOVERY_DESIRED_SIZE="${REC_DESIRED}" PROD_RECOVERY_MAX_SIZE="${REC_MAX}" PROD_RECOVERY_READY_FLOOR="${REC_FLOOR}" EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=prod FRONTEND_HOST=app-prod.claiset.xyz EXPECT_OBSERVABILITY_SMOKE="${TF_VAR_enable_observability_stack:-false}" EXPECT_OBSERVABILITY_DAEMONSETS="${TF_VAR_enable_observability_daemonsets:-false}" EXPECT_PROMTAIL="${TF_VAR_enable_promtail:-false}" EXPECT_APP_OAUTH_SMOKE=true GRAFANA_HOST=grafana-prod.claiset.xyz ROLLOUT_TIMEOUT=12m bash ../../scripts/smoke-test-env.sh --wait-only
 
       - name: Smoke checks (prod)
         working-directory: infra/envs/prod
         run: |
-          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=prod FRONTEND_HOST=app-prod.claiset.xyz EXPECT_OBSERVABILITY_SMOKE="${TF_VAR_enable_observability_stack:-false}" EXPECT_APP_OAUTH_SMOKE=true GRAFANA_HOST=grafana-prod.claiset.xyz bash ../../scripts/smoke-test-env.sh --skip-wait
+          EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=prod FRONTEND_HOST=app-prod.claiset.xyz EXPECT_OBSERVABILITY_SMOKE="${TF_VAR_enable_observability_stack:-false}" EXPECT_OBSERVABILITY_DAEMONSETS="${TF_VAR_enable_observability_daemonsets:-false}" EXPECT_PROMTAIL="${TF_VAR_enable_promtail:-false}" EXPECT_APP_OAUTH_SMOKE=true GRAFANA_HOST=grafana-prod.claiset.xyz bash ../../scripts/smoke-test-env.sh --skip-wait
 
       - name: Scale prod nodegroup down (post-smoke)
         if: success() && env.PROD_SCALE_DOWN_AFTER_SMOKE == 'true'

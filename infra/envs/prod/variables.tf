@@ -112,6 +112,18 @@ variable "enable_observability_daemonsets" {
   EOT
 }
 
+variable "enable_node_exporter" {
+  type        = bool
+  default     = true
+  description = "Set false for logs-first evidence runs to free DaemonSet pod slots for promtail."
+}
+
+variable "enable_promtail" {
+  type        = bool
+  default     = false
+  description = "Set true for Loki/multi-service logs proof runs."
+}
+
 variable "grafana_google_client_id" {
   type        = string
   default     = ""
