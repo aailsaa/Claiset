@@ -3,14 +3,16 @@
 
 ## 0:00 - 0:20 | Problem and architecture
 
-"My project is OnlineCloset. It has a React frontend, three Go microservices (`items`, `outfits`, `schedule`), and PostgreSQL on AWS RDS.  
+"My project is Claiset, an online closet. It has a React frontend, three Go microservices (`items`, `outfits`, `schedule`), and PostgreSQL on AWS RDS.  
 Everything in cloud infrastructure is Terraform-managed: VPC, EKS, RDS, IAM, ingress, certificates, DNS, and observability."
 
 ## 0:20 - 0:50 | CI/CD and promotion logic
 
 "The delivery model is Git-driven promotion: dev -> nightly QA -> UAT -> prod.  
 UAT is triggered by PR merge or RC-style commit flow. Prod is tag-driven with `v*` release tags, not console click deploys.  
-The workflow uses staged Terraform applies, image retagging across environments, readiness checks, and smoke tests."
+The workflow uses staged Terraform applies, image retagging across environments, readiness checks, and smoke tests.
+
+For the EKS deployment strategy rubric, I use **Canary-style progressive rollout**: Terraform-defined **RollingUpdate** with `maxUnavailable` zero and readiness probes, so new pods only receive traffic when healthy and risk is stepped down—without maintaining two full parallel stacks (classical Blue/Green)."
 
 ## 0:50 - 1:25 | Day-2 operations
 

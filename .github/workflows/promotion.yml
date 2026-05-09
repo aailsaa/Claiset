@@ -58,10 +58,9 @@ env:
   TF_VAR_alertmanager_smtp_from: ${{ secrets.ALERTMANAGER_SMTP_FROM }}
   TF_VAR_alertmanager_smtp_user: ${{ secrets.ALERTMANAGER_SMTP_USER }}
   TF_VAR_alertmanager_smtp_password: ${{ secrets.ALERTMANAGER_SMTP_PASSWORD }}
-  # Keep prod nodegroup warm through the whole pipeline unless explicitly opted-in.
-  # Repo variable toggle: set PROD_SCALE_DOWN_AFTER_SMOKE=true/false in GitHub Variables.
-  # Defaults to true when unset.
-  PROD_SCALE_DOWN_AFTER_SMOKE: ${{ vars.PROD_SCALE_DOWN_AFTER_SMOKE == 'false' && 'false' || 'true' }}
+  # Post-smoke nodegroup scale-down (dev/qa/uat/prod). Default true (cost).
+  # Set SCALE_DOWN_NODEGROUP_AFTER_SMOKE=false in GitHub Variables to keep clusters warm for manual testing.
+  SCALE_DOWN_NODEGROUP_AFTER_SMOKE: ${{ vars.SCALE_DOWN_NODEGROUP_AFTER_SMOKE == 'false' && 'false' || 'true' }}
   ALLOW_COSTLY_RUNS: ${{ vars.ALLOW_COSTLY_RUNS == 'true' && 'true' || 'false' }}
   # Single canonical ECR namespace (provisioned in infra/envs/dev; qa+ reference URLs only).
   ECR_ITEMS_REPO: claiset-items
@@ -279,7 +278,7 @@ jobs:
 
       # Post-smoke: warmer baseline than min=1/desired=3 — avoids single-node pinch (app + observability).
       - name: Scale dev nodegroup down (post-smoke)
-        if: always()
+        if: always() && env.SCALE_DOWN_NODEGROUP_AFTER_SMOKE == 'true'
         working-directory: infra/envs/dev
         run: |
           CLUSTER="${EXPECTED_CLUSTER_NAME}"
@@ -438,7 +437,7 @@ jobs:
           EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=qa FRONTEND_HOST=app-qa.claiset.xyz EXPECT_OBSERVABILITY_SMOKE="${TF_VAR_enable_observability_stack:-false}" EXPECT_APP_OAUTH_SMOKE=true GRAFANA_HOST=grafana-qa.claiset.xyz bash ../../scripts/smoke-test-env.sh --skip-wait
 
       - name: Scale qa nodegroup down (post-smoke)
-        if: always()
+        if: always() && env.SCALE_DOWN_NODEGROUP_AFTER_SMOKE == 'true'
         working-directory: infra/envs/qa
         run: |
           CLUSTER="${EXPECTED_CLUSTER_NAME}"
@@ -599,6 +598,8 @@ jobs:
           BASE_DESIRED=3
           BASE_MAX=6
           BURST_DESIRED=6
+          # Align with burst target (never use prod thresholds on UAT — max nodes here is BASE_MAX).
+          READY_FLOOR="${BURST_DESIRED}"
           CLUSTER="${EXPECTED_CLUSTER_NAME}"
           NODEGROUP="${EXPECTED_CLUSTER_NAME}-default"
           AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" "${BASE_MIN}" "${BURST_DESIRED}" "${BASE_MAX}"
@@ -614,20 +615,20 @@ jobs:
           done
           # Guardrail: do not continue into platform/observability reconcile if burst never materializes.
           ready_nodes="$(kubectl get nodes --no-headers 2>/dev/null | awk '$2=="Ready"{c++} END{print c+0}')"
-          if [[ "${ready_nodes}" -lt 10 ]]; then
-            echo "Prod guardrail: Ready nodes (${ready_nodes}) below safe threshold (10). Re-applying burst and waiting once more..." >&2
+          if [[ "${ready_nodes}" -lt "${READY_FLOOR}" ]]; then
+            echo "UAT guardrail: Ready nodes (${ready_nodes}) below floor (${READY_FLOOR}). Re-applying burst and waiting once more..." >&2
             AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" "${BASE_MIN}" "${BURST_DESIRED}" "${BASE_MAX}" || true
             for i in {1..24}; do
               ready_nodes="$(kubectl get nodes --no-headers 2>/dev/null | awk '$2=="Ready"{c++} END{print c+0}')"
               echo "Ready nodes after retry: ${ready_nodes}/${BURST_DESIRED} (attempt ${i}/24)"
-              if [[ "${ready_nodes}" -ge 10 ]]; then
+              if [[ "${ready_nodes}" -ge "${READY_FLOOR}" ]]; then
                 break
               fi
               sleep 10
             done
             ready_nodes="$(kubectl get nodes --no-headers 2>/dev/null | awk '$2=="Ready"{c++} END{print c+0}')"
-            if [[ "${ready_nodes}" -lt 10 ]]; then
-              echo "Prod guardrail failed: only ${ready_nodes} Ready nodes; aborting before Helm reconcile to avoid cascading pod-density failures." >&2
+            if [[ "${ready_nodes}" -lt "${READY_FLOOR}" ]]; then
+              echo "UAT guardrail failed: only ${ready_nodes} Ready nodes (need ${READY_FLOOR}); aborting before Helm reconcile." >&2
               exit 1
             fi
           fi
@@ -650,7 +651,7 @@ jobs:
           EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=uat FRONTEND_HOST=app-uat.claiset.xyz EXPECT_OBSERVABILITY_SMOKE="${TF_VAR_enable_observability_stack:-false}" EXPECT_APP_OAUTH_SMOKE=true GRAFANA_HOST=grafana-uat.claiset.xyz bash ../../scripts/smoke-test-env.sh --skip-wait
 
       - name: Scale uat nodegroup down (post-smoke)
-        if: always()
+        if: always() && env.SCALE_DOWN_NODEGROUP_AFTER_SMOKE == 'true'
         working-directory: infra/envs/uat
         run: |
           CLUSTER="${EXPECTED_CLUSTER_NAME}"
@@ -862,7 +863,8 @@ jobs:
           EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" K8S_APP_NAMESPACE=prod FRONTEND_HOST=app-prod.claiset.xyz EXPECT_OBSERVABILITY_SMOKE="${TF_VAR_enable_observability_stack:-false}" EXPECT_OBSERVABILITY_DAEMONSETS="${TF_VAR_enable_observability_daemonsets:-false}" EXPECT_PROMTAIL="${TF_VAR_enable_promtail:-false}" EXPECT_APP_OAUTH_SMOKE=true GRAFANA_HOST=grafana-prod.claiset.xyz bash ../../scripts/smoke-test-env.sh --skip-wait
 
       - name: Scale prod nodegroup down (post-smoke)
-        if: success() && env.PROD_SCALE_DOWN_AFTER_SMOKE == 'true'
+        # Legacy: prod-only toggle when SCALE_DOWN_NODEGROUP_AFTER_SMOKE is not set explicitly.
+        if: success() && env.SCALE_DOWN_NODEGROUP_AFTER_SMOKE == 'true' && (vars.SCALE_DOWN_NODEGROUP_AFTER_SMOKE != '' || vars.PROD_SCALE_DOWN_AFTER_SMOKE != 'false')
         working-directory: infra/envs/prod
         run: |
           CLUSTER="${EXPECTED_CLUSTER_NAME}"

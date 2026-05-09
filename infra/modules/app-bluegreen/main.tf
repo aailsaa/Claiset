@@ -145,6 +145,15 @@ resource "kubernetes_deployment" "items" {
 
   spec {
     replicas = var.replicas
+    # Canary-style progressive exposure: new pods must pass readiness before old pods go away;
+    # max_unavailable=0 favors availability (with surge allowing an extra pod during roll).
+    strategy {
+      type = "RollingUpdate"
+      rolling_update {
+        max_surge       = "25%"
+        max_unavailable = "0"
+      }
+    }
     selector {
       match_labels = { app = "items" }
     }
@@ -238,7 +247,7 @@ resource "kubernetes_service" "items" {
 }
 
 resource "kubernetes_deployment" "outfits" {
-  count = local.enabled ? 1 : 0
+  count            = local.enabled ? 1 : 0
   wait_for_rollout = false
 
   metadata {
@@ -249,6 +258,13 @@ resource "kubernetes_deployment" "outfits" {
 
   spec {
     replicas = var.replicas
+    strategy {
+      type = "RollingUpdate"
+      rolling_update {
+        max_surge       = "25%"
+        max_unavailable = "0"
+      }
+    }
     selector { match_labels = { app = "outfits" } }
     template {
       metadata { labels = { app = "outfits" } }
@@ -338,7 +354,7 @@ resource "kubernetes_service" "outfits" {
 }
 
 resource "kubernetes_deployment" "schedule" {
-  count = local.enabled ? 1 : 0
+  count            = local.enabled ? 1 : 0
   wait_for_rollout = false
 
   metadata {
@@ -349,6 +365,13 @@ resource "kubernetes_deployment" "schedule" {
 
   spec {
     replicas = var.replicas
+    strategy {
+      type = "RollingUpdate"
+      rolling_update {
+        max_surge       = "25%"
+        max_unavailable = "0"
+      }
+    }
     selector { match_labels = { app = "schedule" } }
     template {
       metadata { labels = { app = "schedule" } }
@@ -438,7 +461,7 @@ resource "kubernetes_service" "schedule" {
 }
 
 resource "kubernetes_deployment" "web" {
-  count = local.enabled ? 1 : 0
+  count            = local.enabled ? 1 : 0
   wait_for_rollout = false
 
   metadata {
@@ -449,6 +472,13 @@ resource "kubernetes_deployment" "web" {
 
   spec {
     replicas = var.replicas
+    strategy {
+      type = "RollingUpdate"
+      rolling_update {
+        max_surge       = "25%"
+        max_unavailable = "0"
+      }
+    }
     selector { match_labels = { app = "web" } }
     template {
       metadata { labels = { app = "web" } }
