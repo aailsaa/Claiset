@@ -37,6 +37,20 @@ AWS_REGION=us-east-1 ./infra/scripts/eks-burst-scale.sh claiset-qa claiset-qa-de
 
 Then rerun apply once pods can schedule.
 
+## 2b) Dev Terraform: `Minimum capacity … can't be greater than desired size`
+
+Symptoms: `terraform apply` (often **`-target=module.eks`**) fails on `aws_eks_node_group` with **`InvalidParameterException`** after **`dev-scale-down-cheap.sh`** or any **`minSize`** above the live **`desiredSize`**.
+
+**Cause:** **`infra/modules/eks`** uses **`lifecycle { ignore_changes = [scaling_config[0].desired_size] }`** so CI can burst **`desired`** without Terraform fighting it. If **`desired`** was scaled to **1** while Terraform still wants **`min_size = 2`**, AWS rejects a single update that only raises **`min`**.
+
+**Fix:** Before apply, set **`desiredSize >= minSize`** (match **`infra/envs/dev`** defaults **`2` / `3` / `6`**):
+
+```bash
+AWS_REGION=us-east-1 ./infra/scripts/eks-burst-scale.sh claiset-dev claiset-dev-default 2 3 6
+```
+
+Promotion **dev** runs this automatically before Phase 1 apply. **`dev-resume-cheap.sh`** defaults nodegroup to the same **`2` / `3` / `6`** so resume + Terraform stay aligned.
+
 ## 3) ALB/Ingress has no ADDRESS
 
 Symptoms: `kubectl get ingress -n <env>` shows empty ADDRESS; website unreachable.

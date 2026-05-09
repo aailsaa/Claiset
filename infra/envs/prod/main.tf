@@ -96,8 +96,10 @@ module "eks_app" {
   replicas = 1
 
   # Same pattern as UAT: single-Pod surge + post-readiness soak so a bad build fails the rollout before full cutover.
-  rolling_update_max_surge  = "1"
-  rollout_min_ready_seconds = 30
+  rolling_update_max_surge          = "1"
+  rollout_min_ready_seconds         = 30
+  web_rollout_prestop_sleep_seconds = 45
+  web_pod_termination_grace_seconds = 120
 
   aws_region               = var.aws_region
   domain_root              = var.domain_root

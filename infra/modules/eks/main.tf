@@ -239,6 +239,8 @@ resource "aws_eks_node_group" "default" {
     # CI intentionally bursts nodegroup desired_size during rollouts/smoke.
     # Ignoring desired_size drift prevents Terraform apply from scaling back down
     # mid-run and starving critical pods/jobs (e.g., prod migrate + observability).
+    # If live desired < min_size (e.g. manual scale-down), pre-burst before apply or AWS returns
+    # InvalidParameterException: minimum capacity can't be greater than desired size.
     ignore_changes = [
       scaling_config[0].desired_size,
     ]

@@ -211,6 +211,13 @@ jobs:
       - name: Terraform apply
         working-directory: infra/envs/dev
         run: |
+          # If the nodegroup was manually scaled down (e.g. 1/1/2), the first apply can fail:
+          # Terraform raises min_size (2) while lifecycle ignores desired_size drift → AWS still
+          # has desired=1 → InvalidParameterException: min can't exceed desired. Align first.
+          CLUSTER="${EXPECTED_CLUSTER_NAME}"
+          NODEGROUP="${EXPECTED_CLUSTER_NAME}-default"
+          AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" 2 3 6
+
           # Phase 1: base AWS only (no platform/ACM/Helm) so a bad DNS/ACM run does not
           # half-apply Helm or leave -target state inconsistent with AWS.
           terraform apply -auto-approve \

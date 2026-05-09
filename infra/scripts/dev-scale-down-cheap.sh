@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Park dev workloads to reduce cost while you prove rollouts elsewhere (e.g. UAT).
+# CI runs a pre-burst before dev Terraform apply so min_size (2) is never applied while desired=1.
 # - Scales core app Deployments to 0
 # - Stops dev RDS when possible
 # - Shrinks the dev nodegroup (kube-system / platform DaemonSets still consume capacity)
