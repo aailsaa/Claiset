@@ -99,6 +99,18 @@ variable "rollout_progress_deadline_seconds" {
   description = "Fails the rollout controller if Pods do not make progress — surfaces stuck migrations or image pulls."
 }
 
+variable "web_rollout_prestop_sleep_seconds" {
+  type        = number
+  default     = 35
+  description = "preStop sleep on web Pods so AWS LB controller can deregister target IPs before nginx stops (fewer rollout 502s)."
+}
+
+variable "web_pod_termination_grace_seconds" {
+  type        = number
+  default     = 90
+  description = "Termination grace window; must comfortably exceed web_rollout_prestop_sleep_seconds."
+}
+
 variable "enable_pod_disruption_budget" {
   type        = bool
   default     = true
