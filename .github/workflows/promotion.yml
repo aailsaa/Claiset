@@ -599,6 +599,25 @@ jobs:
             fi
             sleep 10
           done
+          # Guardrail: do not continue into platform/observability reconcile if burst never materializes.
+          ready_nodes="$(kubectl get nodes --no-headers 2>/dev/null | awk '$2=="Ready"{c++} END{print c+0}')"
+          if [[ "${ready_nodes}" -lt 10 ]]; then
+            echo "Prod guardrail: Ready nodes (${ready_nodes}) below safe threshold (10). Re-applying burst and waiting once more..." >&2
+            AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" "${BASE_MIN}" "${BURST_DESIRED}" "${BASE_MAX}" || true
+            for i in {1..24}; do
+              ready_nodes="$(kubectl get nodes --no-headers 2>/dev/null | awk '$2=="Ready"{c++} END{print c+0}')"
+              echo "Ready nodes after retry: ${ready_nodes}/${BURST_DESIRED} (attempt ${i}/24)"
+              if [[ "${ready_nodes}" -ge 10 ]]; then
+                break
+              fi
+              sleep 10
+            done
+            ready_nodes="$(kubectl get nodes --no-headers 2>/dev/null | awk '$2=="Ready"{c++} END{print c+0}')"
+            if [[ "${ready_nodes}" -lt 10 ]]; then
+              echo "Prod guardrail failed: only ${ready_nodes} Ready nodes; aborting before Helm reconcile to avoid cascading pod-density failures." >&2
+              exit 1
+            fi
+          fi
           kubectl get nodes --no-headers 2>/dev/null | awk '$2 ~ /SchedulingDisabled/ {print $1}' | xargs -r kubectl uncordon || true
 
           K8S_APP_NAMESPACE=uat bash ../../scripts/terraform-k8s-import-guard.sh
@@ -745,11 +764,11 @@ jobs:
             -target=module.eks \
             -target=module.rds
 
-          # This AWS account enforces free-tier-eligible node types (micro); keep prod burst moderate.
-          BASE_MIN=1
-          BASE_DESIRED=2
+          # This AWS account enforces free-tier-eligible node types (micro); keep a warmer baseline for observability.
+          BASE_MIN=2
+          BASE_DESIRED=4
           BASE_MAX=12
-          BURST_DESIRED=10
+          BURST_DESIRED=12
           CLUSTER="${EXPECTED_CLUSTER_NAME}"
           NODEGROUP="${EXPECTED_CLUSTER_NAME}-default"
           AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" "${BASE_MIN}" "${BURST_DESIRED}" "${BASE_MAX}"
@@ -763,13 +782,19 @@ jobs:
             fi
             sleep 10
           done
+          # Guardrail: keep a high-enough floor before rollout/smoke tests.
+          ready_nodes="$(kubectl get nodes --no-headers 2>/dev/null | awk '$2=="Ready"{c++} END{print c+0}')"
+          if [[ "${ready_nodes}" -lt 10 ]]; then
+            echo "Prod guardrail failed post-apply: only ${ready_nodes} Ready nodes; aborting before readiness/smoke." >&2
+            exit 1
+          fi
           kubectl get nodes --no-headers 2>/dev/null | awk '$2 ~ /SchedulingDisabled/ {print $1}' | xargs -r kubectl uncordon || true
 
           K8S_APP_NAMESPACE=prod bash ../../scripts/terraform-k8s-import-guard.sh
           EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" bash ../../scripts/helm-platform-reconcile.sh
           EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" bash ../../scripts/helm-monitoring-reconcile.sh
           terraform apply -auto-approve
-          # Second full apply resets nodegroup desired_size to Terraform default (2 for prod/free-tier).
+          # Second full apply can reset nodegroup desired_size to Terraform defaults.
           # Re-burst before readiness checks so rollout/smoke do not run on an under-capacity cluster.
           AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" "${BASE_MIN}" "${BURST_DESIRED}" "${BASE_MAX}"
           echo "Waiting for post-apply burst node count to be Ready..."
@@ -801,5 +826,5 @@ jobs:
           CLUSTER="${EXPECTED_CLUSTER_NAME}"
           NODEGROUP="${EXPECTED_CLUSTER_NAME}-default"
           # Do not fail the whole workflow if nodegroup is not ACTIVE after an earlier apply failure.
-          AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" 1 2 12 || true
+          AWS_REGION="${AWS_REGION}" bash ../../scripts/eks-burst-scale.sh "${CLUSTER}" "${NODEGROUP}" 2 4 12 || true
 

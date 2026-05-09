@@ -37,13 +37,13 @@ variable "node_instance_types" {
 variable "node_group_desired_size" {
   type        = number
   description = "EKS managed node group desired capacity."
-  default     = 2
+  default     = 4
 }
 
 variable "node_group_min_size" {
   type        = number
   description = "EKS managed node group minimum capacity. Keep high enough that monitoring + apps fit without exhausting VPC-CNI pod density."
-  default     = 1
+  default     = 2
 }
 
 variable "node_group_max_size" {

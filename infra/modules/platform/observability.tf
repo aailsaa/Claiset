@@ -391,9 +391,11 @@ resource "helm_release" "promtail" {
 
   depends_on = [helm_release.loki]
 
-  timeout         = 900
-  atomic          = true
-  cleanup_on_fail = true
+  # DaemonSet readiness can flap while autoscaling nodes join; avoid blocking/rollback loops.
+  timeout         = 1800
+  wait            = false
+  atomic          = false
+  cleanup_on_fail = false
   replace         = true
   values = [yamlencode({
     resources = {
