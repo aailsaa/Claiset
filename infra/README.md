@@ -1,11 +1,11 @@
-## Terraform infrastructure (EKS + RDS + Blue/Green)
+## Terraform infrastructure (EKS + RDS + Kubernetes app)
 
 This folder is the **only place** AWS / Kubernetes infrastructure is managed. No console click-ops.
 
 ### Layout
 - `envs/dev`: first environment to stand up (us-east-1)
 - `envs/qa`, `envs/uat`, `envs/prod`: promotion environments (same modules; different image tags and hostnames)
-- `modules/*`: reusable building blocks (VPC, EKS, RDS, platform add-ons, app blue/green)
+- `modules/*`: reusable building blocks (VPC, EKS, RDS, platform add-ons, **`app-bluegreen`** workloads + Ingress)
 
 ### Quick start (dev)
 1. Create an AWS profile / credentials with permission to create VPC/EKS/RDS/IAM/Route53/ACM.

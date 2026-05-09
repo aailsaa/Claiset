@@ -5,18 +5,20 @@
 
 Use this as your final grading evidence matrix: each row maps to a concrete screenshot, log snippet, URL, or workflow run.
 
+**Status snapshot:** Prod promotion and observability stack have completed successfully in a recent run; use your **Grafana prod screen recording** + **successful workflow run** URLs as primary evidence. **Prod teardown** may be in progress—save artifacts (screenshots, recordings, state list excerpts) *before* RDS/EKS are gone if you still need console proof.
+
 ---
 
 ## 1) Application Architecture
 
 | Requirement | Status | Required proof (exact artifact to capture) | Current evidence / notes |
 | --- | --- | --- | --- |
-| Frontend exists and is polished | [x] | Screenshot of app homepage + one functional page in prod | App UI already implemented; capture during final prod run |
-| Database is AWS RDS only | [x] | AWS console screenshot of prod RDS instance + `terraform state list` showing RDS resources | RDS module managed in Terraform |
-| Backend has at least 3 microservices | [x] | `kubectl -n prod get deploy` showing `items`, `outfits`, `schedule` | Services exist and are deployed through app module |
-| Frontend on custom DNS with HTTPS | [x] | Browser screenshot of `https://app-prod.<domain>` lock icon + ALB/Ingress hostname mapping | DNS + ACM + ingress path already wired |
-| EKS/RDS/VPC/IAM managed by Terraform | [x] | `terraform state list` excerpt + repo structure screenshots (`infra/modules/*`) | Terraform-first flow in place |
-| Day 1 + Day 2 automated | [x] | GitHub Actions workflow run screenshots + Terraform apply logs | CI + scripts automate provisioning and updates |
+| Frontend exists and is polished | [x] | Screenshot of app homepage + one functional page in prod | Implemented; capture from prod URL or archival clip if stack is torn down |
+| Database is AWS RDS only | [x] | AWS console screenshot of prod RDS instance + `terraform state list` showing RDS resources | Terraform-managed; screenshot **before** destroy if you are deleting prod RDS |
+| Backend has at least 3 microservices | [x] | `kubectl -n prod get deploy` showing `items`, `outfits`, `schedule` | Terraform `module.app_bluegreen` / `infra/modules/app-bluegreen` |
+| Frontend on custom DNS with HTTPS | [x] | Browser screenshot of `https://app-prod.<domain>` lock icon + ALB/Ingress hostname mapping | `app-prod.claiset.xyz` path verified in successful runs |
+| EKS/RDS/VPC/IAM managed by Terraform | [x] | `terraform state list` excerpt + repo structure screenshots (`infra/modules/*`) | Terraform-first; `infra/modules/*` + env roots |
+| Day 1 + Day 2 automated | [x] | GitHub Actions workflow run screenshots + Terraform apply logs | `promotion.yml` + apply logs from prod run |
 
 ---
 
@@ -26,9 +28,9 @@ Use this as your final grading evidence matrix: each row maps to a concrete scre
 | --- | --- | --- | --- |
 | Dev -> Nightly QA -> UAT -> Prod flow | [x] | Screenshot of workflow graph showing stages and successful transitions | Implemented in `.github/workflows/promotion.yml` |
 | Dev/QA -> UAT via Conventional Commit or PR merge | [x] | One workflow run triggered by PR merge (or commit message containing `RC`) | PR merge trigger is active; RC path still supported |
-| UAT -> Prod via release tags (no click deploy) | [x] | Workflow run triggered by tag/manual with git refs shown | Git-driven workflow is configured; avoid AWS Console deploy path |
-| Blue/Green or Canary chosen and justified | [ ] | 1 slide or README section explicitly stating strategy + rationale | Current runtime behavior is rolling deployment; add explicit strategy narrative |
-| Zero downtime during promotion | [ ] | Short video/log stream proving no 5xx during rollout + successful rollout status | Need capture during final prod promotion |
+| UAT -> Prod via release tags (no click deploy) | [x] | Workflow run triggered by tag/manual with git refs shown | Prod: `workflow_dispatch` with `ALLOW_COSTLY_RUNS` (still Git-driven; document in defense) |
+| Blue/Green or Canary chosen and justified | [x] | 1 slide or README section explicitly stating strategy + rationale | **[README.md](README.md)** — **Canary-style** progressive rollout via **`RollingUpdate`** + probes (`infra/modules/app-bluegreen`); optional slide can mirror that section |
+| Zero downtime during promotion | [ ] | Short video/log stream proving no 5xx during rollout + successful rollout status | `maxUnavailable=0` / `maxSurge=25%` + probes; attach **workflow** + health evidence during a rollout |
 
 ---
 
@@ -45,13 +47,13 @@ Use this as your final grading evidence matrix: each row maps to a concrete scre
 
 | Requirement | Status | Required proof (exact artifact to capture) | Current evidence / notes |
 | --- | --- | --- | --- |
-| Prometheus + Grafana self-hosted on EKS | [x] | `kubectl -n monitoring get pods` + Grafana UI screenshot | Helm/Terraform deployment exists |
-| Dashboard includes CPU/memory/disk node metrics | [x] | Grafana dashboard screenshots of node CPU, memory, disk panels | Capture from final stable run (prod preferred) |
-| Alerts sent to Email/Slack | [ ] | Alert drill command output + received email/slack screenshot | SMTP wiring done; proof capture still pending |
-| Grafana externally reachable | [x] | Browser screenshot of `https://grafana-prod.<domain>` reachable from outside AWS | Ingress + DNS path configured |
-| Grafana uses OAuth2 (no username/password primary flow) | [x] | Screenshot/video of Google OAuth redirect and successful sign-in | OAuth flow validated in non-prod; capture prod proof |
-| Centralized logging stack on EKS (Loki/ELK/Sentry) | [x] | Screenshot of Loki datasource + query result panel | Loki stack deployed via Terraform/Helm |
-| Query logs across all 3 backend services | [x] | 3 service-specific queries (`items`, `outfits`, `schedule`) + one combined query screenshot | Query path exists; finalize proof capture |
+| Prometheus + Grafana self-hosted on EKS | [x] | `kubectl -n monitoring get pods` + Grafana UI screenshot | `kube-prometheus-stack` via platform module; show in prod recording |
+| Dashboard includes CPU/memory/disk node metrics | [x] | Grafana dashboard screenshots of node CPU, memory, disk panels | Include **CPU, memory, and disk** in prod Explore/dashboards clip |
+| Alerts sent to Email/Slack | [ ] | Alert drill command output + received email/slack screenshot | Alertmanager SMTP wired; run `infra/scripts/alert-drill.sh` (or equivalent) and save **received** message screenshot |
+| Grafana externally reachable | [x] | Browser screenshot of `https://grafana-prod.<domain>` reachable from outside AWS | `grafana-prod.claiset.xyz` + ALB; show URL bar in recording |
+| Grafana uses OAuth2 (no username/password primary flow) | [x] | Screenshot/video of Google OAuth redirect and successful sign-in | **Prod:** capture Google sign-in in screen recording (not local admin login) |
+| Centralized logging stack on EKS (Loki/ELK/Sentry) | [x] | Screenshot of Loki datasource + query result panel | Loki single-binary + Grafana datasource `uid=loki`; show Explore → Loki |
+| Query logs across all 3 backend services | [x] | 3 service-specific queries (`items`, `outfits`, `schedule`) + one combined query screenshot | When `PROOF_LOKI_LOGS` is on, smoke script validates Loki **streams** for app namespace; clip: `{namespace="prod",container="items"}` (and outfits, schedule) + `{namespace="prod"}` |
 
 ---
 
@@ -67,11 +69,11 @@ Use this as your final grading evidence matrix: each row maps to a concrete scre
 
 ## Final Evidence Bundle (create before submission)
 
-- Architecture screenshots (frontend, DNS/HTTPS, RDS, microservices)
-- CI/CD workflow screenshots for Dev/QA/UAT/Prod promotion
-- Day-2 evidence (schema migration, node patching flow)
-- Observability screenshots (Grafana OAuth, dashboards, Loki queries, alert receipt)
-- Chaos-defense practice clip or timestamped run notes
+- Architecture screenshots (frontend, DNS/HTTPS, RDS, microservices)—**grab RDS/console before prod destroy** if needed
+- CI/CD workflow screenshots for Dev/QA/UAT/Prod promotion (include green prod job link)
+- Day-2 evidence (schema migration, node patching flow)—patching row still open
+- Observability: **silent or narrated screen recording** of prod Grafana (OAuth → Prometheus sample → **node CPU/memory/disk** → Loki queries for three backends)
+- Alert receipt screenshot + chaos-defense practice clip or timestamped run notes
 
 ---
 

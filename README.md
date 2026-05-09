@@ -34,7 +34,18 @@ For the **canonical checklist** (checkboxes + rubric mapping), open **[REQUIREME
 | Infra exclusively via Terraform (VPC, EKS, RDS, …) | **Done** under `infra/` |
 | Multi-environment Terraform | **Done** — `infra/envs/{dev,qa,uat,prod}` + remote S3/DynamoDB state |
 
-**Note:** The Terraform module **`app-bluegreen`** is named for the rubric; workloads today use **rolling Kubernetes Deployments** (not two live stacks + weighted traffic flip). You still need a **written justification** for blue/green *or* canary per the assignment.
+#### Deployment strategy for EKS (assignment: Blue/Green **or** Canary)
+
+**Choice: Canary-style progressive rollout** (as required by [REQUIREMENTS.md](REQUIREMENTS.md)), **not** classical Blue/Green with two live stacks and a single traffic flip.
+
+- **What we run:** Standard Kubernetes **Deployments** with an explicit **`RollingUpdate`** strategy (`maxUnavailable: 0`, `maxSurge: 25%` in [`infra/modules/app-bluegreen`](infra/modules/app-bluegreen)), plus **readiness** and **liveness** HTTP probes and optional **soft anti-affinity** so app pods spread across nodes. New pods only receive traffic after readiness passes; old pods are phased out in small steps, which **limits blast radius** the way a canary does—without a service mesh or weighted ALB splits.
+- **Why not Blue/Green here:** Full Blue/Green implies **two parallel versions** of every service and a cutover (or double capacity during the switch). On small managed node groups that is **costly and operationally heavy** for this project; rolling canary steps match the rubric’s “reduce risk during promotion” goal with less duplicate capacity.
+- **What would be “more canary” later:** Add **Argo Rollouts** or **ALB traffic weighting** for percentage-based exposure; the current design is **deliberately the native-Kubernetes baseline (option A)**.
+
+Workloads and Ingress live in Terraform module **`app_bluegreen`** ([`infra/modules/app-bluegreen`](infra/modules/app-bluegreen)).
+
+State note: if a prior commit used `module.k8s_app`, run once per env from `infra/envs/<env>` after `terraform init`:  
+`terraform state mv 'module.k8s_app' 'module.app_bluegreen'`
 
 ### 2. Deployment & CI/CD (git-driven promotion)
 
@@ -43,8 +54,8 @@ For the **canonical checklist** (checkboxes + rubric mapping), open **[REQUIREME
 | Dev → nightly QA → UAT → Prod | **Implemented** — [`promotion.yml`](.github/workflows/promotion.yml) (dev on push to `main`; QA on schedule + manual; **UAT on PR merged to `main` (same repo) or `RC` in commit message**; prod on `v*` tags + manual) |
 | Dev/QA → UAT (Conventional Commits / PR merge) | **Implemented** — Merging an in-repo PR into `main` promotes to UAT. Optional **`RC` token** in the tip merge commit subject/body still works for direct pushes. Fork PR merges are skipped (deploy via `workflow_dispatch` → UAT instead). |
 | UAT → Prod via tags (no console deploy) | **Implemented (initial)** — `v*` tags + `workflow_dispatch` prod |
-| Documented choice: blue/green **or** canary | **Still to do** (doc + how it maps to your rollout) |
-| Zero downtime | **Partial** — rolling updates + probes; formal demo/narrative still expected |
+| Documented choice: blue/green **or** canary | **Done (written)** — Canary-style rolling strategy above; maps to `RollingUpdate` + probes in `app-bluegreen` module |
+| Zero downtime | **Partial** — rollout settings + probes gate traffic; capture workflow/Grafana evidence during a promotion |
 
 **Operational notes (recent work):**
 
@@ -70,23 +81,22 @@ Current automation:
 
 | Requirement | Status |
 | ----------- | ------ |
-| Self-hosted Prometheus + Grafana on-cluster | **Planned only** (comments in `infra/modules/platform/main.tf`) |
-| Grafana external + **OAuth2** (no password login) | **Not implemented** |
-| Dashboards CPU / memory / disk + alerts | **Not implemented** |
-| Central logs (e.g. Loki/ELK) across all backends | **Not implemented** |
+| Self-hosted Prometheus + Grafana on-cluster | **Implemented** (optional per env) — [`infra/modules/platform/observability.tf`](infra/modules/platform/observability.tf), `kube-prometheus-stack` |
+| Grafana external + **OAuth2** (no password login) | **Implemented** when observability stack is enabled — Google OAuth; see env vars / secrets in platform module |
+| Dashboards CPU / memory / disk + alerts | **Implemented** — node metrics via stack; Alertmanager SMTP when configured; **capture alert receipt** for grading |
+| Central logs (e.g. Loki) across all backends | **Implemented** when enabled — Loki + Promtail; optional per env |
 
 ---
 
 ## What still needs to be done (assignment checklist)
 
-See **unchecked** items in **[REQUIREMENTS.md](REQUIREMENTS.md)** for what is still open. Highest impact next:
+See **[REQUIREMENTS_CHECKLIST.md](REQUIREMENTS_CHECKLIST.md)** and unchecked items in **[REQUIREMENTS.md](REQUIREMENTS.md)**. Highest impact next:
 
-1. **Observability (15%)** — Largest gap: self-hosted **Prometheus + Grafana** on EKS, **OAuth2-only** Grafana access, dashboards (CPU/memory/disk), **alerts** (email/Slack), and **centralized logging** (e.g. **Loki** or ELK) with queries across all three Go services.
+1. **Observability evidence (15%)** — Screenshots/recording: Grafana OAuth, dashboards, Loki queries; run **alert drill** and save **email/Slack proof**.
 2. **Day 2 OS patching (10%)** — Document and **demo** rolling EKS node updates (AMI / nodegroup version) **without** killing traffic (drain, surge, verification).
 3. **Day 2 schema change (10%)** — You have migrate; prepare a **graded narrative**: show a schema change, how it ships, and how rollback / safety works.
-4. **CI/CD narrative (15%)** — Promotion path documented: PR merge → UAT, optional `RC` on direct pushes to `main`, prod via `v*` tags; QA nightly teardown if applicable.
-5. **Blue/green or canary (written)** — Pick one, justify it, and relate it to how you deploy (even if implementation stays rolling for now).
-6. **Presentation & chaos defense** — Silent video allowed for long runs; **live narration**; practice using metrics/logs to find a failure in 1–2 minutes.
+4. **Zero-downtime evidence** — Short clip or logs from a promotion showing healthy rollouts / no sustained 5xx.
+5. **Presentation & chaos defense** — Silent video allowed for long runs; **live narration**; practice using metrics/logs to find a failure in 1–2 minutes.
 
 **Cost tip:** Tear down **`qa` / `uat` / `prod`** when not demoing (`./infra/scripts/terraform-destroy-nonprod.sh` or per-env destroy). NAT + second RDS + second EKS add up quickly.
 
