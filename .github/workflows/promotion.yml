@@ -791,11 +791,11 @@ jobs:
           # pod-density churn while observability and app pods converge.
           # Keep prior stable baseline for micro runs; use cost-effective t3.small profile when both proofs are enabled.
           if [[ "${PROOF_NODE_EXPORTER}" == "true" && "${PROOF_LOKI_LOGS}" == "true" ]]; then
-            BASE_MIN=6
-            BASE_DESIRED=6
-            BASE_MAX=8
-            BURST_DESIRED=6
-            READY_FLOOR=5
+            BASE_MIN=8
+            BASE_DESIRED=8
+            BASE_MAX=10
+            BURST_DESIRED=8
+            READY_FLOOR=7
           else
             BASE_MIN=16
             BASE_DESIRED=16
@@ -850,7 +850,7 @@ jobs:
         working-directory: infra/envs/prod
         run: |
           if [[ "${PROOF_NODE_EXPORTER}" == "true" && "${PROOF_LOKI_LOGS}" == "true" ]]; then
-            REC_MIN=6; REC_DESIRED=6; REC_MAX=8; REC_FLOOR=5
+            REC_MIN=8; REC_DESIRED=8; REC_MAX=10; REC_FLOOR=7
           else
             REC_MIN=16; REC_DESIRED=16; REC_MAX=16; REC_FLOOR=14
           fi

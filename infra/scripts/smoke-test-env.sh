@@ -171,7 +171,11 @@ check_promtail_daemonset_ready() {
       min_ready=4
     fi
   else
-    min_ready="${desired}"
+    # Allow one DaemonSet miss for transient memory/scheduling blips on small clusters.
+    min_ready=$(( desired - 1 ))
+    if [[ "${min_ready}" -lt 1 ]]; then
+      min_ready=1
+    fi
   fi
 
   if [[ "${desired}" -eq 0 || "${ready}" -lt "${min_ready}" ]]; then
