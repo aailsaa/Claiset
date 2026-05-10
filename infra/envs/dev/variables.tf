@@ -24,8 +24,17 @@ variable "ecr_repository_prefix" {
 
 variable "eks_cluster_version" {
   type        = string
-  description = "EKS Kubernetes version for this environment."
-  default     = "1.31"
+  description = <<-EOT
+    EKS Kubernetes version for this environment.
+
+    Raised to 1.32 on dev for Day-2 patching / AMI refresh narrative. Prefer a two-phase apply with
+    this module/managed nodegroups: apply control plane bump first, reconcile EKS add-ons (vpc-cni,
+    coredns, kube-proxy—Console or CLI), then pin eks_node_group_kubernetes_version = "1.32" and
+    apply again so worker kubelet/AMI catch up without bundling LT + version in one apply.
+
+    Details: infra/modules/eks (aws_eks_node_group) comments and docs/day2-os-node-patching.md.
+  EOT
+  default     = "1.32"
 }
 
 variable "eks_node_group_kubernetes_version" {
