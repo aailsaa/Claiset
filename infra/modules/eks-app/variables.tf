@@ -63,6 +63,16 @@ variable "images" {
   description = "Container images for each service."
 }
 
+variable "migrate_schema_sha" {
+  type    = string
+  default = ""
+  description = <<-EOT
+    When non-empty (e.g. filesha256 of cmd/migrate/schema.sql), terraform_data replaces kubernetes_job.migrate when the schema file changes
+    (image tags stay :dev/:qa/:uat/:prod otherwise). Omit or leave "" so that env ignores schema churn (manual migrate Job if needed later).
+    OnlineCloset: set only from infra/envs/dev/main.tf unless you intentionally want qa/uat/prod to replace on schema edits too.
+  EOT
+}
+
 variable "enable_kubernetes_app" {
   type        = bool
   default     = true

@@ -104,12 +104,33 @@ resource "kubernetes_secret" "app_env" {
   }
 }
 
+locals {
+  # Empty migrate_schema_sha = do not tie Job replacement to schema.sql (constant trigger).
+  migrate_replace_signal = (
+    trimspace(coalesce(var.migrate_schema_sha, "")) != "" ?
+    trimspace(coalesce(var.migrate_schema_sha, "")) :
+    "schema-replace-trigger-disabled-${var.project}-${var.env}"
+  )
+}
+
+resource "terraform_data" "migrate_schema_replace_trigger" {
+  count = local.enabled ? 1 : 0
+
+  input = local.migrate_replace_signal
+}
+
 resource "kubernetes_job" "migrate" {
   count = local.enabled ? 1 : 0
   # Do not block Terraform apply on Job completion. Under EKS micro-node pod-density pressure
   # the migrate pod can sit Pending for long periods, which aborts the whole promotion even when
   # schema is already up to date. We validate app readiness in smoke checks separately.
   wait_for_completion = false
+
+  lifecycle {
+    replace_triggered_by = [
+      terraform_data.migrate_schema_replace_trigger[0].output,
+    ]
+  }
 
   metadata {
     name      = "migrate"

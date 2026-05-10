@@ -102,6 +102,9 @@ module "eks_app" {
   env     = var.env
   tags    = local.tags
 
+  # Dev only: push + schema.sql change forces a new migrate Job via replace_triggered_by (see eks-app module).
+  migrate_schema_sha = filesha256("${path.module}/../../../cmd/migrate/schema.sql")
+
   enable_kubernetes_app = var.enable_kubernetes_app
   depends_on            = [module.platform]
   replicas              = 1
