@@ -30,6 +30,13 @@ locals {
   )
   # Stable Service name is always "web" (resource metadata.name); only the synthetic ALB action name differs.
   web_spa_ingress_backend_name = local.alb_weighted_canary_for_web ? "web-spa-weighted" : "web"
+
+  # With maxUnavailable=0 + maxSurge=1, a single canary replica can briefly leave the canary Service with no Ready
+  # endpoints during image rollout; ALB then has an unhealthy canary target group for the weighted share. Enforce
+  # at least two nginx canary Pods whenever weighted routing is on (same pattern as stable HA).
+  web_canary_replicas_effective = (
+    local.alb_weighted_canary_for_web ? max(var.web_canary_replicas, 2) : 0
+  )
 }
 
 # Private ECR pulls from cluster nodes rely on IAM. AWS Academy LabRole often lacks AmazonECR*;
@@ -619,9 +626,7 @@ resource "kubernetes_deployment" "web_canary" {
   }
 
   spec {
-    replicas = (
-      local.alb_weighted_canary_for_web ? var.web_canary_replicas : 0
-    )
+    replicas                  = local.web_canary_replicas_effective
     progress_deadline_seconds = var.rollout_progress_deadline_seconds
     min_ready_seconds         = var.rollout_min_ready_seconds
     strategy {

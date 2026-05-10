@@ -126,7 +126,10 @@ variable "pod_disruption_min_available_percent" {
 variable "enable_alb_weighted_canary_for_web" {
   type        = bool
   default     = false
-  description = "When true with alb_web_canary_traffic_percent > 0 and web_canary_replicas > 0, ALB splits browser traffic (Ingress path \"/\" only) between Service web and web-canary via weighted forward. APIs stay on stable Deployments only (cost control)."
+  description = <<-EOT
+    Per-environment Terraform toggle (set in infra/envs/<env>/main.tf or override with TF_VAR_enable_alb_weighted_canary_for_web in a promotion job).
+    When true with alb_web_canary_traffic_percent > 0 and web_canary_replicas > 0, ALB splits browser traffic (Ingress path "/") between Service web and web-canary. APIs stay single-target (cost control).
+  EOT
 }
 
 variable "alb_web_canary_traffic_percent" {
@@ -142,10 +145,12 @@ variable "alb_web_canary_traffic_percent" {
 variable "web_canary_replicas" {
   type        = number
   default     = 0
-  description = "Replicas for parallel Deployment web-canary (nginx SPA). Set to 1 when enabling weighted canary; extra pod cost while enabled."
+  description = <<-EOT
+    Desired minimum for Deployment web-canary when weighted canary is on. The module enforces max(your value, 2) while weighted routing is active so RollingUpdate never leaves the canary Service with zero Ready endpoints (ALB would drop that traffic share). When weighted canary is off, replicas are forced to 0 regardless of this input.
+  EOT
   validation {
-    condition     = var.web_canary_replicas >= 0 && var.web_canary_replicas <= 3
-    error_message = "web_canary_replicas must be between 0 and 3."
+    condition     = var.web_canary_replicas >= 0 && var.web_canary_replicas <= 5
+    error_message = "web_canary_replicas must be between 0 and 5."
   }
 }
 

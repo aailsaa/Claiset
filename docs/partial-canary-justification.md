@@ -58,9 +58,11 @@ Blue/Green is a **valid** rubric option, but it optimizes for **instant cutover*
 
 **Implemented** in [`infra/modules/eks-app`](../infra/modules/eks-app): variables **`enable_alb_weighted_canary_for_web`**, **`alb_web_canary_traffic_percent`**, and **`web_canary_replicas`**. When all are active, the **AWS Load Balancer Controller** applies an **`alb.ingress.kubernetes.io/actions.*`** **weighted `forward`** on the Ingress rule for **`/`** only, splitting traffic between Service **`web`** (stable) and **`web-canary`** (same image by default; separate Deployment so you can roll the SPA independently). **`web-canary`** is always defined when the app module is on, but runs **0 replicas** unless weighted canary is enabled—**no extra nginx cost** in dev/qa/prod defaults.
 
-**UAT** turns this on (**10%** canary, **one** extra `web-canary` Pod) in **`infra/envs/uat/main.tf`** so graders can see **measurable HTTP share** without doubling **items/outfits/schedule** capacity. **Prod** leaves it **off** unless you opt in.
+**UAT** defaults this on (**10%** canary) via **`infra/envs/uat/variables.tf`** (passed into `module "eks_app"`). **Prod/dev/qa** default **off** in their `variables.tf`. **Any** `terraform apply` that targets an env can override with **`TF_VAR_enable_alb_weighted_canary_for_web`**, **`TF_VAR_alb_web_canary_traffic_percent`**, and **`TF_VAR_web_canary_replicas`** (for example, add `env:` entries on the matching job in **`.github/workflows/promotion.yml`**).
 
-**Scaling / cost:** Canary adds **at most** the configured **`web_canary_replicas`** nginx Pods. Pod anti-affinity prefers spreading **`web`**, **`web-canary`**, and backends across nodes (same pattern as stable **`web`**). If a promotion is tight on headroom, lower **`alb_web_canary_traffic_percent`** or disable the feature for that env.
+**Availability:** While weighted routing is active, the module sets **`web-canary` replicas to max(your value, 2)** so **`RollingUpdate` + `maxUnavailable: 0`** never leaves the canary Service with **zero Ready** endpoints (which would make ALB drop the canary traffic share). Stable **`web`** keeps the same rollout semantics as before (**`maxUnavailable: 0`**, soak, **`preStop`**), so the **90%** stable path preserves the same **no intentional capacity dip** story during image promotion.
+
+**Scaling / cost:** Canary adds **two** nginx Pods at minimum when the split is on (not one). Pod anti-affinity prefers spreading **`web`**, **`web-canary`**, and backends across nodes. If a promotion is tight on headroom, lower **`alb_web_canary_traffic_percent`** or set **`enable_alb_weighted_canary_for_web = false`** for that env.
 
 ## 6. Further optional hardening
 

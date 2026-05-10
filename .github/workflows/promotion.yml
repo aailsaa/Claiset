@@ -456,6 +456,11 @@ jobs:
     env:
       EXPECTED_VPC_NAME: claiset-uat
       EXPECTED_CLUSTER_NAME: claiset-uat
+      # Optional ALB SPA canary overrides for this apply (defaults come from infra/envs/uat/variables.tf):
+      # TF_VAR_enable_alb_weighted_canary_for_web: "false"
+      # TF_VAR_alb_web_canary_traffic_percent: "0"
+      # TF_VAR_web_canary_replicas: "0"
+      # Same pattern works on dev/qa/prod jobs if you add env keys there.
     runs-on: ubuntu-latest
     concurrency:
       group: tf-uat-${{ github.repository }}
