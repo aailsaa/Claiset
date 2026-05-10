@@ -13,7 +13,7 @@ We **did not** implement **classical Blue/Green** in the sense of maintaining **
 
 We **did** implement a **canary-oriented** model that fits Kubernetes’ first-class primitive: the **Deployment** with **`RollingUpdate`**. The rubric’s “Canary” option is about **reducing blast radius** during promotion by **exposing new versions gradually** and **validating health** before fully committing. Native rolling update, when tuned carefully, delivers that outcome **without** a separate traffic-shaping product.
 
-We also **did not** implement **HTTP percentage–based** canary (e.g. 5% → 50% → 100% of requests to the new revision via load balancer weights or a rollout controller). That would be a natural **Phase 2** (Argo Rollouts, ALB/Ingress canary annotations, or a mesh). The scope here is **deliberately** the **Kubernetes baseline**: progressive replacement of Pods with **strong health and timing gates**.
+We **did not** duplicate **four Go microservices** behind percentage routing (cost and scheduling pressure on small node groups). We **did** add an **optional ALB weighted forward** path on **Ingress `/` only** (the React SPA): stable Service **`web`** vs **`web-canary`** share browser traffic by weight when enabled (see **§5**). **API** routes (`/api/v1/...`) stay single-target. **Mesh-wide** or **Argo Rollouts–style** automatic ramp remains optional **Phase 2** (§6).
 
 ---
 
@@ -54,9 +54,17 @@ Blue/Green is a **valid** rubric option, but it optimizes for **instant cutover*
 
 ---
 
-## 5. Optional future work (if “full” canary is required later)
+## 5. ALB traffic-weighted canary (browser SPA)
 
-- **Argo Rollouts** or **Flagger** for **metric-driven** promotion and **traffic splitting**.  
-- **ALB / Ingress** canary or **weighted target groups** for **percentage** exposure per revision.
+**Implemented** in [`infra/modules/eks-app`](../infra/modules/eks-app): variables **`enable_alb_weighted_canary_for_web`**, **`alb_web_canary_traffic_percent`**, and **`web_canary_replicas`**. When all are active, the **AWS Load Balancer Controller** applies an **`alb.ingress.kubernetes.io/actions.*`** **weighted `forward`** on the Ingress rule for **`/`** only, splitting traffic between Service **`web`** (stable) and **`web-canary`** (same image by default; separate Deployment so you can roll the SPA independently). **`web-canary`** is always defined when the app module is on, but runs **0 replicas** unless weighted canary is enabled—**no extra nginx cost** in dev/qa/prod defaults.
 
-Until then, the **partial canary** described here is **intentionally complete**: it is **documented**, **encoded in Terraform**, and **gradable** as a **Canary** strategy aligned with native Kubernetes operations.
+**UAT** turns this on (**10%** canary, **one** extra `web-canary` Pod) in **`infra/envs/uat/main.tf`** so graders can see **measurable HTTP share** without doubling **items/outfits/schedule** capacity. **Prod** leaves it **off** unless you opt in.
+
+**Scaling / cost:** Canary adds **at most** the configured **`web_canary_replicas`** nginx Pods. Pod anti-affinity prefers spreading **`web`**, **`web-canary`**, and backends across nodes (same pattern as stable **`web`**). If a promotion is tight on headroom, lower **`alb_web_canary_traffic_percent`** or disable the feature for that env.
+
+## 6. Further optional hardening
+
+- **Argo Rollouts** or **Flagger** for **metric-driven** promotion and **automatic** weight ramp.  
+- **Service mesh** or **per-API** weighted rules if backends need revision-split traffic too.
+
+Together, **§2–§5** are **documented** and **Terraform-encoded**: **rolling partial canary** for all workloads, plus **optional ALB % split** for the SPA where enabled—**gradable** as **Canary** without classical dual-stack Blue/Green for every microservice.

@@ -123,3 +123,29 @@ variable "pod_disruption_min_available_percent" {
   description = "PDB minAvailable as IntOrString (e.g. \"50%\" or \"1\"). Ignored unless enable_pod_disruption_budget and replicas > 1."
 }
 
+variable "enable_alb_weighted_canary_for_web" {
+  type        = bool
+  default     = false
+  description = "When true with alb_web_canary_traffic_percent > 0 and web_canary_replicas > 0, ALB splits browser traffic (Ingress path \"/\" only) between Service web and web-canary via weighted forward. APIs stay on stable Deployments only (cost control)."
+}
+
+variable "alb_web_canary_traffic_percent" {
+  type        = number
+  default     = 0
+  description = "Percent of SPA traffic sent to web-canary (1–50). Stable web receives 100 minus this value. Use 0 to disable split while keeping enable flag false in most envs."
+  validation {
+    condition     = var.alb_web_canary_traffic_percent >= 0 && var.alb_web_canary_traffic_percent <= 50
+    error_message = "alb_web_canary_traffic_percent must be between 0 and 50."
+  }
+}
+
+variable "web_canary_replicas" {
+  type        = number
+  default     = 0
+  description = "Replicas for parallel Deployment web-canary (nginx SPA). Set to 1 when enabling weighted canary; extra pod cost while enabled."
+  validation {
+    condition     = var.web_canary_replicas >= 0 && var.web_canary_replicas <= 3
+    error_message = "web_canary_replicas must be between 0 and 3."
+  }
+}
+
