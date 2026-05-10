@@ -15,7 +15,7 @@ The following maps **syllabus implementation** (what ships in **`main`**) to **w
 
 | Syllabus topic | Implemented in repo | Still on you for a complete grade |
 | --- | --- | --- |
-| **§1 App + RDS + 3µs + HTTPS** | `web/`, `infra/modules/{rds,eks-app,platform}`, Ingress/ACM | Optional polish: **`A2`/`A3`/`A6`** media if graders dig into IaC screenshots |
+| **§1 App + RDS + 3 Microservices + HTTPS** | `web/`, `infra/modules/{rds,eks-app,platform}`, Ingress/ACM | **Done (media):** **`A2`**, **`A3`** (+ **`A3-terraform-state-continuation`**), **`A6`** — embedded in [docs/evidence-media-checklist.md](docs/evidence-media-checklist.md) §A2–A3, §A6. |
 | **§1 IaC + Day 1/Day 2 automation** | All AWS/K8s in **`infra/`**; **`promotion.yml`** | **`C1`–`C4`** URLs/stills optional but strong |
 | **§2 Git promotion** | **dev**: push **`main`**; **qa**: schedule + **`workflow_dispatch`**; **uat**: merged same-repo **`pull_request`** to **`main`** or RC path + manual `uat`; **prod**: **`v*`** tags + **`workflow_dispatch`** (**requires** repo variable **`ALLOW_COSTLY_RUNS=true`** for prod dispatch) | Point graders at green runs |
 | **§2 Canary (not dual-stack BG, not `%` HTTP)** | **`infra/modules/eks-app`** `RollingUpdate`, **`maxUnavailable` 0**, UAT/Prod **`maxSurge` 1** + **`minReadySeconds` soak**, PDB when **`replicas>1`**; **`docs/partial-canary-justification.md`** | Slide pointer + oral defense |
@@ -29,7 +29,7 @@ The following maps **syllabus implementation** (what ships in **`main`**) to **w
 | **§4 Central logging + multi-service queries** | Loki + Promtail Helm; Grafana Loki datasource | **`O6`** clip section |
 | **§5 Presentation / chaos** | *Not infra* | Silent video (**S1** quality check), live narration, timed chaos rehearsal |
 
-**Bottom line:** **Implementation requirements** (excluding full `%` canary and presentation) are **covered by the codebase** assuming **Observability** and **SMTP** secrets are configured where you demo. Left work is **`O7` evidence**, **`C6` evidence**, **`P1–P3` evidence**, **`S1`/chaos rehearsal**, optional **`A*`/`C*` stills**, and self-grading comments at the bottom of this file.
+**Bottom line:** **Implementation requirements** (excluding full `%` canary and presentation) are **covered by the codebase** assuming **Observability** and **SMTP** secrets are configured where you demo. **A2 / A3 / A6** media are in the bundle. Left work is **`O7` evidence**, **`C6`** (confirm rubric vs your strict “zero errors” wording), **`P1–P3` evidence**, **`S1`/chaos rehearsal**, optional **`C3`** prod dispatch still, and self-grading comments at the bottom of this file.
 
 ---
 
@@ -38,10 +38,10 @@ The following maps **syllabus implementation** (what ships in **`main`**) to **w
 | Requirement | Status | Required proof (exact artifact to capture) | Current evidence / notes |
 | --- | --- | --- | --- |
 | Frontend exists and is polished | [x] | App homepage **and** one other functional page; rubric cites prod — in defense note **dev**/prod parity. | **`A1-app-home.png`**, **`A1-app-inner.png`** + extras — see **`### A1`** in [docs/evidence-media-checklist.md](docs/evidence-media-checklist.md). |
-| Database is AWS RDS only | [x] | AWS console RDS **Available** + `terraform state list` showing RDS. | **`A2-rds-console.png`**, **`A3-terraform-state.png`** — [evidence-media-checklist.md](docs/evidence-media-checklist.md) §A2–A3. |
+| Database is AWS RDS only | [x] | AWS console RDS **Available** + `terraform state list` showing RDS. | **`A2-rds-console.png`**, **`A3-terraform-state.png`** (+ **`A3-terraform-state-continuation.png`**) — [evidence-media-checklist.md](docs/evidence-media-checklist.md) §A2–A3. |
 | Backend has at least 3 microservices | [x] | `kubectl get deploy` **`items`**, **`outfits`**, **`schedule`**. | **`A4-kubectl-deploy.png`** (also shows **`web`**) — see **`### A4`** in [docs/evidence-media-checklist.md](docs/evidence-media-checklist.md). |
 | Frontend on custom DNS with HTTPS | [x] | Browser HTTPS lock + Ingress/ALB mapping. | **`A5-kubectl-ingress.png`**; HTTPS extras under **`### A1`** in [docs/evidence-media-checklist.md](docs/evidence-media-checklist.md). |
-| EKS / RDS / VPC / IAM managed by Terraform | [x] | `terraform state list` excerpt + **`infra/modules/`** tree or file samples. | **`A3-terraform-state.png`** (+ continuation) — [evidence-media-checklist.md](docs/evidence-media-checklist.md) §A3; **A6** still optional in §A6. |
+| EKS / RDS / VPC / IAM managed by Terraform | [x] | `terraform state list` excerpt + **`infra/modules/`** tree or file samples. | **`A3-terraform-state.png`** (+ continuation), **`A6-infra-modules.png`** — [evidence-media-checklist.md](docs/evidence-media-checklist.md) §A3, §A6. |
 | Day 1 + Day 2 automated | [x] | GitHub Actions runs + Terraform apply logs. | Silent slice: **`S1-terraform-apply-or-infra-recording.mov`**; **`C1`**, **`C2`**, **`C4`** stills in [evidence-media-checklist.md](docs/evidence-media-checklist.md) §C1–C4. |
 
 ---
@@ -51,10 +51,10 @@ The following maps **syllabus implementation** (what ships in **`main`**) to **w
 | Requirement | Status | Required proof (exact artifact to capture) | Current evidence / notes |
 | --- | --- | --- | --- |
 | Dev → nightly QA → UAT → Prod flow | [x] | Workflow graph with successful transitions. | **`C1-actions-promotion-workflow.png`** — **`### C1`** in [docs/evidence-media-checklist.md](docs/evidence-media-checklist.md). |
-| Dev/QA → UAT via conventional commit / PR merge | [x] | Run from merged PR **`or`** `RC` in commit message. | **`C2-pull-request-merged-uat-actions.png`** — **`### C2`** in [docs/evidence-media-checklist.md](docs/evidence-media-checklist.md). |
+| Dev/QA → UAT via conventional commit / PR merge | [x] | Run from merged PR **`or`** `RC` in commit message. | **`C2-uat-on-merge.mov`** (primary); still **`C2-pull-request-merged-uat-actions.png`** — **`### C2`** in [docs/evidence-media-checklist.md](docs/evidence-media-checklist.md). |
 | UAT → Prod via tags / gated dispatch (no console deploy) | [x] | Tag or **`workflow_dispatch`** prod with refs visible. | **`C3-…`** — **`### C3`** in [docs/evidence-media-checklist.md](docs/evidence-media-checklist.md). |
 | Blue/Green **or** Canary chosen and justified | [x] | README / slide + strategy reflected in infra code. | **Justification:** [docs/partial-canary-justification.md](docs/partial-canary-justification.md) · **Overview + table:** [README — progressive rollout](README.md#progressive-rollout-strategy-eks) · Code: **`infra/modules/eks-app`**, **`maxSurge: 1`** + **`minReadySeconds`** soak in **UAT/Prod**. *(Rubric: “Blue/Green or Canary”; we document progressive rolling canary, not dual-stack BG or HTTP % split.)* |
-| Zero downtime during promotion | [ ] | Short video/log: no elevated 5xx during rollout + rollout succeeded. | **How-to:** **[docs/zero-downtime-promotion-evidence.md](docs/zero-downtime-promotion-evidence.md)** · **`infra/scripts/http-availability-during-rollout.sh`**. Artifacts: **`C6-rollout-or-deployment-recording.mov`** (dev), **`C6-uat-*.mov`** + **`C6-http-during-rollout-uat.txt`** (UAT); verify **[docs/evidence-media/MEDIA_MAPPING.txt](docs/evidence-media/MEDIA_MAPPING.txt)**. |
+| Zero downtime during promotion | [ ] | Short video/log: no elevated 5xx during rollout + rollout succeeded. | **How-to:** **[docs/zero-downtime-promotion-evidence.md](docs/zero-downtime-promotion-evidence.md)** · **`infra/scripts/http-availability-during-rollout.sh`**. Artifacts: **`C6-uat-zero-downtime.mov`** + **`C6-http-during-rollout-uat.txt`** (UAT); verify **[docs/evidence-media/MEDIA_MAPPING.txt](docs/evidence-media/MEDIA_MAPPING.txt)**. |
 
 ---
 
@@ -71,13 +71,13 @@ The following maps **syllabus implementation** (what ships in **`main`**) to **w
 
 | Requirement | Status | Required proof (exact artifact to capture) | Current evidence / notes |
 | --- | --- | --- | --- |
-| Prometheus + Grafana self-hosted on EKS | [x] | `kubectl -n monitoring get pods` + Grafana in UI/recording. | **`O1-monitoring-pods.png`**, **`EXTRA-O1-…`**; tour **`O2-O6-grafana-and-observability.mov`**. |
-| Dashboard: node CPU / memory / **disk** | [x] | Panels or Explore proving all three. | **`EXTRA-O5-grafana-node-exporter-cpu-mem.png`**, **`EXTRA-O5-grafana-dashboard-disk-io-disk-space-empty.png`**, **`O5-disk-capacity-explore.png`**. |
+| Prometheus + Grafana self-hosted on EKS | [x] | `kubectl -n monitoring get pods` + Grafana in UI/recording. | **`O1-monitoring-pods.png`**, **`EXTRA-O1-…`**; **`O3-grafana-and-oauth.mov`**, **`O6-grafana-query-loki-microservices.mov`**. |
+| Dashboard: node CPU / memory / **disk** | [x] | Panels or Explore proving all three. | **`EXTRA-O5-grafana-node-exporter-cpu-mem.png`**, **`EXTRA-O5-grafana-node-exporter-disk-network-uat.png`**, **`O5-disk-capacity-explore.png`**. |
 | Alerts to Email / Slack | [ ] | Alert drill output + **received** notification. | Run **`infra/scripts/alert-drill.sh`**; add **`O7-…`** — **`### O7`** in [docs/evidence-media-checklist.md](docs/evidence-media-checklist.md). |
-| Grafana externally reachable | [x] | `https://grafana-<env>.<domain>` from outside AWS. | URL bar + flow in **`O2-O6-…`** (e.g. **grafana-dev**); narrate env in defense. |
-| Grafana OAuth2 (no password-primary login) | [x] | Google OAuth path into Grafana. | **`EXTRA-app-dev-login-google.png`** + **`O2-O6-…`**. |
-| Centralized logging (Loki stack) | [x] | Datasource / Explore path to Loki. | **`loki`** pod in **`O1`** ; queries in **`O2-O6-…`** — see **Observability** section headers in [docs/evidence-media-checklist.md](docs/evidence-media-checklist.md). |
-| Query logs across all three backends | [x] | **`items`** / **`outfits`** / **`schedule`** filters + broader query. | Demonstrated in **`O2-O6-…`** — **`### O6`** in [docs/evidence-media-checklist.md](docs/evidence-media-checklist.md). |
+| Grafana externally reachable | [x] | `https://grafana-<env>.<domain>` from outside AWS. | URL bar + flow in **`O3-grafana-and-oauth.mov`** (e.g. **grafana-dev**); narrate env in defense. |
+| Grafana OAuth2 (no password-primary login) | [x] | Google OAuth path into Grafana. | **`EXTRA-app-dev-login-google.png`** + **`O3-grafana-and-oauth.mov`**. |
+| Centralized logging (Loki stack) | [x] | Datasource / Explore path to Loki. | **`loki`** pod in **`O1`** ; queries in **`O6-grafana-query-loki-microservices.mov`** — see **Observability** in [docs/evidence-media-checklist.md](docs/evidence-media-checklist.md). |
+| Query logs across all three backends | [x] | **`items`** / **`outfits`** / **`schedule`** filters + broader query. | **`O6-grafana-query-loki-microservices.mov`** — **`### O6`** in [docs/evidence-media-checklist.md](docs/evidence-media-checklist.md). |
 
 ---
 
@@ -95,7 +95,7 @@ The following maps **syllabus implementation** (what ships in **`main`**) to **w
 
 - **Media index (with embeds):** [docs/evidence-media-checklist.md](docs/evidence-media-checklist.md)
 - **Plain files:** `docs/evidence-media/*.png`, `*.mov`
-- Still **recommended** if graders ask: RDS console (**A2**), **`terraform state list`** (**A3**), **`infra/modules`** tree (**A6**), Actions graph / dispatch shots (**C1–C4**), alert inbox (**O7**); **§3 patching** runbook **[docs/day2-os-node-patching.md](docs/day2-os-node-patching.md)**; **zero downtime** **[docs/zero-downtime-promotion-evidence.md](docs/zero-downtime-promotion-evidence.md)**
+- **Bundled:** RDS (**A2**), **`terraform state list`** (**A3** + continuation), **`infra/modules/`** tree (**A6**), Actions (**C1/C2/C4**), **C2** video **`C2-uat-on-merge.mov`**, UAT **C6** **`C6-uat-zero-downtime.mov`** + **`C6-http-during-rollout-uat.txt`**, Grafana/Loki **`O3-grafana-and-oauth.mov`** and **`O6-grafana-query-loki-microservices.mov`** — [docs/evidence-media-checklist.md](docs/evidence-media-checklist.md). Still add if missing: **prod dispatch (`C3`)**, alert inbox (**O7**); **§3 patching** runbook **[docs/day2-os-node-patching.md](docs/day2-os-node-patching.md)**; **zero downtime** narrative **[docs/zero-downtime-promotion-evidence.md](docs/zero-downtime-promotion-evidence.md)**.
 
 ---
 

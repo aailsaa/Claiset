@@ -4,8 +4,9 @@ This folder holds **defense / grading** screenshots (`.png`) and screen recordin
 
 ## What’s here (2026-05-09 bundle)
 
-- **`MEDIA_MAPPING.txt`** — each final filename → original macOS **Screenshot / Screen Recording …** name.
-- **`../evidence-media-checklist.md`** — section *This submission — media package* embeds the main stills and links every file here.
+- **`MEDIA_MAPPING.txt`** — each final filename → original macOS **Screenshot / Screen Recording …** name (or rename/split lineage).
+- **Videos:** **`S1-terraform-apply-or-infra-recording.mov`**, **`C2-uat-on-merge.mov`**, **`C6-uat-zero-downtime.mov`**, **`O3-grafana-and-oauth.mov`**, **`O6-grafana-query-loki-microservices.mov`**.
+- **`../evidence-media-checklist.md`** — embeds the main stills and links every file here.
 
 ## Naming
 

@@ -1,6 +1,7 @@
 A2-rds-console.png	<- Screenshot 2026-05-09 at 3.41.53 PM.png
 A3-terraform-state.png	<- Screenshot 2026-05-09 at 4.31.11 PM.png
 A3-terraform-state-continuation.png	<- Screenshot 2026-05-09 at 4.31.20 PM.png
+A6-infra-modules.png	<- Screenshot 2026-05-09 at 4.53.05 PM.png
 EXTRA-A1-app-prod-all-items.png	<- Screenshot 2026-05-09 at 10.50.02 AM.png
 EXTRA-app-dev-login-google.png	<- Screenshot 2026-05-09 at 11.54.30 AM.png
 EXTRA-app-dev-HTTPS-connection-details.png	<- Screenshot 2026-05-09 at 11.57.02 AM.png
@@ -11,18 +12,19 @@ A1-app-inner.png	<- Screenshot 2026-05-09 at 12.02.10 PM.png
 EXTRA-app-dev-stats.png	<- Screenshot 2026-05-09 at 12.02.33 PM.png
 A4-kubectl-deploy.png	<- Screenshot 2026-05-09 at 12.06.07 PM.png
 A5-kubectl-ingress.png	<- Screenshot 2026-05-09 at 12.06.54 PM.png
-D1-migrate-job.png	<- Screenshot 2026-05-09 at 12.07.16 PM.png
+D1-migrate-job.png	<- (was C2-pull-request-merged-uat-actions.png — Screenshot 2026-05-09 at 4.07.29 PM.png)
+EXTRA-D1-kubectl-get-jobs-migrate-complete-archived.png	<- prior D1-migrate-job.png (Screenshot 2026-05-09 at 12.07.16 PM.png) before remap — true kubectl get jobs migrate Complete
 D2-migrate-describe.png	<- Screenshot 2026-05-09 at 12.07.33 PM.png
 O1-monitoring-pods.png	<- Screenshot 2026-05-09 at 12.07.48 PM.png
 EXTRA-O1-monitoring-pods-wide.png	<- Screenshot 2026-05-09 at 12.07.51 PM.png
 EXTRA-O5-grafana-node-exporter-cpu-mem.png	<- Screenshot 2026-05-09 at 12.10.12 PM.png
-EXTRA-O5-grafana-dashboard-disk-io-disk-space-empty.png	<- Screenshot 2026-05-09 at 12.10.32 PM.png
+EXTRA-O5-grafana-node-exporter-disk-network-uat.png	<- (was mis-saved as C1-actions-promotion-workflow.png — Grafana UAT Node Exporter disk/network)
+C1-actions-promotion-workflow.png	<- Screenshot 2026-05-09 at 5.11.42 PM.png
 O5-disk-capacity-explore.png	<- Screenshot 2026-05-09 at 12.12.09 PM.png
-O2-O6-grafana-and-observability.mov	<- Screen Recording 2026-05-09 at 10.47.39 AM.mov
-S1-terraform-apply-or-infra-recording.mov	<- Screen Recording 2026-05-09 at 8.35.26 AM.mov
-C6-rollout-or-deployment-recording.mov	<- Screen Recording 2026-05-09 at 12.13.43 PM.mov
-C1-actions-promotion-workflow.png	<- Screenshot 2026-05-09 at 12.26.20 PM.png
-C2-pull-request-merged-uat-actions.png	<- Screenshot 2026-05-09 at 4.07.29 PM.png
+C2-pull-request-merged-uat-actions.png	<- same bytes as C4-github-actions-run-success.png (UAT promotion job overview; **video:** **`C2-uat-on-merge.mov`** is the PR-merge → UAT capture)
 C4-github-actions-run-success.png	<- Screenshot 2026-05-09 at 4.18.23 PM.png
-C6-uat-rollout-screen-recording.mov	<- Screen Recording 2026-05-09 at 4.12.01 PM.mov
-C6-uat-http-poll-all-200-trimmed.mov	<- trimmed-zero-drop.mov
+C2-uat-on-merge.mov	<- screen recording — merged PR → UAT (renamed in bundle 2026-05-09)
+C6-uat-zero-downtime.mov	<- UAT rollout + availability (replaces **`C6-uat-rollout-screen-recording.mov`** + **`C6-uat-http-poll-all-200-trimmed.mov`**)
+O3-grafana-and-oauth.mov	<- **`O2-O6-grafana-and-observability.mov`** split / rename — Grafana URL, OAuth, Prometheus Explore (as captured)
+O6-grafana-query-loki-microservices.mov	<- **`O2-O6-grafana-and-observability.mov`** split / rename — Loki Explore, **`items`/`outfits`/`schedule`** queries
+S1-terraform-apply-or-infra-recording.mov	<- Screen Recording 2026-05-09 at 8.35.26 AM.mov
