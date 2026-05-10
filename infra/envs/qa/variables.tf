@@ -24,8 +24,8 @@ variable "ecr_repository_prefix" {
 
 variable "eks_cluster_version" {
   type        = string
-  description = "EKS Kubernetes version for this environment."
-  default     = "1.31"
+  description = "EKS Kubernetes version for this environment. Must match or exceed the live cluster (AWS does not support minor version downgrades)."
+  default     = "1.32"
 }
 
 variable "eks_node_group_kubernetes_version" {
