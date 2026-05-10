@@ -38,7 +38,7 @@ For the **canonical checklist** (checkboxes + rubric mapping), open **[REQUIREME
 
 **Written justification (submission-ready prose):** [docs/partial-canary-justification.md](docs/partial-canary-justification.md)
 
-[REQUIREMENTS.md](REQUIREMENTS.md) asks you to **pick and justify** a deployment strategy between **Blue/Green–style** ideas and **Canary**. This project implements a **hosted-service canary**: **progressive replacement** of Pods using native **`RollingUpdate`**, without running two full immutable stacks or doing a single hard traffic flip. That matches the rubric’s “canary” option in spirit while staying within **core Kubernetes** APIs (no mesh, no weighted target groups in this iteration).
+[REQUIREMENTS.md](REQUIREMENTS.md) asks you to **pick and justify** a deployment strategy between **Blue/Green–style** ideas and **Canary**. This project implements a **hosted-service canary**: **progressive replacement** of Pods using native **`RollingUpdate`**, without running two full immutable stacks or doing a single hard traffic flip. **UAT** additionally enables an **ALB weighted forward** split on the **SPA path `/` only** (stable **`web`** vs **`web-canary`**), so a **percentage of browser traffic** hits the canary Service while **API** routes stay on stable Deployments—see [docs/partial-canary-justification.md](docs/partial-canary-justification.md) §5.
 
 ##### What is implemented (partial canary)
 
@@ -49,21 +49,22 @@ For the **canonical checklist** (checkboxes + rubric mapping), open **[REQUIREME
 | **`minReadySeconds` soak** (**20s** UAT, **30s** Prod) | After `/health` succeeds, the new Pod must stay **Ready** for this window before the Deployment controller advances; catches **flapping** or **slow failures** that a one-shot readiness check might miss—a lightweight **“observe before promote”** gate. |
 | **Readiness / liveness HTTP probes** | **Service endpoints exclude** Pods until readiness passes; only healthy revision serves traffic. |
 | **`PodDisruptionBudget`** (`replicas > 1`) | Caps **voluntary** eviction during node drains so you do not lose an entire service surface at once—complements rollout safety during **cluster** changes. |
+| **ALB weighted forward (`/` only)** | **Per-env Terraform** (defaults **on** in **UAT**, **off** elsewhere): ALB splits **browser** traffic between **`web`** and **`web-canary`** by weight. While enabled, **`web-canary` runs at least two** nginx Pods so rollouts never leave the canary target group empty. **API** paths unchanged—no duplicate Go services. **CI toggles:** GitHub **Settings → Secrets and variables → Actions → Variables** — `ALB_CANARY_<ENV>_ENABLED`, `ALB_CANARY_<ENV>_TRAFFIC_PERCENT`, `ALB_CANARY_<ENV>_WEB_REPLICAS` for `DEV|QA|UAT|PROD` (wired in **`.github/workflows/promotion.yml`**). Local apply: **`TF_VAR_*`**. |
 
 ##### Justification (why this counts as canary for the assignment)
 
 - **Progressive exposure:** New code is introduced in **small increments** (bounded surge + ordered replacement), not all-at-once cutover.
 - **Automated promotion gate:** **Readiness** + **`minReadySeconds`** act as successive checks before the controller retires old Pods—the same *idea* as canary stages, expressed with **Kubernetes-native** knobs instead of an external rollout controller.
 - **Operational fit:** Managed node groups and **budget** favors **minimal extra capacity**; we avoid **double-deploy** Blue/Green for every microservice simultaneously.
-- **Honest boundary:** There is **no percentage-based HTTP split** (e.g. 5% → 50% → 100%) across two arbitrary revisions. Adding that would mean **AWS Load Balancer weights**, **Ingress canary controllers**, or **Argo Rollouts**—tracked as optional hardening below.
+- **HTTP share where it matters:** **ALB weights** on **`/`** give **measurable** canary exposure for the SPA without multiplying **items/outfits/schedule** Pods.
 
 ##### Defaults vs environment policy
 
-All knobs live on module [`infra/modules/eks-app`](infra/modules/eks-app) (`rolling_update_*`, `rollout_*`, PDB). **Prod** (and **UAT** once rebuilt) use **stricter** stepping/soak; **dev/QA** prioritize **iteration speed**.
+All knobs live on module [`infra/modules/eks-app`](infra/modules/eks-app) (`rolling_update_*`, `rollout_*`, PDB, **`enable_alb_weighted_canary_for_web`** / **`alb_web_canary_traffic_percent`** / **`web_canary_replicas`**). **Prod** (and **UAT** once rebuilt) use **stricter** stepping/soak; **dev/QA** prioritize **iteration speed** and leave **ALB % canary** off by default.
 
-##### Future hardening (full traffic-weighted canary)
+##### Future hardening (beyond ALB SPA split)
 
-If grading or production needs **measurable traffic share** per revision: add **Argo Rollouts**, **Ingress/ALB weighted rules**, or a **service mesh**—the current design is intentionally the **baseline** that already satisfies **progressive, probed, capacity-safe** rollout.
+**Argo Rollouts**, **Flagger**, or a **mesh** for **metric-driven** ramps and **per-API** revision splits—see [docs/partial-canary-justification.md](docs/partial-canary-justification.md) §6.
 
 Workloads and Ingress live in Terraform module **`eks_app`** ([`infra/modules/eks-app`](infra/modules/eks-app)).
 

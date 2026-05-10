@@ -91,6 +91,10 @@ module "eks_app" {
   depends_on            = [module.platform]
   replicas              = 1
 
+  enable_alb_weighted_canary_for_web = var.enable_alb_weighted_canary_for_web
+  alb_web_canary_traffic_percent     = var.alb_web_canary_traffic_percent
+  web_canary_replicas                = var.web_canary_replicas
+
   aws_region               = var.aws_region
   domain_root              = var.domain_root
   frontend_subdomain       = var.frontend_subdomain
