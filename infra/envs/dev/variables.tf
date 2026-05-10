@@ -38,10 +38,14 @@ variable "eks_cluster_version" {
 }
 
 variable "eks_node_group_kubernetes_version" {
-  type        = string
-  default     = null
-  nullable    = true
-  description = "Optional. Pin managed node group kubelet to this version; leave null so LT-only updates are not bundled with UpdateNodegroupVersion (avoids AWS launch-template instance-type errors)."
+  type     = string
+  default  = "1.32"
+  nullable = true
+  description = <<-EOT
+    Pin managed node group kubelet to match the cluster after the control plane is on 1.32.
+    Leave null in other envs until their plane is upgraded; dev uses 1.32 for Day-2 worker refresh.
+    If apply errors with launch-template/instance-type, split: upgrade cluster only, then apply this pin.
+  EOT
 }
 
 variable "node_instance_types" {
