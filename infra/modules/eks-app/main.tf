@@ -136,6 +136,10 @@ resource "kubernetes_job" "migrate" {
     name      = "migrate"
     namespace = kubernetes_namespace.app.metadata[0].name
     labels    = { app = "migrate" }
+    annotations = {
+      # CI/script compares this to sha256(repo checkout of schema.sql): match => no pending migrate replace.
+      "claiset.dev/migrate-schema-sha" = local.migrate_replace_signal
+    }
   }
 
   spec {
