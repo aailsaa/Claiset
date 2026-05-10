@@ -58,3 +58,6 @@ CREATE INDEX IF NOT EXISTS idx_items_user ON items (user_sub);
 CREATE INDEX IF NOT EXISTS idx_outfits_user ON outfits (user_sub);
 CREATE INDEX IF NOT EXISTS idx_outfit_assignments_user_day ON outfit_assignments (user_sub, day);
 CREATE INDEX IF NOT EXISTS idx_outfit_items_item ON outfit_items (item_id);
+
+-- Day-2 / rubric: visible additive migration (nullable; no app change required).
+ALTER TABLE items ADD COLUMN IF NOT EXISTS schema_evidence_demo TEXT;
