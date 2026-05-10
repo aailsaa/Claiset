@@ -102,7 +102,7 @@ module "eks_app" {
   env     = var.env
   tags    = local.tags
 
-  # Dev only: push + schema.sql change forces a new migrate Job via replace_triggered_by (see eks-app module).
+  # Dev only: terraform replaces migrate Job when cmd/migrate/schema.sql changes (file hash).
   migrate_schema_sha = filesha256("${path.module}/../../../cmd/migrate/schema.sql")
 
   enable_kubernetes_app = var.enable_kubernetes_app

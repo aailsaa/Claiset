@@ -105,7 +105,7 @@ resource "kubernetes_secret" "app_env" {
 }
 
 locals {
-  # Empty migrate_schema_sha = do not tie Job replacement to schema.sql (constant trigger).
+  # Replace migrate Job only when migrate_schema_sha changes (non-empty dev) or fallback constant per env.
   migrate_replace_signal = (
     trimspace(coalesce(var.migrate_schema_sha, "")) != "" ?
     trimspace(coalesce(var.migrate_schema_sha, "")) :

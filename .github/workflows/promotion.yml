@@ -272,6 +272,12 @@ jobs:
           terraform apply -auto-approve
           EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" DOMAIN_ROOT=claiset.xyz FRONTEND_SUBDOMAIN=app-dev UPDATE_APEX_DNS=false K8S_APP_NAMESPACE=dev bash ../../scripts/route53-ingress-records-guard.sh
 
+      - name: Migrate job wait + logs (dev)
+        working-directory: infra/envs/dev
+        run: |
+          set -euo pipefail
+          bash ../../scripts/kubectl-migrate-job-wait-and-logs.sh dev migrate 720
+
       - name: Wait for readiness
         working-directory: infra/envs/dev
         run: |
