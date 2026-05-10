@@ -6,10 +6,17 @@
 # 3) frontend URL responds (2xx/3xx)
 # 4) backend API routes do not return 5xx
 # 5) RDS instance for this env is Available
+# 6) Optional ALB weighted SPA canary: when TF_VAR_* (CI) or SMOKE_EXPECT_ALB_CANARY_INGRESS is set, asserts
+#    Ingress annotation web-spa-weighted target weights and / backend service match Terraform (not HTTP traffic ratio).
 #
 # Usage (run from infra/envs/<env> after apply):
 #   EXPECTED_CLUSTER_NAME=claiset-dev K8S_APP_NAMESPACE=dev FRONTEND_HOST=app-dev.claiset.xyz \
 #   bash ../../scripts/smoke-test-env.sh
+#
+# ALB weighted canary (optional): when TF_VAR_enable_alb_weighted_canary_for_web=true and percent/replicas >0
+# (as in CI promotion jobs), validates Ingress annotation weights + path / backend. Override with
+# SMOKE_EXPECT_ALB_CANARY_INGRESS=true and SMOKE_EXPECT_CANARY_PERCENT=10.
+# Live path sampling: nginx adds X-Claiset-SPA-Tier (stable|canary) per Pod — curl -sSI https://$FRONTEND_HOST/ | grep -i X-Claiset
 
 set -euo pipefail
 
@@ -98,6 +105,122 @@ app_oauth_smoke_enabled() {
   [[ "${EXPECT_APP_OAUTH_SMOKE}" == "1" || "${EXPECT_APP_OAUTH_SMOKE}" == "true" ]]
 }
 
+# Match module eks-app local.alb_weighted_canary_for_web (enable + percent>0 + replicas>0), or force via SMOKE_*.
+alb_weighted_canary_smoke_should_run() {
+  if [[ "${SMOKE_EXPECT_ALB_CANARY_INGRESS:-}" == "1" || "${SMOKE_EXPECT_ALB_CANARY_INGRESS:-}" == "true" ]]; then
+    return 0
+  fi
+  local e p r
+  e="${TF_VAR_enable_alb_weighted_canary_for_web:-false}"
+  p="${TF_VAR_alb_web_canary_traffic_percent:-0}"
+  r="${TF_VAR_web_canary_replicas:-0}"
+  if [[ "${e}" != "1" && "${e}" != "true" ]]; then
+    return 1
+  fi
+  [[ "${p}" =~ ^[0-9]+$ ]] && [[ "${p}" -gt 0 ]] || return 1
+  [[ "${r}" =~ ^[0-9]+$ ]] && [[ "${r}" -gt 0 ]] || return 1
+  return 0
+}
+
+expected_alb_canary_traffic_percent() {
+  if [[ -n "${SMOKE_EXPECT_CANARY_PERCENT:-}" ]]; then
+    printf '%s' "${SMOKE_EXPECT_CANARY_PERCENT}"
+    return
+  fi
+  printf '%s' "${TF_VAR_alb_web_canary_traffic_percent:-}"
+}
+
+check_alb_weighted_canary_ingress() {
+  local pct action w_web w_canary sp_backend stable exp sum
+  if ! command -v jq >/dev/null 2>&1; then
+    echo "ALB canary smoke skipped: jq not installed." >&2
+    return 0
+  fi
+
+  pct="$(expected_alb_canary_traffic_percent | tr -d '[:space:]')"
+  if [[ "${SMOKE_EXPECT_ALB_CANARY_INGRESS:-}" == "1" || "${SMOKE_EXPECT_ALB_CANARY_INGRESS:-}" == "true" ]]; then
+    if [[ ! "${pct}" =~ ^[0-9]+$ ]] || [[ "${pct}" -lt 1 ]] || [[ "${pct}" -gt 50 ]]; then
+      echo "ALB canary smoke failed: set SMOKE_EXPECT_CANARY_PERCENT (1–50) or export TF_VAR_alb_web_canary_traffic_percent when using SMOKE_EXPECT_ALB_CANARY_INGRESS." >&2
+      return 1
+    fi
+  fi
+  if [[ ! "${pct}" =~ ^[0-9]+$ ]]; then
+    echo "ALB canary smoke failed: could not resolve expected canary traffic percent." >&2
+    return 1
+  fi
+
+  stable=$((100 - pct))
+  echo "ALB canary smoke: expecting Ingress weighted forward (stable web=${stable}%, web-canary=${pct}%) per TF_VAR / SMOKE_EXPECT_*"
+
+  if ! kubectl -n "${NAMESPACE}" get deployment web-canary >/dev/null 2>&1; then
+    echo "ALB canary smoke failed: deployment/web-canary not found in ${NAMESPACE}." >&2
+    return 1
+  fi
+
+  action="$(kubectl -n "${NAMESPACE}" get "ingress/${PROJECT}" -o json 2>/dev/null \
+    | jq -r '.metadata.annotations["alb.ingress.kubernetes.io/actions.web-spa-weighted"] // empty' | tr -d '\r')"
+  if [[ -z "${action}" ]]; then
+    echo "ALB canary smoke failed: missing annotation alb.ingress.kubernetes.io/actions.web-spa-weighted on ingress/${PROJECT}." >&2
+    return 1
+  fi
+
+  if ! printf '%s' "${action}" | jq -e '.type == "forward" and (.forwardConfig.targetGroups | length == 2)' >/dev/null 2>&1; then
+    echo "ALB canary smoke failed: action JSON is not a two-target forward rule." >&2
+    printf '%s\n' "${action}" | jq . >&2 || printf '%s\n' "${action}" >&2
+    return 1
+  fi
+
+  w_web="$(printf '%s' "${action}" | jq -r '.forwardConfig.targetGroups[] | select(.serviceName == "web") | .weight' | head -1)"
+  w_canary="$(printf '%s' "${action}" | jq -r '.forwardConfig.targetGroups[] | select(.serviceName == "web-canary") | .weight' | head -1)"
+  if [[ ! "${w_web}" =~ ^[0-9]+$ ]] || [[ ! "${w_canary}" =~ ^[0-9]+$ ]]; then
+    echo "ALB canary smoke failed: could not read weights for web / web-canary from action JSON." >&2
+    return 1
+  fi
+  if [[ "${w_web}" -ne "${stable}" ]] || [[ "${w_canary}" -ne "${pct}" ]]; then
+    echo "ALB canary smoke failed: weights mismatch (Ingress has web=${w_web}% web-canary=${w_canary}%, expected web=${stable}% web-canary=${pct}%)." >&2
+    return 1
+  fi
+
+  sum=$((w_web + w_canary))
+  if [[ "${sum}" -ne 100 ]]; then
+    echo "ALB canary smoke failed: target weights sum to ${sum}, expected 100." >&2
+    return 1
+  fi
+
+  sp_backend="$(kubectl -n "${NAMESPACE}" get "ingress/${PROJECT}" -o json \
+    | jq -r --arg h "${FRONTEND_HOST}" '
+        .spec.rules[] | select(.host == $h) | .http.paths[] | select(.path == "/") | .backend.service.name // empty
+      ' | head -1)"
+  if [[ "${sp_backend}" != "web-spa-weighted" ]]; then
+    echo "ALB canary smoke failed: Ingress path / backend service name is \"${sp_backend}\", expected web-spa-weighted." >&2
+    return 1
+  fi
+
+  exp="${SMOKE_EXPECT_WEB_CANARY_READY:-2}"
+  [[ "${exp}" =~ ^[0-9]+$ ]] || exp=2
+  if [[ "${exp}" -lt 1 ]]; then
+    exp=1
+  fi
+  if ! kubectl -n "${NAMESPACE}" wait --for=condition=Available "deployment/web-canary" --timeout=180s >/dev/null 2>&1; then
+    echo "ALB canary smoke failed: deployment/web-canary not Available within timeout." >&2
+    kubectl -n "${NAMESPACE}" get deployment web-canary -o wide || true
+    kubectl -n "${NAMESPACE}" get pods -l app=web-canary -o wide || true
+    return 1
+  fi
+  w_ready="$(kubectl -n "${NAMESPACE}" get deployment web-canary -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)"
+  w_ready="${w_ready:-0}"
+  if [[ ! "${w_ready}" =~ ^[0-9]+$ ]]; then
+    w_ready=0
+  fi
+  if [[ "${w_ready}" -lt "${exp}" ]]; then
+    echo "ALB canary smoke failed: web-canary readyReplicas=${w_ready} (expected at least ${exp} for healthy ALB canary share)." >&2
+    kubectl -n "${NAMESPACE}" get pods -l app=web-canary -o wide || true
+    return 1
+  fi
+
+  echo "ALB canary smoke OK (annotation weights web=${w_web}% web-canary=${w_canary}%, path / -> ${sp_backend}, web-canary Ready=${w_ready})."
+}
+
 echo "Smoke test: cluster=${CLUSTER} namespace=${NAMESPACE} frontend=${FRONTEND_HOST} region=${REGION}"
 
 aws eks update-kubeconfig --region "${REGION}" --name "${CLUSTER}" >/dev/null
@@ -108,7 +231,7 @@ wait_for_no_pending_app_pods() {
   local i pending
   echo "Waiting for app pods to leave Pending state..."
   for ((i=1; i<=attempts; i++)); do
-    pending="$(kubectl -n "${NAMESPACE}" get pods -l 'app in (web,items,outfits,schedule)' --no-headers 2>/dev/null | awk '$3=="Pending"{c++} END{print c+0}')"
+    pending="$(kubectl -n "${NAMESPACE}" get pods -l 'app in (web,web-canary,items,outfits,schedule)' --no-headers 2>/dev/null | awk '$3=="Pending"{c++} END{print c+0}')"
     if [[ "${pending}" == "0" ]]; then
       echo "No Pending app pods."
       return 0
@@ -117,7 +240,7 @@ wait_for_no_pending_app_pods() {
     sleep "${sleep_s}"
   done
   echo "App pods remained Pending too long; failing smoke test." >&2
-  kubectl -n "${NAMESPACE}" get pods -l 'app in (web,items,outfits,schedule)' -o wide || true
+  kubectl -n "${NAMESPACE}" get pods -l 'app in (web,web-canary,items,outfits,schedule)' -o wide || true
   return 1
 }
 
@@ -206,11 +329,11 @@ loki_svc_name() {
 }
 
 check_promtail_on_app_workload_nodes() {
-  echo "Observability guard: promtail must run on each node that hosts ${NAMESPACE} workloads (web/items/outfits/schedule)..."
+  echo "Observability guard: promtail must run on each node that hosts ${NAMESPACE} workloads (web/web-canary/items/outfits/schedule)..."
   local missing=""
   local n=""
   local running=""
-  kubectl -n "${NAMESPACE}" get pods -l 'app in (web,items,outfits,schedule)' -o wide || true
+  kubectl -n "${NAMESPACE}" get pods -l 'app in (web,web-canary,items,outfits,schedule)' -o wide || true
   kubectl -n monitoring get pods -l app.kubernetes.io/name=promtail -o wide || true
   while IFS= read -r n; do
     [[ -z "${n}" ]] && continue
@@ -220,7 +343,7 @@ check_promtail_on_app_workload_nodes() {
     if [[ "${running}" -lt 1 ]]; then
       missing="${missing} ${n}"
     fi
-  done < <(kubectl -n "${NAMESPACE}" get pods -l 'app in (web,items,outfits,schedule)' -o jsonpath='{range .items[*]}{.spec.nodeName}{"\n"}{end}' 2>/dev/null | sort -u)
+  done < <(kubectl -n "${NAMESPACE}" get pods -l 'app in (web,web-canary,items,outfits,schedule)' -o jsonpath='{range .items[*]}{.spec.nodeName}{"\n"}{end}' 2>/dev/null | sort -u)
 
   if [[ -n "${missing// }" ]]; then
     echo "Observability guard failed: promtail is missing on node(s):${missing}" >&2
@@ -352,6 +475,9 @@ if [[ "${MODE}" != "skip-wait" ]]; then
   for d in web items outfits schedule; do
     rollout_with_recovery "${d}"
   done
+  if alb_weighted_canary_smoke_should_run; then
+    rollout_with_recovery "web-canary"
+  fi
   wait_for_no_pending_app_pods
 fi
 
@@ -518,6 +644,10 @@ if ! http_2xx_or_3xx "${front_code}"; then
   exit 1
 fi
 echo "Frontend smoke OK (${front_code}) via ${SMOKE_BASE_HOST} (curl path: ${FRONTEND_REACH_MODE})"
+
+if alb_weighted_canary_smoke_should_run; then
+  check_alb_weighted_canary_ingress
+fi
 
 check_grafana() {
   if [[ -z "${GRAFANA_HOST}" ]]; then

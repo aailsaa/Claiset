@@ -553,6 +553,11 @@ resource "kubernetes_deployment" "web" {
           image             = var.images.web
           image_pull_policy = "Always"
 
+          env {
+            name  = "SPA_TIER"
+            value = "stable"
+          }
+
           port { container_port = 80 }
 
           readiness_probe {
@@ -667,6 +672,11 @@ resource "kubernetes_deployment" "web_canary" {
           name              = "web"
           image             = var.images.web
           image_pull_policy = "Always"
+
+          env {
+            name  = "SPA_TIER"
+            value = "canary"
+          }
 
           port { container_port = 80 }
 
