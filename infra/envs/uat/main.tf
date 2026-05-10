@@ -97,6 +97,11 @@ module "eks_app" {
   web_rollout_prestop_sleep_seconds = 45
   web_pod_termination_grace_seconds = 120
 
+  # ALB traffic-weighted canary for SPA (defaults in variables.tf; override per apply with TF_VAR_* from CI).
+  enable_alb_weighted_canary_for_web = var.enable_alb_weighted_canary_for_web
+  alb_web_canary_traffic_percent     = var.alb_web_canary_traffic_percent
+  web_canary_replicas                = var.web_canary_replicas
+
   aws_region               = var.aws_region
   domain_root              = var.domain_root
   frontend_subdomain       = var.frontend_subdomain

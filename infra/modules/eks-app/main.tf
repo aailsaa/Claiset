@@ -20,6 +20,23 @@ locals {
   enabled = var.enable_kubernetes_app
 
   rollout_pdb_eligible = local.enabled && var.replicas > 1 && var.enable_pod_disruption_budget
+
+  # ALB traffic-weighted canary for browser SPA only (path "/"). APIs stay single-service to limit cost.
+  alb_weighted_canary_for_web = (
+    local.enabled &&
+    var.enable_alb_weighted_canary_for_web &&
+    var.alb_web_canary_traffic_percent > 0 &&
+    var.web_canary_replicas > 0
+  )
+  # Stable Service name is always "web" (resource metadata.name); only the synthetic ALB action name differs.
+  web_spa_ingress_backend_name = local.alb_weighted_canary_for_web ? "web-spa-weighted" : "web"
+
+  # With maxUnavailable=0 + maxSurge=1, a single canary replica can briefly leave the canary Service with no Ready
+  # endpoints during image rollout; ALB then has an unhealthy canary target group for the weighted share. Enforce
+  # at least two nginx canary Pods whenever weighted routing is on (same pattern as stable HA).
+  web_canary_replicas_effective = (
+    local.alb_weighted_canary_for_web ? max(var.web_canary_replicas, 2) : 0
+  )
 }
 
 # Private ECR pulls from cluster nodes rely on IAM. AWS Academy LabRole often lacks AmazonECR*;
@@ -518,7 +535,7 @@ resource "kubernetes_deployment" "web" {
                   match_expressions {
                     key      = "app"
                     operator = "In"
-                    values   = ["web", "items", "outfits", "schedule"]
+                    values   = ["web", "web-canary", "items", "outfits", "schedule"]
                   }
                 }
               }
@@ -535,6 +552,11 @@ resource "kubernetes_deployment" "web" {
           name              = "web"
           image             = var.images.web
           image_pull_policy = "Always"
+
+          env {
+            name  = "SPA_TIER"
+            value = "stable"
+          }
 
           port { container_port = 80 }
 
@@ -598,34 +620,175 @@ resource "kubernetes_service" "web" {
   }
 }
 
+resource "kubernetes_deployment" "web_canary" {
+  count            = local.enabled ? 1 : 0
+  wait_for_rollout = false
+
+  metadata {
+    name      = "web-canary"
+    namespace = kubernetes_namespace.app.metadata[0].name
+    labels    = { app = "web-canary" }
+  }
+
+  spec {
+    replicas                  = local.web_canary_replicas_effective
+    progress_deadline_seconds = var.rollout_progress_deadline_seconds
+    min_ready_seconds         = var.rollout_min_ready_seconds
+    strategy {
+      type = "RollingUpdate"
+      rolling_update {
+        max_surge       = var.rolling_update_max_surge
+        max_unavailable = var.rolling_update_max_unavailable
+      }
+    }
+    selector { match_labels = { app = "web-canary" } }
+    template {
+      metadata { labels = { app = "web-canary" } }
+      spec {
+        affinity {
+          pod_anti_affinity {
+            preferred_during_scheduling_ignored_during_execution {
+              weight = 100
+              pod_affinity_term {
+                topology_key = "kubernetes.io/hostname"
+                label_selector {
+                  match_expressions {
+                    key      = "app"
+                    operator = "In"
+                    values   = ["web", "web-canary", "items", "outfits", "schedule"]
+                  }
+                }
+              }
+            }
+          }
+        }
+        image_pull_secrets {
+          name = kubernetes_secret.ecr_pull[0].metadata[0].name
+        }
+
+        termination_grace_period_seconds = var.web_pod_termination_grace_seconds
+
+        container {
+          name              = "web"
+          image             = var.images.web
+          image_pull_policy = "Always"
+
+          env {
+            name  = "SPA_TIER"
+            value = "canary"
+          }
+
+          port { container_port = 80 }
+
+          readiness_probe {
+            http_get {
+              path = "/"
+              port = 80
+            }
+            initial_delay_seconds = 3
+            period_seconds        = 5
+            success_threshold     = 2
+            timeout_seconds       = 2
+          }
+
+          liveness_probe {
+            http_get {
+              path = "/"
+              port = 80
+            }
+            initial_delay_seconds = 10
+            period_seconds        = 10
+          }
+
+          lifecycle {
+            pre_stop {
+              exec {
+                command = ["/bin/sh", "-c", "sleep ${var.web_rollout_prestop_sleep_seconds}"]
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  timeouts {
+    create = "35m"
+    update = "35m"
+  }
+
+  depends_on = [kubernetes_job.migrate]
+}
+
+resource "kubernetes_service" "web_canary" {
+  count = local.enabled ? 1 : 0
+
+  metadata {
+    name      = "web-canary"
+    namespace = kubernetes_namespace.app.metadata[0].name
+    labels    = { app = "web-canary" }
+  }
+
+  spec {
+    selector = { app = "web-canary" }
+    port {
+      name        = "http"
+      port        = 80
+      target_port = 80
+    }
+    type = "ClusterIP"
+  }
+}
+
 resource "kubernetes_ingress_v1" "app" {
   count = local.enabled ? 1 : 0
 
   metadata {
     name      = var.project
     namespace = kubernetes_namespace.app.metadata[0].name
-    annotations = {
-      "kubernetes.io/ingress.class"               = "alb"
-      "alb.ingress.kubernetes.io/scheme"          = "internet-facing"
-      "alb.ingress.kubernetes.io/target-type"     = "ip"
-      "alb.ingress.kubernetes.io/listen-ports"    = "[{\"HTTP\":80},{\"HTTPS\":443}]"
-      "alb.ingress.kubernetes.io/ssl-redirect"    = "443"
-      "alb.ingress.kubernetes.io/certificate-arn" = var.frontend_certificate_arn
-      "external-dns.alpha.kubernetes.io/hostname" = local.external_dns_hostnames
+    annotations = merge(
+      {
+        "kubernetes.io/ingress.class"               = "alb"
+        "alb.ingress.kubernetes.io/scheme"          = "internet-facing"
+        "alb.ingress.kubernetes.io/target-type"     = "ip"
+        "alb.ingress.kubernetes.io/listen-ports"    = "[{\"HTTP\":80},{\"HTTPS\":443}]"
+        "alb.ingress.kubernetes.io/ssl-redirect"    = "443"
+        "alb.ingress.kubernetes.io/certificate-arn" = var.frontend_certificate_arn
+        "external-dns.alpha.kubernetes.io/hostname" = local.external_dns_hostnames
 
-      # Redirect apex/www → canonical frontend host (https://app.<domain>/)
-      "alb.ingress.kubernetes.io/actions.redirect-to-frontend" = jsonencode({
-        Type = "redirect"
-        RedirectConfig = {
-          Protocol   = "HTTPS"
-          Port       = "443"
-          Host       = local.frontend_host
-          Path       = "/#{path}"
-          Query      = "#{query}"
-          StatusCode = "HTTP_301"
-        }
-      })
-    }
+        # Redirect apex/www → canonical frontend host (https://app.<domain>/)
+        "alb.ingress.kubernetes.io/actions.redirect-to-frontend" = jsonencode({
+          Type = "redirect"
+          RedirectConfig = {
+            Protocol   = "HTTPS"
+            Port       = "443"
+            Host       = local.frontend_host
+            Path       = "/#{path}"
+            Query      = "#{query}"
+            StatusCode = "HTTP_301"
+          }
+        })
+      },
+      local.alb_weighted_canary_for_web ? {
+        "alb.ingress.kubernetes.io/actions.web-spa-weighted" = jsonencode({
+          type = "forward"
+          forwardConfig = {
+            targetGroups = [
+              {
+                serviceName = "web"
+                servicePort = "http"
+                weight      = 100 - var.alb_web_canary_traffic_percent
+              },
+              {
+                serviceName = "web-canary"
+                servicePort = "http"
+                weight      = var.alb_web_canary_traffic_percent
+              }
+            ]
+          }
+        })
+      } : {}
+    )
   }
 
   spec {
@@ -668,8 +831,19 @@ resource "kubernetes_ingress_v1" "app" {
           path_type = "Prefix"
           backend {
             service {
-              name = kubernetes_service.web[0].metadata[0].name
-              port { number = 80 }
+              name = local.web_spa_ingress_backend_name
+              dynamic "port" {
+                for_each = local.alb_weighted_canary_for_web ? [1] : []
+                content {
+                  name = "use-annotation"
+                }
+              }
+              dynamic "port" {
+                for_each = local.alb_weighted_canary_for_web ? [] : [1]
+                content {
+                  number = 80
+                }
+              }
             }
           }
         }
@@ -711,6 +885,9 @@ resource "kubernetes_ingress_v1" "app" {
     }
   }
 
-  depends_on = [kubernetes_service.web]
+  depends_on = [
+    kubernetes_service.web[0],
+    kubernetes_service.web_canary[0],
+  ]
 }
 

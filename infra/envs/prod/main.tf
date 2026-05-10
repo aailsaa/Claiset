@@ -95,6 +95,10 @@ module "eks_app" {
   # Free-tier node constraints are tight; keep one replica per service in prod for deterministic scheduling.
   replicas = 1
 
+  enable_alb_weighted_canary_for_web = var.enable_alb_weighted_canary_for_web
+  alb_web_canary_traffic_percent     = var.alb_web_canary_traffic_percent
+  web_canary_replicas                = var.web_canary_replicas
+
   # Same pattern as UAT: single-Pod surge + post-readiness soak so a bad build fails the rollout before full cutover.
   rolling_update_max_surge          = "1"
   rollout_min_ready_seconds         = 30

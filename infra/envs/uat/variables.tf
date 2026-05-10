@@ -101,6 +101,24 @@ variable "enable_kubernetes_app" {
   description = "Set false only for targeted terraform import when app inputs may be unknown."
 }
 
+variable "enable_alb_weighted_canary_for_web" {
+  type        = bool
+  default     = true
+  description = "ALB weighted forward on Ingress path / between web and web-canary. Set false to save nginx Pods. CI: GitHub Variable ALB_CANARY_UAT_ENABLED=false to disable (unset → on). Local: TF_VAR_enable_alb_weighted_canary_for_web."
+}
+
+variable "alb_web_canary_traffic_percent" {
+  type        = number
+  default     = 10
+  description = "Percent of SPA traffic to web-canary (1–50). CI: ALB_CANARY_UAT_TRAFFIC_PERCENT (unset → 10 in promotion workflow)."
+}
+
+variable "web_canary_replicas" {
+  type        = number
+  default     = 2
+  description = "Floor for web-canary size; eks-app enforces at least 2 while weighted canary is on so rollouts keep Ready endpoints (no dropped canary share). CI: ALB_CANARY_UAT_WEB_REPLICAS (unset → 2)."
+}
+
 variable "enable_observability_stack" {
   type        = bool
   default     = false

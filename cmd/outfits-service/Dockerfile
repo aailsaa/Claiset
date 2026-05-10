@@ -1,4 +1,4 @@
-FROM --platform=linux/amd64 golang:1.23-alpine AS build
+FROM golang:1.23-alpine AS build
 WORKDIR /src
 RUN apk add --no-cache ca-certificates
 
@@ -8,7 +8,7 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o /out/outfits-service ./cmd/outfits-service
 
-FROM --platform=linux/amd64 alpine:3.20
+FROM alpine:3.20
 RUN apk add --no-cache ca-certificates
 COPY --from=build /out/outfits-service /outfits-service
 EXPOSE 8082
