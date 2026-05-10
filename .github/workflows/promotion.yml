@@ -269,6 +269,8 @@ jobs:
           # Orphaned / stuck observability Helm releases (pending-install, failed) block Terraform.
           EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" bash ../../scripts/helm-monitoring-reconcile.sh
           # Phase 2: platform (ACM, controllers) + workloads (Ingress + app Deployments, migrate Job) + remainder of stack.
+          # Dev: module.eks_app migrate_schema_sha = filesha256(cmd/migrate/schema.sql) → terraform_data replaces
+          # kubernetes_job.migrate when schema.sql changes; migrate step waits only for a fresh Job or skips if unchanged.
           terraform apply -auto-approve
           EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" DOMAIN_ROOT=claiset.xyz FRONTEND_SUBDOMAIN=app-dev UPDATE_APEX_DNS=false K8S_APP_NAMESPACE=dev bash ../../scripts/route53-ingress-records-guard.sh
 

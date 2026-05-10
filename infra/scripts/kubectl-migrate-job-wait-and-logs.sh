@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Wait for migrate Job completion when needed; skip when this commit's schema is already wired on the Job.
+# Wait for migrate Job completion when Terraform recreated job/migrate for this revision.
 #
-# Primary signal: kubernetes_job migrate has annotation claiset.dev/migrate-schema-sha (Terraform migrate_replace_signal).
-# If it matches sha256(cmd/migrate/schema.sql) from the repo checkout, no new migrate run is expected — skip.
-# If hashes differ but the Job is fresh, wait + logs (new migrate). If hashes differ and Job is stale, fail —
-# Terraform should have recreated the Job (replace_triggered_by terraform_data).
+# claiset.dev/migrate-schema-sha on the Job equals sha256(schema.sql) after apply. That is TRUE both when:
+#   (a) Nothing changed — old Job, same hash as checkout → skip long wait.
+#   (b) Schema changed — NEW Job, same NEW hash as checkout → MUST wait + logs (do not skip).
+# Distinction: Job metadata.creationTimestamp age vs MIGRATE_JOB_FRESH_MAX_AGE_SECONDS (default 7200).
 #
-# Fallback (no annotation or non-hash placeholder): reuse creationTimestamp freshness window.
+# Drift: checkout hash != Job annotation + stale Job → fail (Terraform should have replaced the Job).
 #
 # Usage:
 #   EXPECTED_CLUSTER_NAME=claiset-dev AWS_REGION=us-east-1 \
@@ -85,67 +85,72 @@ fi
 
 JOB_ANNO="$(job_schema_annotation || true)"
 
-# --- Decision: schema annotation vs checkout (authoritative when both are SHA256 hex) ---
-if is_sha256_hex "${REPO_SHA}" && is_sha256_hex "${JOB_ANNO}"; then
-  if [[ "${REPO_SHA}" == "${JOB_ANNO}" ]]; then
-    echo "migrate-schema-sha on Job matches checkout (${REPO_SHA:0:12}…); no recreate needed — skipping wait."
-    gh_step_summary "## Migrate (${NAMESPACE}/${JOB_NAME})"
-    gh_step_summary ""
-    gh_step_summary "**Skipped** — \`${SCHEMA_ANNO_KEY}\` matches \`cmd/migrate/schema.sql\` in this checkout (${REPO_SHA:0:12}…)."
-    gh_step_summary ""
-    exit 0
-  fi
-  echo "Schema drift: checkout sha256=${REPO_SHA} Job annotation=${JOB_ANNO}"
+both_hex() { is_sha256_hex "${REPO_SHA}" && is_sha256_hex "${JOB_ANNO}"; }
+
+# --- Both SHA hex: mismatch => drift or fresh recreate ---
+if both_hex && [[ "${REPO_SHA}" != "${JOB_ANNO}" ]]; then
+  echo "Schema drift: checkout=${REPO_SHA} Job ${SCHEMA_ANNO_KEY}=${JOB_ANNO} (age ~${AGE}s)"
   if [[ "${START_EPOCH}" -eq 0 ]]; then
     echo "Cannot parse creationTimestamp — running full wait + logs..."
     gh_step_summary "## Migrate (${NAMESPACE}/${JOB_NAME})"
-    gh_step_summary ""
-    gh_step_summary "**Ran (mismatch)** — Job annotation differs from repo but age unknown; waiting and streaming logs."
+    gh_step_summary "**Ran** — hash mismatch; could not parse Job age. Logs below."
   elif [[ "${AGE}" -le "${MAX_AGE}" ]]; then
-    echo "Job is fresh (~${AGE}s); waiting for Complete (migrate for new schema)."
+    echo "Job is fresh (~${AGE}s); waiting for Complete (new schema / recreate in progress)."
     gh_step_summary "## Migrate (${NAMESPACE}/${JOB_NAME})"
-    gh_step_summary ""
-    gh_step_summary "**Ran** — schema hash on Job differs from checkout; waited for migration. Logs below."
+    gh_step_summary "**Ran** — annotation differs from checkout on a fresh Job. Logs below."
   else
-    echo "ERROR: Repo schema (${REPO_SHA}) does not match Job (${JOB_ANNO}) but migrate Job metadata is stale (~${AGE}s)." >&2
-    echo "Terraform should recreate job/${JOB_NAME} when cmd/migrate/schema.sql changes dev (replace_triggered_by)." >&2
-    echo "Fix: terraform apply dev from infra/envs/dev or: terraform apply -replace='module.eks_app.kubernetes_job.migrate[0]'" >&2
+    echo "ERROR: Repo schema (${REPO_SHA}) does not match Job (${JOB_ANNO}) but migrate Job is stale (~${AGE}s)." >&2
+    echo "Terraform should replace job/${JOB_NAME} when cmd/migrate/schema.sql changes (dev replace_triggered_by)." >&2
+    echo "Fix: terraform apply from infra/envs/dev or: terraform apply -replace='module.eks_app.kubernetes_job.migrate[0]'" >&2
     gh_step_summary "## Migrate (${NAMESPACE}/${JOB_NAME}) — failed"
-    gh_step_summary "**Error** — schema hash mismatch and Job was not recreated. See step log."
+    gh_step_summary "**Error** — hash mismatch and Job not recreated. See log."
     exit 1
   fi
 
-elif is_sha256_hex "${REPO_SHA}" && ! is_sha256_hex "${JOB_ANNO}"; then
-  echo "No usable ${SCHEMA_ANNO_KEY} on Job yet (${JOB_ANNO:-<missing>}); using freshness window only until the next terraform apply annotates migrate."
-elif ! is_sha256_hex "${REPO_SHA}" && [[ ! -f "$SCHEMA_FILE" ]]; then
-  echo "Schema file missing at ${SCHEMA_FILE}; using freshness heuristic only." >&2
-fi
-
-if [[ "${START_EPOCH}" -eq 0 ]]; then
-  echo "Cannot parse Job creationTimestamp; running full wait..."
-  gh_step_summary "## Migrate (${NAMESPACE}/${JOB_NAME})"
-  gh_step_summary ""
-  gh_step_summary "**Ran (fallback)** — could not parse \`creationTimestamp\`; full wait."
-else
-  if [[ "${AGE}" -gt "${MAX_AGE}" ]]; then
-    # Only fatal here if both sides are authoritative SHA hex and still mismatched (drift handled above failed).
-    if is_sha256_hex "${REPO_SHA}" && is_sha256_hex "${JOB_ANNO}" && [[ "${JOB_ANNO}" != "${REPO_SHA}" ]]; then
-      echo "Stale Job and annotation/checkout still differ after drift handling — exiting error." >&2
-      exit 1
-    fi
-    echo "Migrate Job ${JOB_NAME} is not fresh (created ~${AGE}s ago vs max_age=${MAX_AGE}s)."
-    echo "Skipping long wait — no recent Terraform recreate (and no schema-hash match path applied)."
-    echo "To force migrate logs: terraform apply -replace='module.eks_app.kubernetes_job.migrate[0]'."
+# --- Both SHA hex and MATCH: skip only if Job is stale (same revision already deployed long ago) ---
+elif both_hex && [[ "${REPO_SHA}" == "${JOB_ANNO}" ]]; then
+  if [[ "${START_EPOCH}" -ne 0 ]] && [[ "${AGE}" -gt "${MAX_AGE}" ]]; then
+    echo "migrate-schema-sha matches checkout (${REPO_SHA:0:12}…) and Job is stale (~${AGE}s > ${MAX_AGE}s) — no recreate this pipeline; skipping wait."
     gh_step_summary "## Migrate (${NAMESPACE}/${JOB_NAME})"
-    gh_step_summary ""
-    gh_step_summary "**Skipped** — Job older than \`${MAX_AGE}s\` (legacy freshness heuristic)."
-    gh_step_summary ""
+    gh_step_summary "**Skipped** — same schema revision as Job; Terraform did not recreate migrate (unchanged \`schema.sql\` or apply skipped workloads)."
     exit 0
   fi
-  echo "Job looks fresh (~${AGE}s since creationTimestamp); waiting for Complete..."
+  if [[ "${START_EPOCH}" -eq 0 ]]; then
+    echo "migrate-schema-sha matches checkout but creationTimestamp could not be parsed — waiting for Complete + logs (safe path)."
+  else
+    echo "migrate-schema-sha matches checkout and Job is fresh (~${AGE}s ≤ ${MAX_AGE}s) — waiting for Complete + logs (schema rollout or recent Job recreate)."
+  fi
   gh_step_summary "## Migrate (${NAMESPACE}/${JOB_NAME})"
-  gh_step_summary ""
-  gh_step_summary "**Ran** — fresh Job per age window. Migrate logs in step output."
+  gh_step_summary "**Ran** — hash matches on a fresh Job (or unparsed age); waited for migration (instant if already Complete). Logs below."
+
+# --- Missing / legacy annotation: freshness heuristic only ---
+elif is_sha256_hex "${REPO_SHA}" && ! is_sha256_hex "${JOB_ANNO}"; then
+  echo "No usable ${SCHEMA_ANNO_KEY} on Job (${JOB_ANNO:-<missing>}); using creationTimestamp freshness only."
+  if [[ "${START_EPOCH}" -eq 0 ]]; then
+    echo "Cannot parse creationTimestamp; running full wait..."
+    gh_step_summary "## Migrate (${NAMESPACE}/${JOB_NAME})"
+    gh_step_summary "**Ran (fallback)** — no annotation; full wait."
+  elif [[ "${AGE}" -gt "${MAX_AGE}" ]]; then
+    echo "Migrate Job ${JOB_NAME} not fresh (~${AGE}s) — skipping wait until terraform applies annotations."
+    gh_step_summary "## Migrate (${NAMESPACE}/${JOB_NAME})"
+    gh_step_summary "**Skipped** — stale Job, no schema-sha annotation yet."
+    exit 0
+  fi
+  echo "Job looks fresh (~${AGE}s); waiting for Complete..."
+  gh_step_summary "## Migrate (${NAMESPACE}/${JOB_NAME})"
+  gh_step_summary "**Ran** — freshness fallback. Logs below."
+
+elif ! is_sha256_hex "${REPO_SHA}" && [[ ! -f "$SCHEMA_FILE" ]]; then
+  echo "Schema file missing at ${SCHEMA_FILE}; using freshness only." >&2
+  if [[ "${START_EPOCH}" -eq 0 ]]; then
+    :
+  elif [[ "${AGE}" -gt "${MAX_AGE}" ]]; then
+    echo "Skipping — stale Job." >&2
+    exit 0
+  fi
+else
+  # Repo sha exists but weird; fall through to wait
+  echo "Non-standard schema hash in repo; attempting wait + logs." >&2
 fi
 
 complete_ok=0

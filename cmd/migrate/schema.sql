@@ -59,9 +59,6 @@ CREATE INDEX IF NOT EXISTS idx_outfits_user ON outfits (user_sub);
 CREATE INDEX IF NOT EXISTS idx_outfit_assignments_user_day ON outfit_assignments (user_sub, day);
 CREATE INDEX IF NOT EXISTS idx_outfit_items_item ON outfit_items (item_id);
 
--- Day-2 / rubric: visible additive migration (nullable; no app change required).
-ALTER TABLE items ADD COLUMN IF NOT EXISTS schema_evidence_demo TEXT;
-
--- Push-to-main demo: edits this file change the migrate image digest; Promotion `dev`
--- rebuild/pushes `:dev`, Terraform refreshes kubernetes_job.migrate, and a new Pod runs.
-ALTER TABLE outfits ADD COLUMN IF NOT EXISTS migrate_git_promotion_demo TIMESTAMPTZ;
+-- Backend RDS migration evidence (nullable additive column). Editing this file changes
+-- filesha256 → dev Terraform replaces job/migrate → migrate pod applies ALTER against RDS.
+ALTER TABLE outfits ADD COLUMN IF NOT EXISTS schema_deploy_marker TEXT;
