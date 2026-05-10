@@ -5,7 +5,7 @@
 # 2) Ingress has a load balancer address
 # 3) frontend URL responds (2xx/3xx)
 # 4) backend API routes do not return 5xx
-# 5) RDS instance for this env is Available
+# 5) RDS instance for this env is Available (if stopped and SMOKE_START_RDS_IF_STOPPED is true, starts it first)
 # 6) Optional ALB weighted SPA canary: when TF_VAR_* (CI) or SMOKE_EXPECT_ALB_CANARY_INGRESS is set, asserts
 #    Ingress annotation web-spa-weighted target weights and / backend service match Terraform (not HTTP traffic ratio).
 #
@@ -44,6 +44,8 @@ NAMESPACE="${K8S_APP_NAMESPACE:-${TF_VAR_env:-dev}}"
 PROJECT="${TF_VAR_project:-claiset}"
 FRONTEND_HOST="${FRONTEND_HOST:-}"
 RDS_ID="${RDS_INSTANCE_ID:-${PROJECT}-${NAMESPACE}-postgres}"
+# When RDS was stopped for cost (e.g. *-scale-down-cheap.sh), start it before the RDS smoke check.
+SMOKE_START_RDS_IF_STOPPED="${SMOKE_START_RDS_IF_STOPPED:-true}"
 GRAFANA_HOST="${GRAFANA_HOST:-}"
 EXPECT_OBSERVABILITY_SMOKE="${EXPECT_OBSERVABILITY_SMOKE:-}"
 EXPECT_OBSERVABILITY_DAEMONSETS="${EXPECT_OBSERVABILITY_DAEMONSETS:-}"
@@ -120,6 +122,89 @@ alb_weighted_canary_smoke_should_run() {
   [[ "${p}" =~ ^[0-9]+$ ]] && [[ "${p}" -gt 0 ]] || return 1
   [[ "${r}" =~ ^[0-9]+$ ]] && [[ "${r}" -gt 0 ]] || return 1
   return 0
+}
+
+resolve_rds_id() {
+  local candidate="$1"
+  local s
+  s="$(aws rds describe-db-instances --region "${REGION}" --db-instance-identifier "${candidate}" --query 'DBInstances[0].DBInstanceStatus' --output text 2>/dev/null || true)"
+  if [[ -n "${s}" && "${s}" != "None" ]]; then
+    echo "${candidate}"
+    return 0
+  fi
+
+  local discovered
+  discovered="$(aws rds describe-db-instances --region "${REGION}" \
+    --query "DBInstances[?contains(DBInstanceIdentifier, '${NAMESPACE}')].DBInstanceIdentifier" \
+    --output text 2>/dev/null | awk '{print $1}')"
+  if [[ -n "${discovered}" && "${discovered}" != "None" ]]; then
+    echo "${discovered}"
+    return 0
+  fi
+  echo "${candidate}"
+  return 0
+}
+
+smoke_start_rds_if_stopped_enabled() {
+  [[ "${SMOKE_START_RDS_IF_STOPPED}" == "1" || "${SMOKE_START_RDS_IF_STOPPED}" == "true" ]]
+}
+
+# Ensure RDS is available for smoke; optionally start if stopped (same idea as *-resume-cheap.sh).
+ensure_rds_for_smoke() {
+  local id="$1"
+  local status
+  local i
+
+  status="$(aws rds describe-db-instances --region "${REGION}" --db-instance-identifier "${id}" --query 'DBInstances[0].DBInstanceStatus' --output text 2>/dev/null || true)"
+  if [[ -z "${status}" || "${status}" == "None" ]]; then
+    echo "RDS smoke failed: ${id} not found or status unknown" >&2
+    return 1
+  fi
+
+  if [[ "${status}" == "available" ]]; then
+    echo "RDS smoke OK (${id}: ${status})"
+    return 0
+  fi
+
+  if smoke_start_rds_if_stopped_enabled && [[ "${status}" == "starting" ]]; then
+    echo "RDS is starting; waiting for ${id} to become available..."
+    aws rds wait db-instance-available --region "${REGION}" --db-instance-identifier "${id}"
+    echo "RDS smoke OK (${id}: available)"
+    return 0
+  fi
+
+  if smoke_start_rds_if_stopped_enabled && [[ "${status}" == "stopped" ]]; then
+    echo "RDS is stopped; starting ${id} for smoke (SMOKE_START_RDS_IF_STOPPED=${SMOKE_START_RDS_IF_STOPPED})..."
+    aws rds start-db-instance --region "${REGION}" --db-instance-identifier "${id}" >/dev/null
+    echo "Waiting for RDS ${id} to become available..."
+    aws rds wait db-instance-available --region "${REGION}" --db-instance-identifier "${id}"
+    echo "RDS smoke OK (${id}: available)"
+    return 0
+  fi
+
+  if smoke_start_rds_if_stopped_enabled && [[ "${status}" == "stopping" ]]; then
+    echo "RDS is stopping; waiting then starting ${id} for smoke..."
+    for ((i = 1; i <= 36; i++)); do
+      sleep 10
+      status="$(aws rds describe-db-instances --region "${REGION}" --db-instance-identifier "${id}" --query 'DBInstances[0].DBInstanceStatus' --output text 2>/dev/null || true)"
+      if [[ "${status}" == "available" ]]; then
+        echo "RDS smoke OK (${id}: ${status})"
+        return 0
+      fi
+      if [[ "${status}" == "stopped" ]]; then
+        aws rds start-db-instance --region "${REGION}" --db-instance-identifier "${id}" >/dev/null
+        aws rds wait db-instance-available --region "${REGION}" --db-instance-identifier "${id}"
+        echo "RDS smoke OK (${id}: available)"
+        return 0
+      fi
+      echo "  RDS status=${status} (wait ${i}/36)..."
+    done
+    echo "RDS smoke failed: ${id} still stopping after wait" >&2
+    return 1
+  fi
+
+  echo "RDS smoke failed: ${id} status=${status}" >&2
+  return 1
 }
 
 expected_alb_canary_traffic_percent() {
@@ -224,6 +309,11 @@ check_alb_weighted_canary_ingress() {
 echo "Smoke test: cluster=${CLUSTER} namespace=${NAMESPACE} frontend=${FRONTEND_HOST} region=${REGION}"
 
 aws eks update-kubeconfig --region "${REGION}" --name "${CLUSTER}" >/dev/null
+
+RDS_ID="$(resolve_rds_id "${RDS_ID}")"
+if ! ensure_rds_for_smoke "${RDS_ID}"; then
+  exit 1
+fi
 
 wait_for_no_pending_app_pods() {
   local attempts=36
@@ -939,35 +1029,5 @@ if observability_smoke_enabled && observability_daemonsets_enabled && promtail_e
   check_loki_streams_for_query '{namespace="kube-system"}' "kube-system (sanity)"
   check_loki_streams_for_query "{namespace=\"${NAMESPACE}\"}" "namespace=${NAMESPACE} (requires promtail + app stdout logs)"
 fi
-
-resolve_rds_id() {
-  local candidate="$1"
-  local s
-  s="$(aws rds describe-db-instances --region "${REGION}" --db-instance-identifier "${candidate}" --query 'DBInstances[0].DBInstanceStatus' --output text 2>/dev/null || true)"
-  if [[ -n "${s}" && "${s}" != "None" ]]; then
-    echo "${candidate}"
-    return 0
-  fi
-
-  # Fallback: discover by tags used by Terraform (Project + Env).
-  local discovered
-  discovered="$(aws rds describe-db-instances --region "${REGION}" \
-    --query "DBInstances[?contains(DBInstanceIdentifier, '${NAMESPACE}')].DBInstanceIdentifier" \
-    --output text 2>/dev/null | awk '{print $1}')"
-  if [[ -n "${discovered}" && "${discovered}" != "None" ]]; then
-    echo "${discovered}"
-    return 0
-  fi
-  echo "${candidate}"
-  return 0
-}
-
-RDS_ID="$(resolve_rds_id "${RDS_ID}")"
-rds_status="$(aws rds describe-db-instances --region "${REGION}" --db-instance-identifier "${RDS_ID}" --query 'DBInstances[0].DBInstanceStatus' --output text 2>/dev/null || true)"
-if [[ "${rds_status}" != "available" ]]; then
-  echo "RDS smoke failed: ${RDS_ID} status=${rds_status}" >&2
-  exit 1
-fi
-echo "RDS smoke OK (${RDS_ID}: ${rds_status})"
 
 echo "Smoke test passed for ${NAMESPACE}."

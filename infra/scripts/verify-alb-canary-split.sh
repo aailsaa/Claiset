@@ -143,9 +143,17 @@ while true; do
   esac
   total=$((total + 1))
 
-  # Progress every 50 samples
+  # Progress every 50 samples (not final — duration/request modes run until completion).
+  # Use distinct names + defaults so `set -u` never sees unset vars (bash 3.2 / macOS safe).
   if (( total % 50 == 0 )); then
-    echo "  samples=${total} stable=${stable} canary=${canary} unknown=${unknown}"
+    prog_elapsed=$((now - start_ts))
+    if [[ -n "${DURATION_SEC}" ]]; then
+      time_left=$((end_ts - now))
+      [[ "${time_left}" -lt 0 ]] && time_left=0
+      echo "  [${prog_elapsed}s / ${DURATION_SEC}s, ~${time_left}s left] samples=${total} stable=${stable} canary=${canary} unknown=${unknown}"
+    else
+      echo "  [${prog_elapsed}s] samples=${total}/${REQUESTS} stable=${stable} canary=${canary} unknown=${unknown}"
+    fi
   fi
 
   if awk -v i="${INTERVAL}" 'BEGIN { exit (i > 0) ? 0 : 1 }'; then
@@ -153,8 +161,8 @@ while true; do
   fi
 done
 
-elapsed=$(( $(date +%s) - start_ts ))
-echo "Done: elapsed=${elapsed}s samples=${total} stable=${stable} canary=${canary} unknown=${unknown}"
+total_elapsed=$(( $(date +%s) - start_ts ))
+echo "Done: elapsed=${total_elapsed}s samples=${total} stable=${stable} canary=${canary} unknown=${unknown}"
 
 if [[ "${total}" -lt 1 ]]; then
   echo "FAIL: no samples collected." >&2
