@@ -35,7 +35,7 @@ Reuse the **successful** **`promotion`** run where **smoke** passed after apply;
 
 - Workflow **summary** (**green**) + **`smoke-test-env.sh`** excerpt from logs (shows API checks).
 
-If the video **`C6-rollout-or-deployment-recording.mov`** already aligns, **rename/annotate** via [`docs/evidence-media/MEDIA_MAPPING.txt`](evidence-media/MEDIA_MAPPING.txt) so graders know **which** clip proves **zero downtime.**
+If the video **`C6-uat-zero-downtime.mov`** (or a dev rollout clip) already aligns, **annotate** via [`docs/evidence-media/MEDIA_MAPPING.txt`](evidence-media/MEDIA_MAPPING.txt) so graders know **which** clip proves **zero downtime.**
 
 ---
 
