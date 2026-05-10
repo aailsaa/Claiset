@@ -104,19 +104,19 @@ variable "enable_kubernetes_app" {
 variable "enable_alb_weighted_canary_for_web" {
   type        = bool
   default     = false
-  description = "ALB weighted SPA canary. Default off in prod (cost + change risk); enable deliberately or via TF_VAR_* on prod apply."
+  description = "ALB weighted SPA canary. Default off in prod (cost + change risk). CI: GitHub Variable ALB_CANARY_PROD_ENABLED=true to enable. Local: TF_VAR_*."
 }
 
 variable "alb_web_canary_traffic_percent" {
   type        = number
   default     = 0
-  description = "Percent to web-canary when enable_alb_weighted_canary_for_web is true (1–50)."
+  description = "Percent to web-canary when enable_alb_weighted_canary_for_web is true (1–50). CI: ALB_CANARY_PROD_TRAFFIC_PERCENT (unset → 0)."
 }
 
 variable "web_canary_replicas" {
   type        = number
   default     = 0
-  description = "Desired floor for web-canary; module bumps to ≥2 when weighted canary is on."
+  description = "Desired floor for web-canary; module bumps to ≥2 when weighted canary is on. CI: ALB_CANARY_PROD_WEB_REPLICAS (unset → 0)."
 }
 
 variable "enable_observability_stack" {

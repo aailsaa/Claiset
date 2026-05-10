@@ -76,6 +76,10 @@ jobs:
       # Must match infra/envs/dev defaults: project claiset + env dev (VPC/EKS Name tag).
       EXPECTED_VPC_NAME: claiset-dev
       EXPECTED_CLUSTER_NAME: claiset-dev
+      # ALB SPA canary (repo Variables): set ALB_CANARY_DEV_ENABLED=true to turn on; optional ALB_CANARY_DEV_TRAFFIC_PERCENT (1–50), ALB_CANARY_DEV_WEB_REPLICAS (0–5).
+      TF_VAR_enable_alb_weighted_canary_for_web: ${{ vars.ALB_CANARY_DEV_ENABLED == 'true' && 'true' || 'false' }}
+      TF_VAR_alb_web_canary_traffic_percent: ${{ vars.ALB_CANARY_DEV_TRAFFIC_PERCENT != '' && vars.ALB_CANARY_DEV_TRAFFIC_PERCENT || '0' }}
+      TF_VAR_web_canary_replicas: ${{ vars.ALB_CANARY_DEV_WEB_REPLICAS != '' && vars.ALB_CANARY_DEV_WEB_REPLICAS || '0' }}
     runs-on: ubuntu-latest
     concurrency:
       group: tf-dev-${{ github.repository }}
@@ -297,6 +301,10 @@ jobs:
     env:
       EXPECTED_VPC_NAME: claiset-qa
       EXPECTED_CLUSTER_NAME: claiset-qa
+      # ALB SPA canary (repo Variables): ALB_CANARY_QA_ENABLED, ALB_CANARY_QA_TRAFFIC_PERCENT, ALB_CANARY_QA_WEB_REPLICAS (defaults match infra/envs/qa/variables.tf when unset).
+      TF_VAR_enable_alb_weighted_canary_for_web: ${{ vars.ALB_CANARY_QA_ENABLED == 'true' && 'true' || 'false' }}
+      TF_VAR_alb_web_canary_traffic_percent: ${{ vars.ALB_CANARY_QA_TRAFFIC_PERCENT != '' && vars.ALB_CANARY_QA_TRAFFIC_PERCENT || '0' }}
+      TF_VAR_web_canary_replicas: ${{ vars.ALB_CANARY_QA_WEB_REPLICAS != '' && vars.ALB_CANARY_QA_WEB_REPLICAS || '0' }}
     runs-on: ubuntu-latest
     concurrency:
       group: tf-qa-${{ github.repository }}
@@ -456,11 +464,10 @@ jobs:
     env:
       EXPECTED_VPC_NAME: claiset-uat
       EXPECTED_CLUSTER_NAME: claiset-uat
-      # Optional ALB SPA canary overrides for this apply (defaults come from infra/envs/uat/variables.tf):
-      # TF_VAR_enable_alb_weighted_canary_for_web: "false"
-      # TF_VAR_alb_web_canary_traffic_percent: "0"
-      # TF_VAR_web_canary_replicas: "0"
-      # Same pattern works on dev/qa/prod jobs if you add env keys there.
+      # ALB SPA canary (repo Variables): ALB_CANARY_UAT_ENABLED=false turns off; unset/other → on. ALB_CANARY_UAT_TRAFFIC_PERCENT (default 10), ALB_CANARY_UAT_WEB_REPLICAS (default 2).
+      TF_VAR_enable_alb_weighted_canary_for_web: ${{ vars.ALB_CANARY_UAT_ENABLED == 'false' && 'false' || 'true' }}
+      TF_VAR_alb_web_canary_traffic_percent: ${{ vars.ALB_CANARY_UAT_TRAFFIC_PERCENT != '' && vars.ALB_CANARY_UAT_TRAFFIC_PERCENT || '10' }}
+      TF_VAR_web_canary_replicas: ${{ vars.ALB_CANARY_UAT_WEB_REPLICAS != '' && vars.ALB_CANARY_UAT_WEB_REPLICAS || '2' }}
     runs-on: ubuntu-latest
     concurrency:
       group: tf-uat-${{ github.repository }}
@@ -675,6 +682,10 @@ jobs:
     env:
       EXPECTED_VPC_NAME: claiset-prod
       EXPECTED_CLUSTER_NAME: claiset-prod
+      # ALB SPA canary (repo Variables): ALB_CANARY_PROD_ENABLED=true to turn on; ALB_CANARY_PROD_TRAFFIC_PERCENT (1–50), ALB_CANARY_PROD_WEB_REPLICAS (0–5).
+      TF_VAR_enable_alb_weighted_canary_for_web: ${{ vars.ALB_CANARY_PROD_ENABLED == 'true' && 'true' || 'false' }}
+      TF_VAR_alb_web_canary_traffic_percent: ${{ vars.ALB_CANARY_PROD_TRAFFIC_PERCENT != '' && vars.ALB_CANARY_PROD_TRAFFIC_PERCENT || '0' }}
+      TF_VAR_web_canary_replicas: ${{ vars.ALB_CANARY_PROD_WEB_REPLICAS != '' && vars.ALB_CANARY_PROD_WEB_REPLICAS || '0' }}
     runs-on: ubuntu-latest
     concurrency:
       group: tf-prod-${{ github.repository }}
