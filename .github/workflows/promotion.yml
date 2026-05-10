@@ -147,13 +147,21 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: "Build + push images (tag: dev)"
+        env:
+          # Default BuildKit attestations add extra manifests; ECR pushes can stall or run long without this.
+          BUILDX_NO_DEFAULT_ATTESTATIONS: 1
         run: |
           set -euo pipefail
-          docker buildx build --platform linux/amd64 -f cmd/items-service/Dockerfile   -t "${ECR_REGISTRY}/${ECR_ITEMS_REPO}:dev"   --push .
-          docker buildx build --platform linux/amd64 -f cmd/outfits-service/Dockerfile -t "${ECR_REGISTRY}/${ECR_OUTFITS_REPO}:dev" --push .
-          docker buildx build --platform linux/amd64 -f cmd/schedule-service/Dockerfile -t "${ECR_REGISTRY}/${ECR_SCHEDULE_REPO}:dev" --push .
-          docker buildx build --platform linux/amd64 -f cmd/migrate/Dockerfile        -t "${ECR_REGISTRY}/${ECR_MIGRATE_REPO}:dev" --push .
-          docker buildx build --platform linux/amd64 -f web/Dockerfile                -t "${ECR_REGISTRY}/${ECR_WEB_REPO}:dev"     --push .
+          docker buildx build --platform linux/amd64 --provenance=false \
+            -f cmd/items-service/Dockerfile   -t "${ECR_REGISTRY}/${ECR_ITEMS_REPO}:dev"   --push .
+          docker buildx build --platform linux/amd64 --provenance=false \
+            -f cmd/outfits-service/Dockerfile -t "${ECR_REGISTRY}/${ECR_OUTFITS_REPO}:dev" --push .
+          docker buildx build --platform linux/amd64 --provenance=false \
+            -f cmd/schedule-service/Dockerfile -t "${ECR_REGISTRY}/${ECR_SCHEDULE_REPO}:dev" --push .
+          docker buildx build --platform linux/amd64 --provenance=false \
+            -f cmd/migrate/Dockerfile        -t "${ECR_REGISTRY}/${ECR_MIGRATE_REPO}:dev" --push .
+          docker buildx build --platform linux/amd64 --provenance=false \
+            -f web/Dockerfile                -t "${ECR_REGISTRY}/${ECR_WEB_REPO}:dev"     --push .
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
