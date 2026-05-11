@@ -90,6 +90,8 @@ module "eks_app" {
   env     = var.env
   tags    = local.tags
 
+  migrate_schema_sha = filesha256("${path.module}/../../../cmd/migrate/schema.sql")
+
   enable_kubernetes_app = var.enable_kubernetes_app
   depends_on            = [module.platform]
   # Free-tier node constraints are tight; keep one replica per service in prod for deterministic scheduling.

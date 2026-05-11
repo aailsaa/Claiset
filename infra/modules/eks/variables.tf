@@ -20,8 +20,8 @@ variable "subnet_ids" {
 
 variable "cluster_version" {
   type        = string
-  description = "EKS Kubernetes version."
-  default     = "1.31"
+  description = "EKS Kubernetes version (must not be below the live cluster version)."
+  default     = "1.32"
 }
 
 variable "node_group_kubernetes_version" {

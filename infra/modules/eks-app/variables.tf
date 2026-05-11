@@ -63,6 +63,15 @@ variable "images" {
   description = "Container images for each service."
 }
 
+variable "migrate_schema_sha" {
+  type        = string
+  default     = ""
+  description = <<-EOT
+    When non-empty (e.g. filesha256 of cmd/migrate/schema.sql), terraform_data replaces kubernetes_job.migrate when the schema file changes.
+    OnlineCloset: infra/envs/{dev,qa,uat,prod} pass filesha256(schema.sql).
+  EOT
+}
+
 variable "enable_kubernetes_app" {
   type        = bool
   default     = true

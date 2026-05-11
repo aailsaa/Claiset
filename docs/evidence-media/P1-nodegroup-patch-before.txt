@@ -1,0 +1,29 @@
+==============================================
+EKS node patch evidence snapshot UTC 2026-05-10T19:54:18Z
+CLUSTER=claiset-dev NODEGROUP=claiset-dev-default REGION=us-east-1
+==============================================
+
+--- aws eks describe-nodegroup (subset) ---
+CapacityType: ON_DEMAND
+InstanceTypes:
+- t3.small
+K8sVersion: '1.31'
+ReleaseVersion: 1.31.14-20260505
+Scaling:
+  desiredSize: 6
+  maxSize: 6
+  minSize: 2
+Status: ACTIVE
+UpdateCfg:
+  maxUnavailablePercentage: 33
+
+--- kubectl get nodes -o wide ---
+NAME                           STATUS   ROLES    AGE   VERSION                INTERNAL-IP    EXTERNAL-IP   OS-IMAGE                        KERNEL-VERSION                    CONTAINER-RUNTIME
+ip-10-60-1-195.ec2.internal    Ready    <none>   13m   v1.31.14-eks-4136f65   10.60.1.195    <none>        Amazon Linux 2023.11.20260505   6.1.168-203.330.amzn2023.x86_64   containerd://2.2.3+unknown
+ip-10-60-17-252.ec2.internal   Ready    <none>   13m   v1.31.14-eks-4136f65   10.60.17.252   <none>        Amazon Linux 2023.11.20260505   6.1.168-203.330.amzn2023.x86_64   containerd://2.2.3+unknown
+ip-10-60-28-35.ec2.internal    Ready    <none>   13m   v1.31.14-eks-4136f65   10.60.28.35    <none>        Amazon Linux 2023.11.20260505   6.1.168-203.330.amzn2023.x86_64   containerd://2.2.3+unknown
+ip-10-60-39-125.ec2.internal   Ready    <none>   17h   v1.31.14-eks-4136f65   10.60.39.125   <none>        Amazon Linux 2023.11.20260505   6.1.168-203.330.amzn2023.x86_64   containerd://2.2.3+unknown
+ip-10-60-4-24.ec2.internal     Ready    <none>   13m   v1.31.14-eks-4136f65   10.60.4.24     <none>        Amazon Linux 2023.11.20260505   6.1.168-203.330.amzn2023.x86_64   containerd://2.2.3+unknown
+ip-10-60-46-181.ec2.internal   Ready    <none>   13m   v1.31.14-eks-4136f65   10.60.46.181   <none>        Amazon Linux 2023.11.20260505   6.1.168-203.330.amzn2023.x86_64   containerd://2.2.3+unknown
+
+==============================================

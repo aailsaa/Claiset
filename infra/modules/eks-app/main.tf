@@ -104,6 +104,21 @@ resource "kubernetes_secret" "app_env" {
   }
 }
 
+locals {
+  # Replace migrate Job when migrate_schema_sha changes (set per env) or fallback constant if empty.
+  migrate_replace_signal = (
+    trimspace(coalesce(var.migrate_schema_sha, "")) != "" ?
+    trimspace(coalesce(var.migrate_schema_sha, "")) :
+    "schema-replace-trigger-disabled-${var.project}-${var.env}"
+  )
+}
+
+resource "terraform_data" "migrate_schema_replace_trigger" {
+  count = local.enabled ? 1 : 0
+
+  input = local.migrate_replace_signal
+}
+
 resource "kubernetes_job" "migrate" {
   count = local.enabled ? 1 : 0
   # Do not block Terraform apply on Job completion. Under EKS micro-node pod-density pressure
@@ -111,10 +126,20 @@ resource "kubernetes_job" "migrate" {
   # schema is already up to date. We validate app readiness in smoke checks separately.
   wait_for_completion = false
 
+  lifecycle {
+    replace_triggered_by = [
+      terraform_data.migrate_schema_replace_trigger[0].output,
+    ]
+  }
+
   metadata {
     name      = "migrate"
     namespace = kubernetes_namespace.app.metadata[0].name
     labels    = { app = "migrate" }
+    annotations = {
+      # CI/script compares this to sha256(repo checkout of schema.sql): match => no pending migrate replace.
+      "claiset.dev/migrate-schema-sha" = local.migrate_replace_signal
+    }
   }
 
   spec {

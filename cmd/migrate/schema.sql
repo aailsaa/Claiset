@@ -58,3 +58,7 @@ CREATE INDEX IF NOT EXISTS idx_items_user ON items (user_sub);
 CREATE INDEX IF NOT EXISTS idx_outfits_user ON outfits (user_sub);
 CREATE INDEX IF NOT EXISTS idx_outfit_assignments_user_day ON outfit_assignments (user_sub, day);
 CREATE INDEX IF NOT EXISTS idx_outfit_items_item ON outfit_items (item_id);
+
+-- Backend RDS migration evidence (nullable additive column). Editing this file changes
+-- filesha256 → dev Terraform replaces job/migrate → migrate pod applies ALTER against RDS.
+ALTER TABLE outfits ADD COLUMN IF NOT EXISTS schema_deploy_marker TEXT;
