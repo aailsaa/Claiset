@@ -105,7 +105,7 @@ resource "kubernetes_secret" "app_env" {
 }
 
 locals {
-  # Replace migrate Job only when migrate_schema_sha changes (non-empty dev) or fallback constant per env.
+  # Replace migrate Job when migrate_schema_sha changes (set per env) or fallback constant if empty.
   migrate_replace_signal = (
     trimspace(coalesce(var.migrate_schema_sha, "")) != "" ?
     trimspace(coalesce(var.migrate_schema_sha, "")) :

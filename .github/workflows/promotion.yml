@@ -5,13 +5,8 @@ on:
     branches: ["main"]
     tags:
       - "v*"
-  # Merge to default branch (squash merge or merge commit): promote to UAT without RC in tip message.
-  # Fork PR merges are skipped (`head.repo`) so workflows keep access to Actions secrets safely.
-  pull_request:
-    types:
-      - closed
-    branches:
-      - main
+  # UAT runs on the same `push` workflow as dev (after dev succeeds) — see `uat` job `needs` + `if`.
+  # Squash-merge commits may omit "Merge pull request …"; use RC in the subject or Run workflow → uat.
   schedule:
     # Nightly QA promotion (UTC). Adjust as needed.
     - cron: "0 6 * * *"
@@ -477,6 +472,7 @@ jobs:
 
   uat:
     name: Promote to UAT (PR merge or RC commits)
+    needs: [dev]
     env:
       EXPECTED_VPC_NAME: claiset-uat
       EXPECTED_CLUSTER_NAME: claiset-uat
@@ -488,38 +484,40 @@ jobs:
     concurrency:
       group: tf-uat-${{ github.repository }}
       cancel-in-progress: false
-    # UAT triggers:
-    # 1) PR merged into main (same-repo head — fork PR merges skip automatically for secret safety).
-    # 2) Push to main with RC token in merge commit subject/body (not substrings like "resources").
-    # 3) workflow_dispatch targeting uat.
+    # UAT runs after `dev` in the same workflow run (`needs: [dev]`). Triggers align with syllabus:
+    # • Release-candidate markers: RC, RC space, RC1/RC2/… (starts with RC), Merge pull request (merge-commit PR to main).
+    # • Squash merges often omit "Merge pull request …"; put RC… in the squash subject line.
+    # • workflow_dispatch → uat when dev skipped or succeeded.
     if: |
-      (
-        github.event_name == 'pull_request'
-        && github.event.pull_request.merged == true
-        && github.event.pull_request.base.ref == 'main'
-        && github.event.pull_request.head.repo.full_name == github.repository
-      ) ||
-      (
-        github.event_name == 'push'
-        && github.ref == 'refs/heads/main'
-        && github.event.head_commit != null
-        && (
-          github.event.head_commit.message == 'RC' ||
-          startsWith(github.event.head_commit.message, 'RC ') ||
-          endsWith(github.event.head_commit.message, ' RC') ||
-          contains(github.event.head_commit.message, ' RC ')
+      always()
+      && (
+        (
+          github.event_name == 'workflow_dispatch'
+          && github.event.inputs.target == 'uat'
+          && (needs.dev.result == 'skipped' || needs.dev.result == 'success')
         )
-      )
-      ||
-      (
-        github.event_name == 'workflow_dispatch'
-        && github.event.inputs.target == 'uat'
+        || (
+          github.event_name == 'push'
+          && github.ref == 'refs/heads/main'
+          && github.event.head_commit != null
+          && (
+            startsWith(github.event.head_commit.message, 'RC')
+            || endsWith(github.event.head_commit.message, ' RC')
+            || contains(github.event.head_commit.message, ' RC ')
+            || contains(github.event.head_commit.message, ' RC1 ')
+            || contains(github.event.head_commit.message, ' RC2 ')
+            || contains(github.event.head_commit.message, ' RC3 ')
+            || contains(github.event.head_commit.message, '(RC1)')
+            || contains(github.event.head_commit.message, '(RC2)')
+            || contains(github.event.head_commit.message, '(RC3)')
+            || contains(github.event.head_commit.message, 'Merge pull request')
+          )
+          && needs.dev.result == 'success'
+        )
       )
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
