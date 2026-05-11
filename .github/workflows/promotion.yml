@@ -452,6 +452,12 @@ jobs:
           terraform apply -auto-approve
           EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" DOMAIN_ROOT=claiset.xyz K8S_APP_NAMESPACE=qa FRONTEND_SUBDOMAIN=app-qa UPDATE_APEX_DNS=false bash ../../scripts/route53-ingress-records-guard.sh
 
+      - name: Migrate job wait + logs (qa)
+        working-directory: infra/envs/qa
+        run: |
+          set -euo pipefail
+          bash ../../scripts/kubectl-migrate-job-wait-and-logs.sh qa migrate 720
+
       - name: Wait for readiness (qa)
         working-directory: infra/envs/qa
         run: |
@@ -673,6 +679,12 @@ jobs:
           terraform apply -auto-approve
           EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" DOMAIN_ROOT=claiset.xyz K8S_APP_NAMESPACE=uat FRONTEND_SUBDOMAIN=app-uat UPDATE_APEX_DNS=false bash ../../scripts/route53-ingress-records-guard.sh
 
+      - name: Migrate job wait + logs (uat)
+        working-directory: infra/envs/uat
+        run: |
+          set -euo pipefail
+          bash ../../scripts/kubectl-migrate-job-wait-and-logs.sh uat migrate 720
+
       - name: Wait for readiness (uat)
         working-directory: infra/envs/uat
         run: |
@@ -884,6 +896,12 @@ jobs:
           done
           kubectl get nodes --no-headers 2>/dev/null | awk '$2 ~ /SchedulingDisabled/ {print $1}' | xargs -r kubectl uncordon || true
           EXPECTED_CLUSTER_NAME="${EXPECTED_CLUSTER_NAME}" DOMAIN_ROOT=claiset.xyz K8S_APP_NAMESPACE=prod FRONTEND_SUBDOMAIN=app-prod UPDATE_APEX_DNS=true bash ../../scripts/route53-ingress-records-guard.sh
+
+      - name: Migrate job wait + logs (prod)
+        working-directory: infra/envs/prod
+        run: |
+          set -euo pipefail
+          bash ../../scripts/kubectl-migrate-job-wait-and-logs.sh prod migrate 720
 
       - name: Wait for readiness (prod)
         working-directory: infra/envs/prod
